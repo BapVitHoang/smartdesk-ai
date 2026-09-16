@@ -1,0 +1,6 @@
+{
+  "name": "SmartDesk AI",
+  "description": "Nền tảng Customer Support & Knowledge Automation với AI Chatbot RAG, Form gửi Ticket kiểm tra hợp lệ RFC, và Agent Triage Dashboard hỗ trợ 4 trạng thái UI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
