@@ -1,95 +1,114 @@
 # SmartDesk AI - Backend Service
 
-> **Service:** Asynchronous AI Customer Support & Knowledge Synthesizer  
-> **Framework:** FastAPI (Python 3.11+)  
-> **Architecture:** Clean Layered Architecture (Async 100%, Pydantic v2, Circuit Breaker RAG)
+Dịch vụ Backend bất đồng bộ (ASGI) xây dựng bằng **FastAPI**, cung cấp API cho trợ lý AI hỗ trợ khách hàng (RAG), điều phối ticket tự động và cơ chế dự phòng tìm kiếm từ khóa (BM25 Fallback).
 
 ---
 
-## 1. Overview & Architecture
+## 1. Thông tin Dịch vụ
 
-The **SmartDesk AI** backend provides high-performance, resilient customer support automation combining:
-- **Retrieval-Augmented Generation (RAG):** Grounded answering powered by Google Gemini 1.5 Flash with strict source citation badges.
-- **Latency Budget & Circuit Breaker (4.0s max):** Automatically falls back to deterministic BM25 / Keyword matching on curated FAQ knowledge with `"is_fallback": true` and prompt escalation.
-- **Agent Copilot & Ticket Triage:** Auto-assigns `#TICK-XXXX` codes, tags categories/priorities, calculates SLA response times, and drafts personalized resolution responses.
-- **Async Database Engine:** Dual support for PostgreSQL (with `pgvector`) and SQLite Async (`aiosqlite`) for zero-friction local development.
+### Các tính năng cốt lõi:
+- **Retrieval-Augmented Generation (RAG):** Sử dụng Google Gemini 1.5 Flash để tổng hợp câu trả lời dựa trên cơ sở tri thức, có trích dẫn tài liệu tham khảo (`[Doc #ID: Tiêu đề]`).
+- **Circuit Breaker & Fallback BM25 (< 4.0s):** Tự động chuyển đổi sang tìm kiếm từ khóa/BM25 trên tập dữ liệu `data/seed_faq.json` khi LLM quá hạn (timeout), gặp lỗi 429 hoặc không có API key.
+- **AI Copilot & Ticket Triage:** Tự động sinh mã `#TICK-XXXX`, gán thẻ phân loại, xác định độ ưu tiên, tính toán thời hạn SLA và tạo bản thảo phản hồi khách hàng.
+- **Hỗ trợ Cơ sở dữ liệu linh hoạt:** Mặc định chạy SQLite Async (`aiosqlite`) cho môi trường phát triển cục bộ và hỗ trợ PostgreSQL (`asyncpg` + `pgvector`) cho môi trường triển khai thực tế.
 
 ---
 
-## 2. Directory Structure
+## 2. Cấu trúc Thư mục
 
 ```text
 backend/
 ├── app/
-│   ├── api/v1/endpoints/   # REST Endpoints (chat, tickets, agent, health)
-│   ├── core/               # App configuration, security guardrails, custom exceptions
-│   ├── db/                 # Async database session & schema initialization
+│   ├── api/v1/endpoints/   # Các REST endpoints (chat, tickets, agent, health)
+│   ├── core/               # Cấu hình hệ thống, bảo mật (guardrails), xử lý lỗi
+│   ├── db/                 # Khởi tạo kết nối & session cơ sở dữ liệu bất đồng bộ
 │   ├── models/             # SQLAlchemy 2.0 ORM models (Ticket, FAQItem, KnowledgeChunk)
-│   ├── schemas/            # Pydantic v2 Request/Response contracts
-│   ├── services/           # Business logic (LLM wrapper, BM25 fallback, RAG, Ticket Copilot)
-│   └── main.py             # FastAPI ASGI entrypoint, CORS, exception handlers
+│   ├── schemas/            # Pydantic v2 schemas chuẩn hóa Request/Response
+│   ├── services/           # Logic nghiệp vụ (LLM, BM25 Fallback, RAG, Ticket Copilot)
+│   └── main.py             # Điểm khởi tạo ứng dụng FastAPI, cấu hình CORS
 ├── data/
-│   └── seed_faq.json       # 12 curated support FAQ articles for fallback & DB seeding
+│   └── seed_faq.json       # Dữ liệu FAQ mẫu phục vụ Fallback & Seed database
 ├── tests/
-│   └── test_api.py         # Automated integration tests (pytest + httpx)
-├── .env.example            # Environment configuration template
-├── Dockerfile              # Production container build
-└── requirements.txt        # Python dependencies
+│   └── test_api.py         # Bộ kiểm thử tích hợp tự động (pytest + httpx)
+├── .env.example            # Mẫu file biến môi trường
+├── Dockerfile              # Cấu hình container Docker
+└── requirements.txt        # Danh sách thư viện phụ thuộc
 ```
 
 ---
 
-## 3. Quickstart & Installation
+## 3. Cài đặt & Cấu hình (Setup)
 
-### Step 1: Install Dependencies
+### Bước 1: Cài đặt thư viện phụ thuộc
+Yêu cầu: **Python 3.11+**
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-### Step 2: Configure Environment
-Copy `.env.example` to `.env`:
+### Bước 2: Thiết lập file môi trường `.env`
+Tạo file `.env` từ file mẫu:
 ```bash
 cp .env.example .env
 ```
-Key configuration settings in `.env`:
-- `GEMINI_API_KEY`: Your Google Gemini API Key from [Google AI Studio](https://aistudio.google.com/). *(Optional: If omitted, the deterministic fallback engine activates automatically).*
-- `DATABASE_URL`: Defaults to `sqlite+aiosqlite:///./smartdesk.db` for instant local execution.
-- `LLM_TIMEOUT_SECONDS`: `4.0` (Hard ceiling for external AI calls).
 
-### Step 3: Run the Development Server
+Các thông số cấu hình chính trong `.env`:
+- `GEMINI_API_KEY`: Khóa API Google Gemini lấy từ [Google AI Studio](https://aistudio.google.com/). *(Tùy chọn: Nếu không điền, hệ thống sẽ tự động chuyển sang dùng Fallback BM25)*.
+- `DATABASE_URL`: Đường dẫn kết nối CSDL, mặc định `sqlite+aiosqlite:///./smartdesk.db`.
+- `LLM_TIMEOUT_SECONDS`: `4.0` (Thời gian chờ tối đa cho các lệnh gọi LLM).
+- `CORS_ORIGINS`: Danh sách các domain Frontend được phép truy cập (ví dụ: `["http://localhost:3000","http://localhost:5173"]`).
+
+---
+
+## 4. Cách chạy Backend (How to Run)
+
+Khởi động server phát triển bằng Uvicorn với chế độ tự động tải lại (hot reload):
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-The server will start at `http://localhost:8000`. Interactive OpenAPI documentation is available at:
-- **Swagger UI:** `http://localhost:8000/docs`
-- **ReDoc:** `http://localhost:8000/redoc`
+
+Sau khi khởi động thành công:
+- **API Base URL:** `http://localhost:8000/api/v1`
+- **Tài liệu Swagger UI:** `http://localhost:8000/docs`
+- **Tài liệu ReDoc:** `http://localhost:8000/redoc`
+- **Health Check Endpoint:** `http://localhost:8000/api/v1/health`
 
 ---
 
-## 4. API Endpoints Summary
+## 5. Danh sách API Endpoints Chính
 
-| Method | Endpoint | Description |
+| Phương thức | Đường dẫn | Chức năng |
 | :--- | :--- | :--- |
-| `POST` | `/api/v1/chat` | Customer RAG inquiry with citation badges & circuit breaker |
-| `POST` | `/api/v1/tickets` | Submit customer ticket with auto `#TICK-XXXX`, AI tags & draft |
-| `GET` | `/api/v1/tickets` | List tickets with filters (`status`, `category`, `priority`, `search`) |
-| `GET` | `/api/v1/tickets/{id}` | Get ticket details by ID or code |
-| `PATCH` | `/api/v1/tickets/{id}` | Update ticket status or customize AI draft reply |
-| `POST` | `/api/v1/agent/tickets/{id}/generate-draft` | AI Copilot regenerate draft resolution |
-| `GET` | `/api/v1/health` | Service readiness probe & database ping |
-| `GET` | `/api/v1/health/smoke-test` | Live Gemini LLM round-trip benchmark & latency report |
+| `POST` | `/api/v1/chat` | Chatbot hỗ trợ khách hàng với RAG, trích dẫn tài liệu & Circuit Breaker |
+| `POST` | `/api/v1/tickets` | Gửi ticket mới (tự sinh mã `#TICK-XXXX`, gán tag và sinh bản thảo trả lời) |
+| `GET` | `/api/v1/tickets` | Lấy danh sách ticket (hỗ trợ lọc theo `status`, `category`, `priority`, `search`) |
+| `GET` | `/api/v1/tickets/{id}` | Lấy chi tiết ticket theo ID hoặc mã định danh |
+| `PATCH` | `/api/v1/tickets/{id}` | Cập nhật trạng thái ticket hoặc chỉnh sửa bản thảo câu trả lời |
+| `POST` | `/api/v1/agent/tickets/{id}/generate-draft` | AI Copilot tái sinh bản thảo câu trả lời cho ticket |
+| `GET` | `/api/v1/health` | Kiểm tra trạng thái hoạt động của dịch vụ và kết nối cơ sở dữ liệu |
+| `GET` | `/api/v1/health/smoke-test` | Đo lường độ trễ thực tế của kết nối LLM |
 
 ---
 
-## 5. Running Automated Tests
+## 6. Chạy Kiểm thử Tự động (Testing)
 
-Run the comprehensive async test suite with `pytest`:
+Thực thi bộ test tự động sử dụng `pytest`:
 ```bash
 pytest tests/ -v
 ```
-All tests execute against an isolated async SQLite database and verify:
-- Health & Smoke-test benchmarks.
-- RAG chat and Fallback Circuit Breaker activation.
-- Prompt injection security defense.
-- Ticket CRUD, auto-tagging, and Copilot draft reply generation.
+Tất cả các bài kiểm tra chạy độc lập trên cơ sở dữ liệu SQLite in-memory/tạm thời, kiểm thử toàn diện các luồng:
+- Health check & Smoke test đo độ trễ.
+- Chat RAG và cơ chế Circuit Breaker Fallback khi LLM timeout/lỗi.
+- Bộ lọc ngăn chặn tấn công tiêm câu lệnh (Prompt Injection).
+- Nghiệp vụ CRUD ticket, gán nhãn tự động và sinh bản thảo trả lời của AI Copilot.
+
+---
+
+## 7. Các lưu ý quan trọng (Important Notes)
+
+1. **Nguyên tắc Bất đồng bộ (Async First):** Toàn bộ I/O bao gồm gọi database, gọi external API và đọc ghi file đều bắt buộc sử dụng `async` / `await` để tránh làm tắc nghẽn ASGI event loop.
+2. **Cơ chế Circuit Breaker:** Khi thời gian phản hồi của Gemini vượt quá `LLM_TIMEOUT_SECONDS` (mặc định 4.0s) hoặc API trả về lỗi (429/500), dịch vụ sẽ tự động chuyển sang cơ chế Fallback BM25 và trả về cờ `"is_fallback": true`, không để xảy ra lỗi 500 cho người dùng.
+3. **Định dạng Ticket & Mức độ Ưu tiên:**
+   - Mã định danh bắt buộc theo định dạng: `#TICK-XXXX`.
+   - Mức độ ưu tiên gồm đúng 4 cấp độ: `Low`, `Medium`, `High`, `Urgent`.
+   - Vòng đời trạng thái ticket: `open` -> `in_progress` -> `resolved` (hoặc `closed`).
