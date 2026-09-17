@@ -45,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-2">
               <h1 className="font-bold text-slate-900 tracking-tight text-base sm:text-lg">SmartDesk AI</h1>
               <span className="bg-indigo-50 text-indigo-700 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-indigo-200/70 hidden sm:inline-block">
-                Homework 3A
+                Enterprise Edition
               </span>
             </div>
             <p className="text-[11px] text-slate-500 hidden sm:block">Customer Support &amp; Knowledge Automation Platform</p>
@@ -115,9 +115,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="h-4 w-px bg-slate-200"></div>
           <div className="flex items-center gap-2 text-slate-600">
             <span className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">
-              SV
+              AD
             </span>
-            <span className="font-semibold text-slate-700">Sinh Viên HCMUTE</span>
+            <span className="font-semibold text-slate-700">Support Operations</span>
           </div>
         </div>
       </header>
@@ -152,9 +152,9 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* TEACHER TEST BAR: DEMO 4 TRẠNG THÁI UI */}
+      {/* SYSTEM STATES PREVIEW BAR */}
       <div
-        id="teacher-states-bar"
+        id="system-states-bar"
         className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white px-4 py-2 flex flex-wrap items-center justify-between text-xs gap-2 shrink-0 border-b border-slate-800"
       >
         <div className="flex items-center gap-2">
@@ -162,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Check className="w-3 h-3" />
           </span>
           <span className="font-medium text-slate-300">
-            <strong className="text-white">Thanh Nghiệm Thu UI States:</strong>
+            <strong className="text-white">Mô phỏng Trạng thái Hệ thống (System States):</strong>
           </span>
         </div>
 

@@ -35,7 +35,7 @@ smartdesk-ai/
 │   └── types.ts              # Định nghĩa kiểu dữ liệu TypeScript
 ├── backend/                  # Mã nguồn Backend (FastAPI Async)
 │   ├── app/
-│   │   ├── api/v1/endpoints/ # API routes: chat, tickets, agent, health
+│   │   ├── api/v1/endpoints/ # API routes: chat, tickets, agent, knowledge, health
 │   │   ├── core/             # Cấu hình (config.py), bảo mật, xử lý ngoại lệ
 │   │   ├── db/               # Khởi tạo kết nối & session cơ sở dữ liệu
 │   │   ├── models/           # SQLAlchemy ORM Models (Ticket, FAQItem, KnowledgeChunk)
@@ -49,6 +49,11 @@ smartdesk-ai/
 │   ├── .env.example          # Mẫu file cấu hình môi trường backend
 │   ├── Dockerfile            # Cấu hình đóng gói Docker
 │   └── requirements.txt      # Danh sách thư viện Python
+├── docker-compose.yml        # Triển khai PostgreSQL 16 pgvector + Backend FastAPI
+├── start_all.bat             # Script khởi động đồng thời cả Frontend và Backend
+├── start_backend.bat         # Script khởi động riêng Backend FastAPI
+├── start.bat                 # Script khởi động riêng Frontend Vite
+├── install.bat               # Script cài đặt tự động cả Node.js và Python packages
 ├── API_CONTRACT.md           # Đặc tả chi tiết Request/Response của các API
 ├── TEST_ACCEPTANCE.md        # Kịch bản kiểm thử nghiệm thu (Acceptance Tests)
 └── README.md                 # Tài liệu hướng dẫn tổng quan dự án

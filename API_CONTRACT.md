@@ -2,7 +2,7 @@
 
 > **Specification Version:** 1.0.0  
 > **Base URL:** `http://localhost:8000/api/v1`  
-> **Course / Deliverable:** Homework 3B - Complete Frontend & Backend Integration
+> **Architecture Status:** Full Enterprise System Integration (Frontend & Backend)
 
 ---
 
@@ -208,7 +208,47 @@ Regenerate a tailored AI draft response for a ticket.
 
 ---
 
-## 4. Health & Latency Benchmarks
+## 4. Knowledge Base & FAQ Retrieval
+
+### `GET /api/v1/knowledge`
+Retrieve verified FAQ knowledge articles supporting RAG grounding with optional category or keyword search.
+
+#### Query Parameters
+- `category`: Optional category filter (`Authentication`, `Billing`, `Technical Bug`, etc.)
+- `search`: Keyword search matching title or content
+
+#### Response (HTTP 200 OK)
+```json
+[
+  {
+    "doc_id": "doc-01",
+    "category": "Authentication",
+    "title": "How to Reset Your CloudDesk / SmartDesk Password",
+    "content": "To reset your password without email access: 1. Go to the login screen...",
+    "source_url": "/faq/auth/password-reset"
+  }
+]
+```
+
+---
+
+### `GET /api/v1/knowledge/{doc_id}`
+Fetch a specific knowledge article by its document identifier (e.g. `doc-01`).
+
+#### Response (HTTP 200 OK)
+```json
+{
+  "doc_id": "doc-01",
+  "category": "Authentication",
+  "title": "How to Reset Your CloudDesk / SmartDesk Password",
+  "content": "To reset your password without email access: 1. Go to the login screen...",
+  "source_url": "/faq/auth/password-reset"
+}
+```
+
+---
+
+## 5. Health & Latency Benchmarks
 
 ### `GET /api/v1/health`
 Operational readiness probe.

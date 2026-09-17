@@ -1,6 +1,6 @@
 # SmartDesk AI - Test Suite & Acceptance Test Matrix
 
-> **Deliverable:** Homework 3B Test Evidence & Verification Document  
+> **Document:** Enterprise Test Evidence & Quality Assurance Matrix  
 > **Target:** Verification of complete customer support workflow, RAG, fallback, ticket triage, and agent copilot.
 
 ---

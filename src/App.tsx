@@ -134,7 +134,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Header & Teacher States Bar */}
+      {/* Header & System States Bar */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}

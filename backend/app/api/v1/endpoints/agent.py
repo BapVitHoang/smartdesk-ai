@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 import logging
 
 from app.schemas.ticket import TicketResponse

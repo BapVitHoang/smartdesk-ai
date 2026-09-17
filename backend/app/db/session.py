@@ -28,26 +28,29 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
-db_url = normalize_database_url(settings.DATABASE_URL)
+def create_engine_and_factory(url: str):
+    """Factory helper to build async engine and session factory."""
+    norm_url = normalize_database_url(url)
+    kwargs = {"echo": settings.DEBUG}
+    if "sqlite" in norm_url:
+        kwargs["connect_args"] = {"check_same_thread": False}
+    else:
+        kwargs["pool_pre_ping"] = True
+        kwargs["pool_size"] = 10
+        kwargs["max_overflow"] = 20
 
-# Configure Async Engine with appropriate pooling
-engine_kwargs = {"echo": settings.DEBUG}
-if "sqlite" in db_url:
-    engine_kwargs["connect_args"] = {"check_same_thread": False}
-else:
-    engine_kwargs["pool_pre_ping"] = True
-    engine_kwargs["pool_size"] = 10
-    engine_kwargs["max_overflow"] = 20
+    eng = create_async_engine(norm_url, **kwargs)
+    factory = async_sessionmaker(
+        bind=eng,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False
+    )
+    return eng, factory
 
-engine: AsyncEngine = create_async_engine(db_url, **engine_kwargs)
 
-async_session_factory = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False
-)
+engine, async_session_factory = create_engine_and_factory(settings.DATABASE_URL)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -65,19 +68,31 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db() -> None:
     """Initialize database tables and seed initial FAQ data if empty."""
-    # Import models here to ensure they register with Base.metadata
+    global engine, async_session_factory
     from app.models.ticket import Ticket  # noqa: F401
     from app.models.knowledge import FAQItem  # noqa: F401
 
+    # 1. Synchronize schema, falling back to SQLite if PostgreSQL fails
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database schema synchronized successfully.")
+        logger.info(f"Database schema synchronized successfully on {engine.url.drivername}.")
+    except Exception as e:
+        logger.warning(
+            f"Primary database connection failed ({e}). "
+            f"Falling back to local async SQLite: {settings.FALLBACK_SQLITE_URL}"
+        )
+        engine, async_session_factory = create_engine_and_factory(settings.FALLBACK_SQLITE_URL)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database schema synchronized on fallback SQLite engine.")
 
-        # Seed initial FAQ items if table is empty
+    # 2. Seed initial data
+    try:
         async with async_session_factory() as session:
             result = await session.execute(select(FAQItem).limit(1))
             existing_faq = result.scalars().first()
+
 
             if not existing_faq:
                 faq_path = settings.resolved_seed_faq_path

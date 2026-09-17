@@ -179,9 +179,38 @@ async def test_agent_copilot_regenerate_draft(client: AsyncClient):
     )
     ticket_id = create_res.json()["id"]
 
-    # Regenerate draft
+    # Regenerate draft via integer ID
     regen_res = await client.post(f"/api/v1/agent/tickets/{ticket_id}/generate-draft")
     assert regen_res.status_code == 200
     data = regen_res.json()
     assert data["ai_draft_reply"] is not None
     assert "Hoang Anh E" in data["ai_draft_reply"] or len(data["ai_draft_reply"]) > 20
+
+    # Also test regenerate draft via formatted ticket_code (without raw unencoded '#' fragment)
+    ticket_code_clean = create_res.json()["ticket_code"].replace("#", "")
+    regen_code_res = await client.post(f"/api/v1/agent/tickets/{ticket_code_clean}/generate-draft")
+    assert regen_code_res.status_code == 200
+    data_code = regen_code_res.json()
+    assert data_code["ticket_code"] == f"#{ticket_code_clean}"
+
+
+@pytest.mark.asyncio
+async def test_list_and_get_knowledge_articles(client: AsyncClient):
+    """Test GET /api/v1/knowledge and GET /api/v1/knowledge/{doc_id}."""
+    # List all articles
+    response = await client.get("/api/v1/knowledge")
+    assert response.status_code == 200
+    articles = response.json()
+    assert isinstance(articles, list)
+    assert len(articles) > 0
+
+    # Get specific article by doc_id
+    doc_id = articles[0]["doc_id"]
+    detail_res = await client.get(f"/api/v1/knowledge/{doc_id}")
+    assert detail_res.status_code == 200
+    item = detail_res.json()
+    assert item["doc_id"] == doc_id
+    assert "title" in item
+    assert "content" in item
+
+

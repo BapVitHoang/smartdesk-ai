@@ -1,6 +1,6 @@
 # SmartDesk AI – UI/UX & System Design Document
 > **Project:** SmartDesk AI – Intelligent Customer Support & Knowledge Synthesizer  
-> **Course / Deliverable:** Homework 3A – UI Skeleton & Interaction Design  
+> **Document:** Enterprise UI/UX & Interaction Design Specifications  
 > **Target Platform:** Responsive Web (Next.js 14 / React + Tailwind CSS)
 
 ---
@@ -64,12 +64,12 @@ Designed around a clean, enterprise-grade SaaS aesthetic utilizing Tailwind CSS 
 - **Top Navigation Bar:**
   - Brand identity with live status indicator (Online / Mock Demo Mode).
   - Screen navigation links with active highlight bar.
-  - **Demo State Switcher:** Global interactive control allowing graders to toggle `Loading`, `Empty`, `Success`, and `Error` states instantly.
+  - **Demo State Switcher:** Global interactive control allowing operators and reviewers to toggle `Loading`, `Empty`, `Success`, and `Error` states instantly.
 - **Mobile Drawer / Bottom Nav:** On small viewports (`< 768px`), navigation adapts to a compact header with collapsible menu or segmented tab bar.
 
 ---
 
-## 4. Screen Specifications (Homework 3A Core Deliverables)
+## 4. Screen Specifications & Architecture
 
 ### 4.1 Screen 1: Customer AI Chat Assistant (RAG Interaction)
 - **Purpose:** Provide immediate, citation-backed answers to customer questions with one-click fallback escalation.
@@ -128,7 +128,7 @@ Designed around a clean, enterprise-grade SaaS aesthetic utilizing Tailwind CSS 
 
 ## 5. Mock Data & 4 UI States Specification
 
-To satisfy Homework 3A requirements, the UI explicitly demonstrates four discrete operational states:
+To ensure high enterprise resilience and rigorous UX standards, the UI explicitly demonstrates four discrete operational states:
 
 ```
 +-------------------------------------------------------------------------------+
@@ -161,7 +161,7 @@ To satisfy Homework 3A requirements, the UI explicitly demonstrates four discret
 
 ## 6. Implementation Architecture & File Layout
 
-For ease of review, grading, and execution, the UI skeleton is structured into modular, clean components:
+For ease of maintainability, code cleanliness, and scalability, the UI skeleton is structured into modular components:
 
 ```text
 src/
