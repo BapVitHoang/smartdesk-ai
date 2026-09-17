@@ -1,7 +1,7 @@
 # SmartDesk AI – UI/UX & System Design Document
 > **Project:** SmartDesk AI – Intelligent Customer Support & Knowledge Synthesizer  
 > **Document:** Enterprise UI/UX & Interaction Design Specifications  
-> **Target Platform:** Responsive Web (Next.js 14 / React + Tailwind CSS)
+> **Target Platform:** Responsive Web (React 19 + Vite + Tailwind CSS v4)
 
 ---
 
@@ -161,19 +161,20 @@ To ensure high enterprise resilience and rigorous UX standards, the UI explicitl
 
 ## 6. Implementation Architecture & File Layout
 
-For ease of maintainability, code cleanliness, and scalability, the UI skeleton is structured into modular components:
+For ease of maintainability, code cleanliness, and scalability, the UI skeleton is structured into modular components matching `AGENTS.md`:
 
 ```text
 src/
 ├── components/
-│   ├── Navigation.tsx         # Top bar with screen switcher & demo controls
-│   ├── ChatScreen.tsx         # Screen 1: Customer RAG chat & citations
-│   ├── TicketFormScreen.tsx   # Screen 2: Form with client-side validation
-│   ├── AgentDashboardScreen.tsx # Screen 3: Agent queue, details & AI draft reply
-│   ├── StateController.tsx    # Demo switch for Loading/Empty/Success/Error
-│   └── ui/                    # Reusable atomic UI (Button, Badge, Skeleton)
-├── types/
-│   └── index.ts               # Type definitions for Ticket, Message, FormState
+│   ├── Header.tsx             # Top navigation, active tab switcher, health badge, demo state
+│   ├── ChatView.tsx           # Screen 1: Customer RAG chat, citation pills & feedback
+│   ├── TicketFormView.tsx     # Screen 2: Form with client-side validation & SLA calculation
+│   ├── AgentDashboardView.tsx # Screen 3: Agent queue, filters & AI draft reply Copilot
+│   └── Footer.tsx             # System status badge, latency summary, copyright
+├── services/
+│   └── api.ts                 # Central API client with dual-mode automatic offline fallback
+├── data.ts                    # Local fallback mock dataset & deterministic RAG fallback
+├── types.ts                   # Canonical TypeScript interfaces & enums
 └── App.tsx                    # Main layout combining screens & demo states
 ```
 

@@ -31,7 +31,7 @@ Before modifying or generating code:
   ```python
   GEMINI_API_KEY: str = ""
   DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/smartdesk"
-  FALLBACK_SQLITE_URL: str = "sqlite+aiosqlite:///./test.db"
+  FALLBACK_SQLITE_URL: str = "sqlite+aiosqlite:///./smartdesk.db"
   LLM_TIMEOUT_SECONDS: float = 4.0
   CORS_ORIGINS: list[str] = ["http://localhost:3000"]
   ```
@@ -71,13 +71,19 @@ Before modifying or generating code:
    - Async background task to analyze ticket category/priority and write `ai_draft_reply`.
 
 ### Step 4: Router Endpoints (`app/api/v1/endpoints/`)
-- `POST /api/v1/chat`: Returns response, citations, latency_ms, is_fallback.
-- `POST /api/v1/tickets`: Submit customer ticket with validation.
+- `POST /api/v1/chat`: Returns response, citations, latency_ms, is_fallback. Includes prompt injection guardrail check.
+- `POST /api/v1/tickets`: Submit customer ticket with validation and AI SLA/priority analysis.
 - `GET /api/v1/tickets`: Query/filter tickets for Agent Triage Dashboard.
-- `PATCH /api/v1/tickets/{id}`: Agent edit draft or status.
+- `PATCH /api/v1/tickets/{id}`: Agent edit draft, category, priority, or status (`open`, `in_progress`, `resolved`).
 - `POST /api/v1/agent/tickets/{id}/generate-draft`: AI Copilot regeneration.
+- `GET /api/v1/knowledge`: Query indexed knowledge items and seed FAQs.
+- `POST /api/v1/knowledge/sync`: Re-index seed FAQs into database vector chunks.
 - `GET /api/v1/health`: Basic readiness & DB ping.
-- `GET /api/v1/health/smoke-test`: Executes live LLM call and returns latency report matching `scripts/smoke_test.py`.
+- `GET /api/v1/health/smoke-test`: Executes live LLM call and returns latency report matching acceptance criteria.
+
+### Step 5: Security & Status Mapping Integration
+- **Guardrail:** Sanitize inputs and reject prompt injection attempts before calling LLM (`core/security.py`).
+- **Status Mapping:** Backend uses lowercase statuses (`"open"`, `"in_progress"`, `"resolved"`). These map to frontend (`"Open"`, `"Pending"`, `"Resolved"`).
 
 ---
 

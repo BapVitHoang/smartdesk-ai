@@ -1,0 +1,34 @@
+# SmartDesk AI - Rules for AI Coding Assistant (.cursorrules)
+
+You are an expert fullstack AI engineer working on SmartDesk AI. Strictly adhere to these rules:
+
+## 1. Project Architecture
+- Frontend is **React 19 + Vite 6 + Tailwind CSS v4 + TypeScript + Lucide Icons + Motion**. DO NOT use Next.js or server-side routing components.
+- Backend is **FastAPI (Python 3.11+) ASGI**, async throughout (`async def`, `httpx.AsyncClient`, SQLAlchemy async session).
+- Primary Database: PostgreSQL 16 with `pgvector` (local fallback: SQLite `aiosqlite`).
+
+## 2. Mandatory Document References
+- API contract and endpoints: Read `API_CONTRACT.md`.
+- UI/UX tokens, colors, typography: Read `DESIGN.md`.
+- Quality and test scenarios: Read `TEST_ACCEPTANCE.md`.
+- Core guidelines: Read `AGENTS.md`.
+
+## 3. Frontend Rules (`src/`)
+- NEVER call `fetch()` or `axios` directly in UI components. ALL network calls must pass through `src/services/api.ts`.
+- Maintain dual-mode fallback: If the backend is offline, gracefully use local mock data (`INITIAL_TICKETS`, `getRagResponse`) and show a warning toast. Never crash the app.
+- Status Mapping:
+  - Backend: `"open"` | `"in_progress"` | `"resolved"`
+  - Frontend: `"Open"` | `"Pending"` | `"Resolved"`
+  - Use `mapBackendStatusToFrontend()` and `mapFrontendStatusToBackend()` in `src/services/api.ts`.
+- UI Language: Vietnamese for all labels, buttons, toasts, and placeholders. English for code and comments.
+
+## 4. Backend Rules (`backend/app/`)
+- All I/O operations MUST use `async`/`await`.
+- External calls to Gemini API have a strict timeout of 4.0s (`asyncio.wait_for`).
+- Circuit Breaker: If Gemini times out, returns HTTP 429/500, or fails, gracefully catch the error and invoke `FallbackService` (BM25 keyword search on `seed_faq.json`) with `"is_fallback": true`.
+- Prompt Injection Defense: Incoming user prompts must be sanitized and checked via `core/security.py`. Reject injections with HTTP 400 (`PROMPT_SECURITY_VIOLATION`).
+- Ticket IDs must follow format `#TICK-XXXX`. Priority must be one of: `Low`, `Medium`, `High`, `Urgent`.
+
+## 5. Security & Verification
+- Do NOT hardcode or commit API keys.
+- Run tests with `pytest backend/tests/ -v` and `npm run lint` before completing tasks.
