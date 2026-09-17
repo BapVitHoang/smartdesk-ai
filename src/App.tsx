@@ -4,7 +4,7 @@ import { ChatView } from './components/ChatView';
 import { TicketFormView } from './components/TicketFormView';
 import { AgentDashboardView } from './components/AgentDashboardView';
 import { Footer } from './components/Footer';
-import { TabType, UIState, Ticket, ChatMessage, Toast, ToastType, TicketStatus } from './types';
+import { TabType, UIState, Ticket, ChatMessage, Toast, ToastType, TicketStatus, TicketFormData } from './types';
 import { INITIAL_TICKETS, INITIAL_CHAT_MESSAGES } from './data';
 import { registerApiToastHandler, getTickets } from './services/api';
 import { CheckCircle2, AlertCircle, Info, X, Loader2, Inbox } from 'lucide-react';
@@ -15,6 +15,7 @@ export default function App() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(INITIAL_TICKETS[0]);
   const [demoState, setDemoState] = useState<UIState>('success');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
+  const [prefillTicketData, setPrefillTicketData] = useState<Partial<TicketFormData> | undefined>(undefined);
   const [toast, setToast] = useState<Toast | null>(null);
 
   const showToast = (message: string, type: ToastType = 'success') => {
@@ -53,9 +54,15 @@ export default function App() {
     };
   }, []);
 
+  const handleEscalateToTicket = (prefill?: Partial<TicketFormData>) => {
+    setPrefillTicketData(prefill);
+    setActiveTab('ticket');
+  };
+
   const handleTicketCreated = (newTicket: Ticket) => {
     setTickets((prev) => [newTicket, ...prev]);
     setSelectedTicket(newTicket);
+    setPrefillTicketData(undefined);
   };
 
   const handleUpdateTicketStatus = (ticketId: string, newStatus: TicketStatus, draftReply?: string) => {
@@ -151,6 +158,7 @@ export default function App() {
             chatMessages={chatMessages}
             setChatMessages={setChatMessages}
             setActiveTab={setActiveTab}
+            onEscalateToTicket={handleEscalateToTicket}
             onToast={showToast}
           />
         )}
@@ -160,6 +168,7 @@ export default function App() {
             onTicketCreated={handleTicketCreated}
             setActiveTab={setActiveTab}
             setSelectedTicket={setSelectedTicket}
+            initialData={prefillTicketData}
             onToast={showToast}
           />
         )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   ArrowRight, 
@@ -27,6 +27,7 @@ interface TicketFormViewProps {
   onTicketCreated: (newTicket: Ticket) => void;
   setActiveTab: (tab: TabType) => void;
   setSelectedTicket: (ticket: Ticket) => void;
+  initialData?: Partial<TicketFormData>;
   onToast: (msg: string, type?: ToastType) => void;
 }
 
@@ -34,21 +35,50 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
   onTicketCreated,
   setActiveTab,
   setSelectedTicket,
+  initialData,
   onToast,
 }) => {
   const [formData, setFormData] = useState<TicketFormData>({
-    fullName: '',
-    email: '',
-    category: 'Authentication',
-    priority: 'Medium',
-    subject: '',
-    message: '',
+    fullName: initialData?.fullName || '',
+    email: initialData?.email || '',
+    category: initialData?.category || 'Authentication',
+    priority: initialData?.priority || 'Medium',
+    subject: initialData?.subject || '',
+    message: initialData?.message || '',
   });
 
   const [formErrors, setFormErrors] = useState<TicketFormErrors>({});
   const [formTouched, setFormTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [ticketCreatedSuccess, setTicketCreatedSuccess] = useState<Ticket | null>(null);
+
+  useEffect(() => {
+    if (initialData && Object.keys(initialData).length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        fullName: initialData.fullName !== undefined ? initialData.fullName : prev.fullName,
+        email: initialData.email !== undefined ? initialData.email : prev.email,
+        category: initialData.category !== undefined ? initialData.category : prev.category,
+        priority: initialData.priority !== undefined ? initialData.priority : prev.priority,
+        subject: initialData.subject !== undefined ? initialData.subject : prev.subject,
+        message: initialData.message !== undefined ? initialData.message : prev.message,
+      }));
+
+      // Clear validation errors for populated fields
+      setFormErrors((prev) => {
+        const next = { ...prev };
+        if (initialData.subject) delete next.subject;
+        if (initialData.message) delete next.message;
+        if (initialData.category) delete next.category;
+        if (initialData.priority) delete next.priority;
+        return next;
+      });
+
+      if (initialData.subject || initialData.message) {
+        onToast('Đã tự động trích xuất nội dung từ đoạn chat sang biểu mẫu Ticket!', 'info');
+      }
+    }
+  }, [initialData]);
 
   // SLA calculation helper
   const getSlaByPriority = (priority: TicketPriority) => {
@@ -215,6 +245,24 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Banner thông báo One-Click Escalation Pre-fill */}
+        {initialData && (initialData.subject || initialData.message) && (
+          <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 shadow-xs flex items-center justify-between gap-3 text-xs text-violet-900">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-violet-100 text-violet-700 shrink-0">
+                <Sparkles className="w-4 h-4 text-violet-600" />
+              </span>
+              <div>
+                <span className="font-bold">One-Click Escalation kích hoạt: </span>
+                <span>Nội dung đã được trích xuất tự động từ câu hỏi gần nhất trong phiên trò chuyện AI. Bạn có thể kiểm tra và chỉnh sửa trước khi gửi.</span>
+              </div>
+            </div>
+            <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-violet-200/80 text-violet-800 text-[11px] font-semibold shrink-0">
+              Đã điền tự động
+            </span>
+          </div>
+        )}
 
         {/* BANNER TÓM TẮT QUY TẮC KIỂM TRA (Form Validation Rules Guide) */}
         <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-xs">

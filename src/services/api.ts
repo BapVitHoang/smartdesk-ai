@@ -14,8 +14,9 @@ import {
   ToastType,
   BackendChatResponse,
   BackendTicketResponse,
+  KnowledgeArticle,
 } from '../types';
-import { INITIAL_TICKETS, getRagResponse } from '../data';
+import { INITIAL_TICKETS, INITIAL_FAQ_ARTICLES, getRagResponse } from '../data';
 
 // 1. Base URL Configuration
 export const API_BASE_URL: string =
@@ -527,3 +528,68 @@ export async function checkBackendHealth(): Promise<{
     return { status: 'offline' };
   }
 }
+
+/**
+ * 7. Get Knowledge Base Article by ID
+ * Endpoint: GET /api/v1/knowledge/{doc_id}
+ */
+export async function getKnowledgeArticle(
+  docId: string,
+  onToast?: ToastNotifier
+): Promise<KnowledgeArticle> {
+  const toastFn = onToast || notifyFallback;
+
+  // Normalize candidate doc_ids (e.g. "faq-01", "doc-01", "faq-02: Two-Factor...")
+  const cleanDocId = (docId || '').split(':')[0].trim().toLowerCase().replace(/^#/, '');
+  const candidates: string[] = [cleanDocId];
+  if (cleanDocId.startsWith('doc-')) {
+    candidates.push(cleanDocId.replace('doc-', 'faq-'));
+  } else if (cleanDocId.startsWith('faq-')) {
+    candidates.push(cleanDocId.replace('faq-', 'doc-'));
+  }
+  const digitMatch = cleanDocId.match(/\d+/);
+  if (digitMatch) {
+    const num = parseInt(digitMatch[0], 10);
+    const paddedFaq = num < 10 ? `faq-0${num}` : `faq-${num}`;
+    const paddedDoc = num < 10 ? `doc-0${num}` : `doc-${num}`;
+    if (!candidates.includes(paddedFaq)) candidates.push(paddedFaq);
+    if (!candidates.includes(paddedDoc)) candidates.push(paddedDoc);
+  }
+
+  // Attempt backend API call with candidate doc_ids
+  for (const candidate of candidates) {
+    try {
+      const res = await fetchWithTimeout(
+        `${API_BASE_URL}/knowledge/${encodeURIComponent(candidate)}`,
+        { method: 'GET' },
+        3000
+      );
+      if (res.ok) {
+        const article: KnowledgeArticle = await res.json();
+        return article;
+      }
+    } catch {
+      // Continue to next candidate or fallback
+    }
+  }
+
+  // Fallback to local INITIAL_FAQ_ARTICLES
+  toastFn('Đang xem bài viết từ kho tri thức nội bộ SmartDesk (Chế độ Ngoại tuyến).', 'info');
+
+  const localMatch = INITIAL_FAQ_ARTICLES.find((art) => {
+    const artId = art.doc_id.toLowerCase();
+    const artTitle = art.title.toLowerCase();
+    return (
+      candidates.some((c) => artId === c || artId.includes(c) || c.includes(artId)) ||
+      artTitle.includes(cleanDocId) ||
+      cleanDocId.includes(artTitle.slice(0, 15).toLowerCase())
+    );
+  });
+
+  if (localMatch) {
+    return localMatch;
+  }
+
+  return INITIAL_FAQ_ARTICLES[0];
+}
+

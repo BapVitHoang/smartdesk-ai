@@ -16,6 +16,14 @@ export interface Citation {
   source_url?: string;
 }
 
+export interface KnowledgeArticle {
+  doc_id: string;
+  category: string;
+  title: string;
+  content: string;
+  source_url: string;
+}
+
 export interface ChatMessage {
   id?: string;
   sender: 'bot' | 'user';
@@ -108,5 +116,13 @@ export interface BackendTicketResponse {
   estimated_response_hours: number;
   created_at: string;
   updated_at?: string | null;
+}
+
+export interface KnowledgeArticle {
+  doc_id: string;
+  category: string;
+  title: string;
+  content: string;
+  source_url: string;
 }
 

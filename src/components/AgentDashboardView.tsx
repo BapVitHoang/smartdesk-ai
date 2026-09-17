@@ -12,9 +12,11 @@ import {
   ShieldCheck, 
   Tag, 
   Filter,
-  Loader2
+  Loader2,
+  Search,
+  X
 } from 'lucide-react';
-import { Ticket, UIState, TicketStatus, ToastType } from '../types';
+import { Ticket, UIState, TicketStatus, ToastType, TicketCategory } from '../types';
 import { getTickets, updateTicketStatus, regenerateAiDraft } from '../services/api';
 
 interface AgentDashboardViewProps {
@@ -39,6 +41,8 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
   onToast,
 }) => {
   const [filterType, setFilterType] = useState<'all' | 'open' | 'urgent'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [agentReplyText, setAgentReplyText] = useState(selectedTicket?.draftReply || '');
   const [agentSending, setAgentSending] = useState(false);
   const [isRegeneratingDraft, setIsRegeneratingDraft] = useState(false);
@@ -50,16 +54,46 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
     }
   }, [selectedTicket]);
 
+  // Combined real-time filtering: Status + Category + Search term
   const filteredTickets = tickets.filter((t) => {
-    if (filterType === 'open') return t.status === 'Open';
-    if (filterType === 'urgent') return t.priority === 'Urgent';
+    // 1. Status / Urgency filter
+    if (filterType === 'open' && t.status !== 'Open') return false;
+    if (filterType === 'urgent' && t.priority !== 'Urgent') return false;
+
+    // 2. Category filter
+    if (selectedCategory !== 'all' && t.category !== selectedCategory) {
+      return false;
+    }
+
+    // 3. Search query: Ticket ID, customer name, or subject
+    if (searchTerm.trim()) {
+      const term = searchTerm.trim().toLowerCase();
+      const idMatch =
+        t.id.toLowerCase().includes(term) ||
+        (t.ticket_code && t.ticket_code.toLowerCase().includes(term));
+      const customerMatch = t.customer.toLowerCase().includes(term);
+      const subjectMatch = t.subject.toLowerCase().includes(term);
+      if (!idMatch && !customerMatch && !subjectMatch) return false;
+    }
+
     return true;
   });
 
   const handleRefreshTickets = async () => {
     setIsRefreshing(true);
     try {
-      const fresh = await getTickets(undefined, onToast);
+      const filters: {
+        status?: string;
+        category?: string;
+        priority?: string;
+        search?: string;
+      } = {};
+      if (filterType === 'open') filters.status = 'open';
+      if (filterType === 'urgent') filters.priority = 'Urgent';
+      if (selectedCategory !== 'all') filters.category = selectedCategory;
+      if (searchTerm.trim()) filters.search = searchTerm.trim();
+
+      const fresh = await getTickets(Object.keys(filters).length > 0 ? filters : undefined, onToast);
       if (setTickets && fresh && fresh.length > 0) {
         setTickets(fresh);
         if (!selectedTicket || !fresh.some((t) => t.id === selectedTicket.id)) {
@@ -147,11 +181,55 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Filter Quick Tabs */}
-        <div className="px-4 py-2 bg-white border-b border-slate-100 flex items-center gap-1 shrink-0 text-xs">
+        {/* Thanh tìm kiếm & Dropdown lọc danh mục (Feature 3) */}
+        <div className="p-3 bg-white border-b border-slate-200 space-y-2 shrink-0">
+          {/* Input Search */}
+          <div className="relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+            <input
+              id="agent-ticket-search-input"
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Tìm theo mã ticket (#TICK), tên, tiêu đề..."
+              className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all text-slate-800 placeholder:text-slate-400"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 p-0.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-colors cursor-pointer"
+                title="Xóa tìm kiếm"
+                aria-label="Xóa tìm kiếm"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Dropdown Lọc Category */}
+          <div className="flex items-center gap-1.5">
+            <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
+            <select
+              id="agent-ticket-category-select"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full text-xs py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 font-medium cursor-pointer transition-colors"
+            >
+              <option value="all">Tất cả danh mục (All Categories)</option>
+              <option value="Authentication">Authentication (Đăng nhập, 2FA)</option>
+              <option value="Billing">Billing (Thanh toán, Hoàn tiền)</option>
+              <option value="Bug Report">Bug Report (Lỗi kỹ thuật, Timeout)</option>
+              <option value="Feature Request">Feature Request (Đề xuất tính năng)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Filter Quick Tabs (Status / Urgency) */}
+        <div className="px-3 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1.5 shrink-0 text-xs">
           <button
             onClick={() => setFilterType('all')}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg font-medium text-xs transition-all cursor-pointer ${
               filterType === 'all'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -161,7 +239,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
           </button>
           <button
             onClick={() => setFilterType('open')}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg font-medium text-xs transition-all cursor-pointer ${
               filterType === 'open'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -171,7 +249,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
           </button>
           <button
             onClick={() => setFilterType('urgent')}
-            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg font-medium text-xs transition-all cursor-pointer ${
               filterType === 'urgent'
                 ? 'bg-rose-600 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100'
