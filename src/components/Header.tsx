@@ -152,82 +152,84 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* SYSTEM STATES PREVIEW BAR */}
-      <div
-        id="system-states-bar"
-        className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white px-4 py-2 flex flex-wrap items-center justify-between text-xs gap-2 shrink-0 border-b border-slate-800"
-      >
-        <div className="flex items-center gap-2">
-          <span className="flex items-center justify-center w-5 h-5 rounded bg-indigo-500/30 text-indigo-300 font-mono font-bold text-[10px] border border-indigo-400/40">
-            <Check className="w-3 h-3" />
-          </span>
-          <span className="font-medium text-slate-300">
-            <strong className="text-white">Mô phỏng Trạng thái Hệ thống (System States):</strong>
-          </span>
+      {/* SYSTEM STATES PREVIEW BAR (Hiển thị chỉ trên Agent Dashboard) */}
+      {activeTab === 'agent' && (
+        <div
+          id="system-states-bar"
+          className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white px-4 py-2 flex flex-wrap items-center justify-between text-xs gap-2 shrink-0 border-b border-slate-800"
+        >
+          <div className="flex items-center gap-2">
+            <span className="flex items-center justify-center w-5 h-5 rounded bg-indigo-500/30 text-indigo-300 font-mono font-bold text-[10px] border border-indigo-400/40">
+              <Check className="w-3 h-3" />
+            </span>
+            <span className="font-medium text-slate-300">
+              <strong className="text-white">Mô phỏng Trạng thái Hệ thống (System States):</strong>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-lg border border-slate-800">
+            <button
+              id="state-btn-success"
+              onClick={() => {
+                setDemoState('success');
+                onToast('Đã chuyển sang SUCCESS State: Dữ liệu tải đầy đủ', 'success');
+              }}
+              className={`px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1.5 ${demoState === 'success'
+                ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
+              1. Success State
+            </button>
+
+            <button
+              id="state-btn-loading"
+              onClick={() => {
+                setDemoState('loading');
+                onToast('Đã chuyển sang LOADING State: Đang hiển thị Skeleton Loaders', 'loading');
+              }}
+              className={`px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1.5 ${demoState === 'loading'
+                ? 'bg-amber-600 text-white shadow-xs font-bold'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-ping"></span>
+              2. Loading State
+            </button>
+
+            <button
+              id="state-btn-empty"
+              onClick={() => {
+                setDemoState('empty');
+                onToast('Đã chuyển sang EMPTY State: Hàng đợi rỗng', 'empty');
+              }}
+              className={`px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1.5 ${demoState === 'empty'
+                ? 'bg-blue-600 text-white shadow-xs font-bold'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-300"></span>
+              3. Empty State
+            </button>
+
+            <button
+              id="state-btn-error"
+              onClick={() => {
+                setDemoState('error');
+                onToast('Đã chuyển sang ERROR State: Lỗi kết nối mạng 503', 'error');
+              }}
+              className={`px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1.5 ${demoState === 'error'
+                ? 'bg-red-600 text-white shadow-xs font-bold'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-red-300"></span>
+              4. Error State
+            </button>
+          </div>
         </div>
-
-        <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-lg border border-slate-800">
-          <button
-            id="state-btn-success"
-            onClick={() => {
-              setDemoState('success');
-              onToast('Đã chuyển sang SUCCESS State: Dữ liệu tải đầy đủ', 'success');
-            }}
-            className={`px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1.5 ${demoState === 'success'
-              ? 'bg-emerald-600 text-white shadow-xs font-bold'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
-            1. Success State
-          </button>
-
-          <button
-            id="state-btn-loading"
-            onClick={() => {
-              setDemoState('loading');
-              onToast('Đã chuyển sang LOADING State: Đang hiển thị Skeleton Loaders', 'loading');
-            }}
-            className={`px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1.5 ${demoState === 'loading'
-              ? 'bg-amber-600 text-white shadow-xs font-bold'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-ping"></span>
-            2. Loading State
-          </button>
-
-          <button
-            id="state-btn-empty"
-            onClick={() => {
-              setDemoState('empty');
-              onToast('Đã chuyển sang EMPTY State: Hàng đợi rỗng', 'empty');
-            }}
-            className={`px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1.5 ${demoState === 'empty'
-              ? 'bg-blue-600 text-white shadow-xs font-bold'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-300"></span>
-            3. Empty State
-          </button>
-
-          <button
-            id="state-btn-error"
-            onClick={() => {
-              setDemoState('error');
-              onToast('Đã chuyển sang ERROR State: Lỗi kết nối mạng 503', 'error');
-            }}
-            className={`px-2.5 py-1 rounded-md font-medium text-xs transition-all flex items-center gap-1.5 ${demoState === 'error'
-              ? 'bg-red-600 text-white shadow-xs font-bold'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-red-300"></span>
-            4. Error State
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

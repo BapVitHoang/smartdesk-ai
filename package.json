@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "setup": "npm install",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "tsc --noEmit && vite build"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
