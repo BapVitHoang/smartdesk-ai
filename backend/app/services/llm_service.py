@@ -115,6 +115,7 @@ class LLMService:
                     config=types.GenerateContentConfig(
                         system_instruction=system_prompt,
                         temperature=temperature,
+                        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                     )
                 )
                 return response.text or ""
