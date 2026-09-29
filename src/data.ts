@@ -1,4 +1,4 @@
-import { Ticket, ChatMessage, KnowledgeArticle, Citation } from './types';
+import { Ticket, ChatMessage, KnowledgeArticle, Citation, Workspace, DocumentItem, DocumentChunk, VerificationReport } from './types';
 
 export const INITIAL_FAQ_ARTICLES: KnowledgeArticle[] = [
   {
@@ -130,13 +130,116 @@ export const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   }
 ];
 
-export function getRagResponse(question: string): {
+export function getRagResponse(question: string, workspaceId: number = 1): {
   text: string;
   bulletPoints: string[];
   citations: Citation[];
 } {
   const q = question.toLowerCase();
 
+  // 1. Workspace 2: Nha Khoa SmileCare
+  if (workspaceId === 2) {
+    if (q.includes("niềng") || q.includes("invisalign") || q.includes("mắc cài") || q.includes("trả góp")) {
+      return {
+        text: `Bác sĩ SmileCare Bot xin tư vấn về dịch vụ Chỉnh nha & Niềng răng tại phòng khám:`,
+        bulletPoints: [
+          "Niềng răng mắc cài kim loại tiêu chuẩn: 25.000.000đ - 35.000.000đ.",
+          "Niềng răng trong suốt Invisalign (Mỹ): 60.000.000đ - 95.000.000đ tùy mức độ xô lệch.",
+          "Chính sách trả góp 0% lãi suất: Chỉ cần thanh toán trước 30%, phần còn lại chia đều trong 12 - 18 tháng."
+        ],
+        citations: [
+          {
+            code: "Bảng giá SmileCare (Trang 1)",
+            link: "#",
+            doc_id: "doc-sc-01",
+            title: "Bảng giá Dịch vụ & Chính sách Bảo hành SmileCare",
+            source_url: "/docs/smilecare"
+          }
+        ]
+      };
+    }
+
+    if (q.includes("implant") || q.includes("trụ") || q.includes("răng") || q.includes("cạo vôi") || q.includes("trám")) {
+      return {
+        text: `Bác sĩ SmileCare Bot xin gửi thông tin chi phí các dịch vụ nha khoa tổng quát và cấy ghép Implant:`,
+        bulletPoints: [
+          "Cạo vôi răng và đánh bóng siêu âm: 200.000đ / 2 hàm.",
+          "Trám răng thẩm mỹ bằng Composite hạt Nano: 350.000đ - 500.000đ / răng.",
+          "Cấy ghép Implant Dentium (Hàn Quốc): 14.500.000đ/răng (bảo hành 15 năm). Trụ Straumann (Thụy Sĩ): 28.000.000đ/răng (bảo hành trọn đời).",
+          "Khám tư vấn và chụp phim X-quang Panorex miễn phí 100%."
+        ],
+        citations: [
+          {
+            code: "Bảng giá SmileCare (Trang 1)",
+            link: "#",
+            doc_id: "doc-sc-01",
+            title: "Bảng giá Dịch vụ & Chính sách Bảo hành SmileCare",
+            source_url: "/docs/smilecare"
+          }
+        ]
+      };
+    }
+
+    return {
+      text: `Bác sĩ SmileCare Bot xin chào quý khách! Hiện tại trong tài liệu nha khoa chưa có thông tin chính xác về câu hỏi "${question}".`,
+      bulletPoints: [
+        "Nha Khoa SmileCare là cơ sở y tế chuyên khoa răng hàm mặt (niềng răng, implant, bọc sứ, thẩm mỹ).",
+        "Nếu quý khách cần tư vấn tình trạng răng miệng hoặc đặt lịch khám với bác sĩ chuyên khoa, quý khách có thể gửi câu hỏi thêm.",
+        "Quý khách vui lòng bấm nút 'Gửi Ticket' để đội ngũ lễ tân và trợ lý nha khoa liên hệ tư vấn trực tiếp."
+      ],
+      citations: [
+        {
+          code: "Tài liệu Nha Khoa SmileCare",
+          link: "#",
+          doc_id: "doc-sc-general",
+          title: "Sổ tay Dịch vụ Khách hàng SmileCare",
+          source_url: "/docs/smilecare"
+        }
+      ]
+    };
+  }
+
+  // 2. Workspace 3: Điện Máy TechStore
+  if (workspaceId === 3) {
+    if (q.includes("đổi trả") || q.includes("1 đổi 1") || q.includes("30 ngày") || q.includes("lỗi") || q.includes("hộp")) {
+      return {
+        text: `TechStore Advisor xin thông tin chính sách đổi mới và bảo hành tại chuỗi siêu thị Điện Máy TechStore:`,
+        bulletPoints: [
+          "Chính sách 1 ĐỔI 1 TRONG 30 NGÀY ĐẦU TIÊN hoàn toàn miễn phí nếu sản phẩm phát sinh lỗi phần cứng từ nhà sản xuất.",
+          "Điều kiện tiếp nhận: Giữ nguyên vỏ hộp (không rách nát), đầy đủ phụ kiện kèm theo và máy không bị trầy xước cấn móp.",
+          "Bảo hành điện tử thông qua Serial/IMEI, thời gian xử lý tối đa 15 ngày làm việc."
+        ],
+        citations: [
+          {
+            code: "Chính sách Đổi trả TechStore (Trang 1)",
+            link: "#",
+            doc_id: "doc-ts-01",
+            title: "Chính sách Đổi trả và Bảo hành Chính hãng TechStore",
+            source_url: "/docs/techstore"
+          }
+        ]
+      };
+    }
+
+    return {
+      text: `TechStore Advisor xin chào quý khách! Trong hệ thống chính sách điện máy chưa tìm thấy thông tin chính xác cho câu hỏi "${question}".`,
+      bulletPoints: [
+        "Hệ thống Điện Máy TechStore hỗ trợ thiết bị điện thoại, laptop, tablet, tivi và gia dụng thông minh.",
+        "Quý khách có thể bấm 'Gửi Ticket' để nhân viên kỹ thuật hoặc tổng đài viên 1800 6060 hỗ trợ nhanh chóng."
+      ],
+      citations: [
+        {
+          code: "Chính sách TechStore",
+          link: "#",
+          doc_id: "doc-ts-general",
+          title: "Chính sách Khách hàng TechStore",
+          source_url: "/docs/techstore"
+        }
+      ]
+    };
+  }
+
+  // 3. Workspace 1 (Default): SmartDesk Cloud Support
   if (q.includes("hoàn tiền") || q.includes("thanh toán") || q.includes("billing") || q.includes("tiền")) {
     return {
       text: `Dưới đây là thông tin tra cứu tự động về quy định hoàn tiền và xử lý lỗi thanh toán giao dịch:`,
@@ -293,3 +396,109 @@ export const INITIAL_TICKETS: Ticket[] = [
     message: "Hiện tại hệ thống chỉ cho tải PDF tổng hợp tháng, mong muốn có thêm nút Export CSV theo tuần."
   }
 ];
+
+export const INITIAL_WORKSPACES: Workspace[] = [
+  {
+    id: 1,
+    slug: "default",
+    name: "SmartDesk Cloud Support",
+    industry: "IT & SaaS",
+    persona_name: "SmartDesk Assistant",
+    tone_of_voice: "Chuyên nghiệp, ngắn gọn, thân thiện và chính xác về mặt kỹ thuật.",
+    business_rules: "Hỗ trợ xử lý sự cố tài khoản, phân quyền, tích hợp API, thanh toán định kỳ. Luôn bảo vệ an toàn thông tin khách hàng.",
+    created_at: "2026-09-01T00:00:00Z"
+  },
+  {
+    id: 2,
+    slug: "smilecare",
+    name: "Nha Khoa Thẩm Mỹ SmileCare",
+    industry: "Y tế & Nha khoa",
+    persona_name: "Bác sĩ SmileCare Bot",
+    tone_of_voice: "Ân cần, chu đáo, đồng cảm, chuyên môn y khoa cao nhưng dễ hiểu.",
+    business_rules: "Tư vấn niềng răng, bọc sứ, tẩy trắng, cấy ghép Implant. Báo giá dịch vụ minh bạch. Không đưa ra chỉ định thuốc kháng sinh khi chưa có đơn khám.",
+    created_at: "2026-09-02T00:00:00Z"
+  },
+  {
+    id: 3,
+    slug: "techstore",
+    name: "Hệ Thống Điện Máy TechStore",
+    industry: "Bán lẻ thiết bị công nghệ",
+    persona_name: "TechStore Advisor",
+    tone_of_voice: "Năng động, nhiệt tình, rõ ràng về thông số kỹ thuật và chính sách.",
+    business_rules: "Tư vấn điện thoại, laptop, phụ kiện. Hướng dẫn đổi trả 1 đổi 1 trong 30 ngày nếu lỗi kỹ thuật. Quy định trừ phí phụ kiện nếu mất hộp.",
+    created_at: "2026-09-03T00:00:00Z"
+  }
+];
+
+export const INITIAL_DOCUMENTS: DocumentItem[] = [
+  {
+    id: 1,
+    workspace_id: 2,
+    filename: "nha_khoa_smilecare_bang_gia_dich_vu.txt",
+    file_type: "txt",
+    file_size: 1420,
+    status: "published",
+    chunk_count: 3,
+    created_at: "2026-09-20T08:30:00Z"
+  },
+  {
+    id: 2,
+    workspace_id: 3,
+    filename: "dien_may_techstore_chinh_sach_doi_tra.txt",
+    file_type: "txt",
+    file_size: 1850,
+    status: "published",
+    chunk_count: 4,
+    created_at: "2026-09-21T09:15:00Z"
+  }
+];
+
+export const INITIAL_VERIFICATION_REPORTS: Record<number, VerificationReport> = {
+  1: {
+    id: 1,
+    document_id: 1,
+    workspace_id: 2,
+    faithfulness_score: 0.95,
+    status: "passed",
+    created_at: "2026-09-20T08:35:00Z",
+    items: [
+      {
+        id: 1,
+        question: "Chi phí niềng răng mắc cài kim loại tại SmileCare là bao nhiêu?",
+        ground_truth: "Trọn gói 25.000.000 VNĐ. Thời gian điều trị từ 18 đến 24 tháng. Hỗ trợ trả góp 0% lãi suất trong 12 tháng.",
+        rag_answer: "Giá niềng răng mắc cài kim loại tại SmileCare là 25.000.000 VNĐ trọn gói, điều trị trong 18-24 tháng và có trả góp 0% trong 12 tháng.",
+        score: 0.98,
+        status: "passed",
+        reason: "Câu trả lời hoàn toàn chính xác và đầy đủ các chính sách bảo hành, trả góp."
+      },
+      {
+        id: 2,
+        question: "Khách hàng có được miễn phí quét dấu răng 3D Invisalign không?",
+        ground_truth: "Khách hàng được quét dấu răng 3D iTero miễn phí trong lần thăm khám đầu tiên khi tư vấn Invisalign.",
+        rag_answer: "Đúng vậy, khách hàng được miễn phí quét dấu răng 3D bằng máy iTero ngay lần thăm khám đầu tiên.",
+        score: 0.95,
+        status: "passed",
+        reason: "Xác nhận đúng chính sách thăm khám ban đầu."
+      }
+    ]
+  },
+  2: {
+    id: 2,
+    document_id: 2,
+    workspace_id: 3,
+    faithfulness_score: 0.92,
+    status: "passed",
+    created_at: "2026-09-21T09:20:00Z",
+    items: [
+      {
+        id: 3,
+        question: "Thời hạn đổi trả 1 đổi 1 tại TechStore là bao lâu?",
+        ground_truth: "Quy định 1 đổi 1 trong 30 ngày đầu tiên nếu sản phẩm phát sinh lỗi phần cứng từ nhà sản xuất.",
+        rag_answer: "TechStore áp dụng chính sách 1 đổi 1 trong 30 ngày đầu tiên đối với các lỗi phần cứng từ nhà sản xuất.",
+        score: 0.96,
+        status: "passed",
+        reason: "Khớp hoàn toàn với quy định 30 ngày đổi mới."
+      }
+    ]
+  }
+};

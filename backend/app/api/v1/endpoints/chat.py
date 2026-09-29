@@ -47,7 +47,8 @@ async def chat_with_assistant(
     # 3. Route to RAG Service
     response = await rag_service.answer_query(
         query=cleaned_message,
-        session=db
+        session=db,
+        workspace_id=payload.workspace_id
     )
 
     return response

@@ -47,6 +47,7 @@ async def create_ticket(
     description="Query tickets with optional filtering by status, category, priority, and text search for Agent Dashboard."
 )
 async def list_tickets(
+    workspace_id: Optional[int] = Query(None, description="Filter by workspace ID"),
     status: Optional[str] = Query(None, description="Filter by status (e.g. open, in_progress, resolved)"),
     category: Optional[str] = Query(None, description="Filter by category"),
     priority: Optional[str] = Query(None, description="Filter by priority (Low, Medium, High, Urgent)"),
@@ -58,6 +59,8 @@ async def list_tickets(
     """Retrieve filtered ticket list sorted by newest first."""
     query = select(Ticket)
 
+    if workspace_id:
+        query = query.where(Ticket.workspace_id == workspace_id)
     if status:
         query = query.where(Ticket.status == status.lower())
     if category:

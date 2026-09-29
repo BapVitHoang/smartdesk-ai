@@ -10,7 +10,8 @@ import {
   HelpCircle,
   ShieldCheck,
   Check,
-  Sparkles
+  Sparkles,
+  Building2
 } from 'lucide-react';
 import { 
   Ticket, 
@@ -19,9 +20,10 @@ import {
   TicketPriority, 
   TicketCategory, 
   TabType,
-  ToastType 
+  ToastType,
+  Workspace
 } from '../types';
-import { createTicket } from '../services/api';
+import { createTicket, getWorkspaces } from '../services/api';
 
 interface TicketFormViewProps {
   onTicketCreated: (newTicket: Ticket) => void;
@@ -29,6 +31,7 @@ interface TicketFormViewProps {
   setSelectedTicket: (ticket: Ticket) => void;
   initialData?: Partial<TicketFormData>;
   onToast: (msg: string, type?: ToastType) => void;
+  currentWorkspaceId?: number;
 }
 
 export const TicketFormView: React.FC<TicketFormViewProps> = ({
@@ -37,7 +40,9 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
   setSelectedTicket,
   initialData,
   onToast,
+  currentWorkspaceId = 1,
 }) => {
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [formData, setFormData] = useState<TicketFormData>({
     fullName: initialData?.fullName || '',
     email: initialData?.email || '',
@@ -45,12 +50,25 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
     priority: initialData?.priority || 'Medium',
     subject: initialData?.subject || '',
     message: initialData?.message || '',
+    workspace_id: initialData?.workspace_id || currentWorkspaceId || 1,
   });
 
   const [formErrors, setFormErrors] = useState<TicketFormErrors>({});
   const [formTouched, setFormTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [ticketCreatedSuccess, setTicketCreatedSuccess] = useState<Ticket | null>(null);
+
+  useEffect(() => {
+    const fetchWs = async () => {
+      try {
+        const list = await getWorkspaces();
+        if (list && list.length > 0) setWorkspaces(list);
+      } catch (err) {
+        console.warn('Failed to fetch workspaces in TicketFormView:', err);
+      }
+    };
+    fetchWs();
+  }, []);
 
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
@@ -62,6 +80,7 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
         priority: initialData.priority !== undefined ? initialData.priority : prev.priority,
         subject: initialData.subject !== undefined ? initialData.subject : prev.subject,
         message: initialData.message !== undefined ? initialData.message : prev.message,
+        workspace_id: initialData.workspace_id !== undefined ? initialData.workspace_id : (prev.workspace_id || currentWorkspaceId || 1),
       }));
 
       // Clear validation errors for populated fields
@@ -78,7 +97,7 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
         onToast('Đã tự động trích xuất nội dung từ đoạn chat sang biểu mẫu Ticket!', 'info');
       }
     }
-  }, [initialData]);
+  }, [initialData, currentWorkspaceId]);
 
   // SLA calculation helper
   const getSlaByPriority = (priority: TicketPriority) => {
@@ -209,6 +228,7 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
         priority: 'Medium',
         subject: '',
         message: '',
+        workspace_id: currentWorkspaceId || 1,
       });
       setFormTouched({});
       setFormErrors({});
@@ -411,6 +431,38 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="p-6 space-y-5">
+            {/* Không gian làm việc (Workspace Tenant) */}
+            <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <label htmlFor="ticket-workspace" className="text-xs font-bold text-slate-800 block">
+                    Không gian tiếp nhận (Workspace Tenant)
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Ticket sẽ được định tuyến tự động vào hàng đợi của Không gian tương ứng
+                  </p>
+                </div>
+              </div>
+              <select
+                id="ticket-workspace"
+                value={formData.workspace_id || currentWorkspaceId || 1}
+                onChange={(e) => setFormData((prev) => ({ ...prev, workspace_id: Number(e.target.value) }))}
+                className="text-xs font-semibold px-3 py-2 rounded-lg border border-indigo-200 bg-white text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-xs"
+              >
+                {workspaces.map((ws) => (
+                  <option key={ws.id} value={ws.id}>
+                    {ws.name} ({ws.slug})
+                  </option>
+                ))}
+                {workspaces.length === 0 && (
+                  <option value={currentWorkspaceId || 1}>Không gian #{currentWorkspaceId || 1}</option>
+                )}
+              </select>
+            </div>
+
             {/* Grid 2 Cột: Name & Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               

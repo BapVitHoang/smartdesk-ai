@@ -10,7 +10,8 @@ import {
   Activity,
   Clock,
   FolderX,
-  AlertCircle
+  AlertCircle,
+  BookOpen
 } from 'lucide-react';
 import { TabType, UIState, ToastType } from '../types';
 
@@ -92,6 +93,18 @@ export const Header: React.FC<HeaderProps> = ({
               {openTicketsCount}
             </span>
           </button>
+
+          <button
+            id="tab-btn-knowledge"
+            onClick={() => setActiveTab('knowledge')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === 'knowledge'
+              ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/60'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+          >
+            <BookOpen className="w-4 h-4 text-indigo-600" />
+            4. Quản lý Tri thức & Sát hạch
+          </button>
         </nav>
 
         {/* Mobile Hamburger */}
@@ -148,6 +161,14 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Inbox className="w-4 h-4" />
             3. Agent Triage Dashboard (Quản trị viên)
+          </button>
+          <button
+            onClick={() => { setActiveTab('knowledge'); setMobileMenuOpen(false); }}
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-left ${activeTab === 'knowledge' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'
+              }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            4. Quản lý Tri thức & Sát hạch
           </button>
         </div>
       )}

@@ -46,7 +46,9 @@ async def generate_draft_reply(
         category=ticket.category,
         priority=ticket.priority,
         subject=ticket.subject,
-        description=ticket.description
+        description=ticket.description,
+        workspace_id=ticket.workspace_id,
+        db=db
     )
 
     ticket.ai_draft_reply = new_draft

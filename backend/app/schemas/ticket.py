@@ -34,6 +34,11 @@ class TicketCategoryEnum(str, Enum):
 class TicketCreate(BaseModel):
     """Schema for customer ticket submission or escalation."""
 
+    workspace_id: Optional[int] = Field(
+        default=None,
+        description="Associated workspace ID, defaults to Default Workspace",
+        examples=[1]
+    )
     customer_name: str = Field(
         ...,
         min_length=2,
@@ -105,6 +110,7 @@ class TicketResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int = Field(..., description="Unique integer primary key", examples=[1042])
+    workspace_id: Optional[int] = Field(default=1, description="Associated workspace ID", examples=[1])
     ticket_code: str = Field(..., description="Formatted ticket identifier", examples=["#TICK-1042"])
     customer_name: str = Field(..., description="Customer full name")
     customer_email: str = Field(..., description="Customer email address")
@@ -134,6 +140,7 @@ class TicketResponse(BaseModel):
 class TicketFilter(BaseModel):
     """Filter parameters for listing tickets in the Agent Triage Dashboard."""
 
+    workspace_id: Optional[int] = None
     status: Optional[str] = None
     category: Optional[str] = None
     priority: Optional[str] = None

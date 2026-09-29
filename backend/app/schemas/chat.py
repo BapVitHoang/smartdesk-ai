@@ -10,6 +10,8 @@ class CitationBadge(BaseModel):
     doc_id: str = Field(..., description="Unique identifier of the source document", examples=["doc-04"])
     title: str = Field(..., description="Human-readable title of the cited article", examples=["Account Recovery & 2FA Reset Guide"])
     source_url: str = Field(..., description="Link or anchor to the referenced knowledge section", examples=["/docs/auth/account-recovery"])
+    page: Optional[int] = Field(default=None, description="Page number if applicable", examples=[2])
+    snippet: Optional[str] = Field(default=None, description="Referenced text snippet", examples=["Bảo hành 12 tháng..."])
 
 
 class ChatRequest(BaseModel):
@@ -27,6 +29,11 @@ class ChatRequest(BaseModel):
         description="Optional session or conversation identifier for multi-turn tracking",
         examples=["sess-9a8b7c"]
     )
+    workspace_id: Optional[int] = Field(
+        default=None,
+        description="Target workspace ID, defaults to Default Workspace",
+        examples=[1]
+    )
 
 
 class ChatResponse(BaseModel):
@@ -42,6 +49,10 @@ class ChatResponse(BaseModel):
     is_fallback: bool = Field(
         default=False,
         description="Indicates whether the response was generated via deterministic fallback mechanism"
+    )
+    fallback_reason: Optional[str] = Field(
+        default=None,
+        description="Reason if fallback was triggered, e.g. FREE_TIER_RATE_LIMIT_COOLDOWN"
     )
     escalation_recommended: Optional[bool] = Field(
         default=False,

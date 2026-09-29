@@ -2,7 +2,15 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import chat, tickets, agent, health, knowledge
+from app.api.v1.endpoints import (
+    chat,
+    tickets,
+    agent,
+    health,
+    knowledge,
+    workspaces,
+    documents,
+)
 
 api_router = APIRouter()
 
@@ -11,3 +19,5 @@ api_router.include_router(tickets.router, prefix="/tickets", tags=["Tickets & Tr
 api_router.include_router(agent.router, prefix="/agent", tags=["Agent Copilot"])
 api_router.include_router(knowledge.router, prefix="/knowledge", tags=["Knowledge Base"])
 api_router.include_router(health.router, prefix="/health", tags=["Health & Benchmarks"])
+api_router.include_router(workspaces.router, prefix="/workspaces", tags=["Workspaces"])
+api_router.include_router(documents.router, prefix="", tags=["Documents & Verification"])

@@ -19,6 +19,9 @@ class Ticket(Base):
     __tablename__ = "tickets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, index=True, default=1
+    )
     ticket_code: Mapped[str] = mapped_column(
         String(32), unique=True, index=True, nullable=False, doc="Formatted ticket ID (e.g. #TICK-1042)"
     )

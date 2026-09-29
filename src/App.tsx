@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { ChatView } from './components/ChatView';
 import { TicketFormView } from './components/TicketFormView';
 import { AgentDashboardView } from './components/AgentDashboardView';
+import { KnowledgeManagerView } from './components/KnowledgeManagerView';
 import { Footer } from './components/Footer';
 import { TabType, UIState, Ticket, ChatMessage, Toast, ToastType, TicketStatus, TicketFormData } from './types';
 import { INITIAL_TICKETS, INITIAL_CHAT_MESSAGES } from './data';
@@ -11,6 +12,7 @@ import { CheckCircle2, AlertCircle, Info, X, Loader2, Inbox } from 'lucide-react
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('chat');
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<number>(1);
   const [tickets, setTickets] = useState<Ticket[]>(INITIAL_TICKETS);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(INITIAL_TICKETS[0]);
   const [demoState, setDemoState] = useState<UIState>('success');
@@ -160,6 +162,8 @@ export default function App() {
             setActiveTab={setActiveTab}
             onEscalateToTicket={handleEscalateToTicket}
             onToast={showToast}
+            currentWorkspaceId={currentWorkspaceId}
+            setCurrentWorkspaceId={setCurrentWorkspaceId}
           />
         )}
 
@@ -170,6 +174,7 @@ export default function App() {
             setSelectedTicket={setSelectedTicket}
             initialData={prefillTicketData}
             onToast={showToast}
+            currentWorkspaceId={currentWorkspaceId}
           />
         )}
 
@@ -182,6 +187,16 @@ export default function App() {
             demoState={demoState}
             setDemoState={setDemoState}
             onUpdateTicketStatus={handleUpdateTicketStatus}
+            onToast={showToast}
+            currentWorkspaceId={currentWorkspaceId}
+          />
+        )}
+
+        {activeTab === 'knowledge' && (
+          <KnowledgeManagerView
+            currentWorkspaceId={currentWorkspaceId}
+            setCurrentWorkspaceId={setCurrentWorkspaceId}
+            demoState={demoState}
             onToast={showToast}
           />
         )}

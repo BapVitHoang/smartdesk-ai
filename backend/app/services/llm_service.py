@@ -1,4 +1,4 @@
-"""Google Gemini 1.5 Flash client wrapper with latency tracking and strict timeout."""
+"""Google Gemini 1.5 Flash client wrapper with latency tracking, strict timeout, and Cost-Guard Circuit Breaker."""
 
 import asyncio
 import time
@@ -23,12 +23,13 @@ SYSTEM_INSTRUCTION = (
 
 
 class LLMService:
-    """Async Google Gemini 1.5 Flash Service Wrapper."""
+    """Async Google Gemini 1.5 Flash Service Wrapper with Cost-Guard Circuit Breaker."""
 
     def __init__(self) -> None:
         self.api_key = settings.GEMINI_API_KEY
         self.model_name = settings.LLM_MODEL_NAME
         self.timeout_seconds = settings.LLM_TIMEOUT_SECONDS
+        self.cooldown_until: float = 0.0
         self._client: Any = None
         self._init_client()
 
@@ -60,6 +61,10 @@ class LLMService:
                 self._client = None
                 self._sdk_type = None
 
+    def is_in_cooldown(self) -> bool:
+        """Check if Cost-Guard is in cooldown due to 429 Rate Limit."""
+        return time.time() < self.cooldown_until
+
     async def generate_response(
         self,
         prompt: str,
@@ -74,12 +79,20 @@ class LLMService:
             
         Raises:
             LLMTimeoutException: If execution exceeds 4.0s.
-            LLMServiceException: If API key is missing or API errors out.
+            LLMServiceException: If API key is missing, API errors out, or rate limit cooldown is active.
         """
+        # Cost-Guard Circuit Breaker Check
+        if self.is_in_cooldown():
+            logger.warning(
+                f"[Cost-Guard] Currently in Free Tier cooldown for another {round(self.cooldown_until - time.time(), 1)}s. "
+                "Bypassing external LLM call."
+            )
+            raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
+
         if not self._client:
             self._init_client()
 
-        if not self._client or not self.api_key:
+        if not self._client or not self.api_key or self.api_key == "YOUR_GEMINI_API_KEY_HERE":
             raise LLMServiceException("Gemini API key is not configured or client failed to initialize.")
 
         start_time = time.perf_counter()
@@ -100,6 +113,11 @@ class LLMService:
             raise LLMTimeoutException(f"LLM call timed out after {elapsed_ms}ms")
         except Exception as e:
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            err_str = str(e)
+            if "429" in err_str or "ResourceExhausted" in err_str or "quota" in err_str.lower():
+                self.cooldown_until = time.time() + 60.0
+                logger.warning("[Cost-Guard] Rate limit 429 kích hoạt. Khóa gọi AI trong 60 giây.")
+                raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
             logger.error(f"LLM API execution error after {elapsed_ms}ms: {str(e)}", exc_info=True)
             raise LLMServiceException(f"LLM execution failed: {str(e)}")
 

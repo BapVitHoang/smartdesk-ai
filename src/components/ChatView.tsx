@@ -12,7 +12,8 @@ import {
   Search,
   X,
   Loader2,
-  ShieldCheck
+  ShieldCheck,
+  Building2,
 } from 'lucide-react';
 import { 
   ChatMessage, 
@@ -22,10 +23,11 @@ import {
   KnowledgeArticle, 
   TicketFormData, 
   TicketCategory, 
-  TicketPriority 
+  TicketPriority,
+  Workspace
 } from '../types';
 import { getRagResponse } from '../data';
-import { sendChatMessage, getKnowledgeArticle } from '../services/api';
+import { sendChatMessage, getKnowledgeArticle, getWorkspaces } from '../services/api';
 
 interface ChatViewProps {
   chatMessages: ChatMessage[];
@@ -33,6 +35,8 @@ interface ChatViewProps {
   setActiveTab: (tab: TabType) => void;
   onEscalateToTicket?: (prefill?: Partial<TicketFormData>) => void;
   onToast: (msg: string, type?: ToastType) => void;
+  currentWorkspaceId?: number;
+  setCurrentWorkspaceId?: (id: number) => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -41,7 +45,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
   setActiveTab,
   onEscalateToTicket,
   onToast,
+  currentWorkspaceId = 1,
+  setCurrentWorkspaceId,
 }) => {
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -51,6 +58,55 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [articleLoading, setArticleLoading] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const [articleData, setArticleData] = useState<KnowledgeArticle | null>(null);
+
+  useEffect(() => {
+    async function loadWs() {
+      const ws = await getWorkspaces(onToast);
+      setWorkspaces(ws);
+    }
+    loadWs();
+  }, []);
+
+  const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId) || workspaces[0];
+
+  const getSuggestionChips = () => {
+    const slug = currentWorkspace?.slug;
+    const ind = (currentWorkspace?.industry || '').toLowerCase();
+
+    if (slug === 'smilecare' || ind.includes('nha khoa') || ind.includes('y tế')) {
+      return [
+        { label: '🦷 Giá cạo vôi & Trám răng', query: 'Chi phí cạo vôi răng và trám răng thẩm mỹ là bao nhiêu?' },
+        { label: '✨ Niềng răng Invisalign', query: 'Chính sách trả góp và chi phí niềng răng trong suốt Invisalign?' },
+        { label: '🏥 Cấy ghép Implant', query: 'Trụ Implant Dentium và Straumann được bảo hành bao lâu?' },
+      ];
+    }
+
+    if (slug === 'techstore' || ind.includes('bán lẻ') || ind.includes('điện máy') || ind.includes('công nghệ')) {
+      return [
+        { label: '🔄 Đổi mới 30 ngày', query: 'Quy định 1 đổi 1 trong vòng 30 ngày đầu tiên nếu sản phẩm bị lỗi?' },
+        { label: '📦 Điều kiện tiếp nhận', query: 'Điều kiện về vỏ hộp và phụ kiện khi gửi đổi trả sản phẩm?' },
+        { label: '🛠️ Bảo hành điện tử', query: 'Thời gian bảo hành điện tử theo Serial/IMEI là bao lâu?' },
+      ];
+    }
+
+    return [
+      { label: '💳 Hoàn tiền lỗi giao dịch', query: 'Chính sách hoàn tiền khi thanh toán bị trừ 2 lần?' },
+      { label: '🔑 Cấp API Key mới', query: 'Cách tạo API Token để tích hợp webhook?' },
+      { label: '⏱️ SLA cam kết hỗ trợ', query: 'Thời gian phản hồi SLA của gói Pro là bao lâu?' },
+    ];
+  };
+
+  const getPlaceholderText = () => {
+    const slug = currentWorkspace?.slug;
+    const ind = (currentWorkspace?.industry || '').toLowerCase();
+    if (slug === 'smilecare' || ind.includes('nha khoa') || ind.includes('y tế')) {
+      return 'Hỏi Bác sĩ SmileCare về bảng giá, niềng răng, cấy implant, đặt lịch hẹn...';
+    }
+    if (slug === 'techstore' || ind.includes('bán lẻ') || ind.includes('điện máy')) {
+      return 'Hỏi TechStore về đổi trả 30 ngày, bảo hành IMEI, phụ kiện...';
+    }
+    return 'Nhập câu hỏi cần tra cứu tài liệu hỗ trợ (vd: lỗi 2FA, thanh toán, export)...';
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -146,6 +202,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       message: userQuery || 'Tôi cần chuyên viên hỗ trợ giải quyết sự cố này.',
       category: inferredCategory,
       priority: customPriority || 'High',
+      workspace_id: currentWorkspaceId,
     };
 
     if (onEscalateToTicket) {
@@ -172,7 +229,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setIsBotTyping(true);
 
     try {
-      const ragAnswer = await sendChatMessage(userText, undefined, onToast);
+      const ragAnswer = await sendChatMessage(userText, undefined, currentWorkspaceId, onToast);
       const botReply: ChatMessage = {
         id: `bot-${Date.now()}`,
         sender: 'bot',
@@ -223,7 +280,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       <div className="bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col flex-1 overflow-hidden">
         
         {/* Chat Header */}
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/70">
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-100">
@@ -233,25 +290,48 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-bold text-slate-800 text-sm sm:text-base">SmartDesk RAG Assistant</h2>
+                <h2 className="font-bold text-slate-800 text-sm sm:text-base">
+                  {currentWorkspace?.persona_name || "SmartDesk RAG Assistant"}
+                </h2>
                 <span className="bg-indigo-100 text-indigo-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
-                  v3.2 Hybrid Search
+                  {currentWorkspace?.industry || "Enterprise RAG"}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">Tra cứu tự động từ hơn 500+ tài liệu nội bộ và quy trình chuẩn</p>
+              <p className="text-xs text-slate-500">
+                {currentWorkspace?.tone_of_voice || "Tra cứu tự động từ dữ liệu tri thức được kiểm định"}
+              </p>
             </div>
           </div>
 
-          {/* One-Click Escalation Button */}
-          <button
-            id="btn-escalate-from-chat"
-            onClick={() => handleEscalateWithContext('High')}
-            className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300/80 font-medium text-xs transition-colors shadow-xs cursor-pointer"
-            title="Chuyển sang biểu mẫu gửi Ticket với nội dung được điền sẵn"
-          >
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>Gặp sự cố? Chuyển sang gửi Ticket</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Workspace Selector */}
+            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[11px] font-semibold text-slate-600">Lĩnh vực:</span>
+              <select
+                value={currentWorkspaceId}
+                onChange={(e) => setCurrentWorkspaceId?.(Number(e.target.value))}
+                className="text-xs font-bold text-indigo-700 bg-transparent focus:outline-none cursor-pointer"
+              >
+                {workspaces.map((ws) => (
+                  <option key={ws.id} value={ws.id}>
+                    {ws.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* One-Click Escalation Button */}
+            <button
+              id="btn-escalate-from-chat"
+              onClick={() => handleEscalateWithContext('High')}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300/80 font-medium text-xs transition-colors shadow-xs cursor-pointer"
+              title="Chuyển sang biểu mẫu gửi Ticket với nội dung được điền sẵn"
+            >
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Gửi Ticket</span>
+            </button>
+          </div>
         </div>
 
         {/* Chat Messages List */}
@@ -411,27 +491,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <Sparkles className="w-3 h-3 text-indigo-500" />
             Gợi ý câu hỏi:
           </span>
-          <button
-            type="button"
-            onClick={() => setChatInput('Chính sách hoàn tiền khi thanh toán bị trừ 2 lần?')}
-            className="px-2.5 py-1 bg-white hover:bg-indigo-50 hover:text-indigo-700 rounded-lg border border-slate-200 shrink-0 text-slate-700 transition-colors cursor-pointer"
-          >
-            💳 Hoàn tiền lỗi giao dịch
-          </button>
-          <button
-            type="button"
-            onClick={() => setChatInput('Cách tạo API Token để tích hợp webhook?')}
-            className="px-2.5 py-1 bg-white hover:bg-indigo-50 hover:text-indigo-700 rounded-lg border border-slate-200 shrink-0 text-slate-700 transition-colors cursor-pointer"
-          >
-            🔑 Cấp API Key mới
-          </button>
-          <button
-            type="button"
-            onClick={() => setChatInput('Thời gian phản hồi SLA của gói Pro là bao lâu?')}
-            className="px-2.5 py-1 bg-white hover:bg-indigo-50 hover:text-indigo-700 rounded-lg border border-slate-200 shrink-0 text-slate-700 transition-colors cursor-pointer"
-          >
-            ⏱️ SLA cam kết hỗ trợ
-          </button>
+          {getSuggestionChips().map((chip, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setChatInput(chip.query)}
+              className="px-2.5 py-1 bg-white hover:bg-indigo-50 hover:text-indigo-700 rounded-lg border border-slate-200 shrink-0 text-slate-700 transition-colors cursor-pointer"
+            >
+              {chip.label}
+            </button>
+          ))}
         </div>
 
         {/* Chat Input Bar */}
@@ -443,7 +512,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Nhập câu hỏi cần tra cứu tài liệu hỗ trợ (vd: lỗi 2FA, thanh toán, export)..."
+              placeholder={getPlaceholderText()}
               className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-800 placeholder:text-slate-400"
             />
           </div>

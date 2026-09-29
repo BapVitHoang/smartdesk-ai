@@ -144,18 +144,45 @@ class FallbackService:
             logger.error(f"Failed to load seed FAQ file: {e}", exc_info=True)
             self.faq_items = []
 
-    def match_faq(self, query: str) -> Dict[str, Any]:
+    def match_faq(
+        self,
+        query: str,
+        workspace_id: Optional[int] = 1,
+        workspace_name: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Matches customer query deterministically against verified knowledge base.
-        
-        Returns structured dictionary containing:
-        - response: str
-        - citations: list of citation dictionaries
-        - confidence: float
-        - is_fallback: bool (True)
-        - escalation_recommended: bool
+        Ensures tenant isolation so non-default workspaces don't leak default IT FAQs.
         """
-        # Ensure index is fitted
+        ws_id = workspace_id or 1
+        ws_label = workspace_name or (
+            "Nha Khoa SmileCare" if ws_id == 2 else (
+                "Điện Máy TechStore" if ws_id == 3 else "SmartDesk Cloud"
+            )
+        )
+
+        # 1. Non-default workspaces do NOT leak default IT SaaS FAQs
+        if ws_id != 1:
+            return {
+                "response": (
+                    f"Hiện tại hệ thống trợ lý AI đang tạm thời gián đoạn kết nối thời gian thực. "
+                    f"Chúng tôi chưa tìm thấy tài liệu phù hợp trong kho tri thức của {ws_label}.\n\n"
+                    f"Để được hỗ trợ nhanh nhất và chính xác nhất, quý khách vui lòng bấm nút "
+                    f"'Leo thang sự cố (Gửi Ticket ưu tiên)' để chuyển yêu cầu trực tiếp tới đội ngũ chuyên trách."
+                ),
+                "citations": [
+                    {
+                        "doc_id": f"ws-{ws_id}-support",
+                        "title": f"Trung tâm hỗ trợ {ws_label}",
+                        "source_url": "/tickets"
+                    }
+                ],
+                "confidence": 0.40,
+                "is_fallback": True,
+                "escalation_recommended": True
+            }
+
+        # 2. For default IT workspace, query seed FAQs
         if not self.faq_items and self.faq_file_path.exists():
             self._load_faq()
 
@@ -163,15 +190,14 @@ class FallbackService:
 
         if ranked and ranked[0][1] > 0.8:
             top_doc, raw_score = ranked[0]
-            # Normalize confidence score between 0.40 and 0.85
             confidence = min(0.85, max(0.40, round(raw_score / 15.0, 2)))
             
             response_text = (
-                f"We could not reach the real-time AI assistant. "
-                f"Based on our verified Knowledge Base, here is the relevant article: '{top_doc['title']}':\n\n"
+                f"Hệ thống trợ lý AI thời gian thực đang bận hoặc gián đoạn kết nối. "
+                f"Dựa trên Cơ sở tri thức đã xác thực, dưới đây là tài liệu liên quan nhất: '{top_doc['title']}':\n\n"
                 f"{top_doc['content']}\n\n"
-                f"If this does not resolve your problem, our team is ready to assist you. "
-                f"Please click 'Escalate to Priority Ticket' below to open a direct support request."
+                f"Nếu thông tin trên chưa giải quyết trọn vẹn vấn đề, quý khách vui lòng bấm "
+                f"'Leo thang sự cố (Gửi Ticket ưu tiên)' phía dưới để chuyên viên kỹ thuật hỗ trợ trực tiếp."
             )
             citations = [
                 {
@@ -190,10 +216,10 @@ class FallbackService:
 
         # No direct keyword/BM25 match found
         fallback_text = (
-            "We are currently experiencing high server volume or connectivity issues with our AI inference engine. "
-            "We could not find an exact match in our top FAQs for your question.\n\n"
-            "To get immediate personalized assistance, please submit a priority ticket using the "
-            "'Submit Ticket' tab, and our support team will respond promptly."
+            "Hệ thống hiện đang gặp lượng truy cập lớn hoặc gián đoạn kết nối với bộ máy suy luận AI. "
+            "Hiện tại chưa tìm thấy bài viết phù hợp chính xác với câu hỏi của quý khách trong cơ sở tri thức.\n\n"
+            "Để nhận được hỗ trợ trực tiếp và kịp thời, quý khách vui lòng chuyển sang tab 'Gửi Ticket' "
+            "để đội ngũ chuyên viên tiếp nhận xử lý."
         )
         return {
             "response": fallback_text,

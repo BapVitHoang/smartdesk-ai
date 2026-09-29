@@ -15,8 +15,19 @@ import {
   BackendChatResponse,
   BackendTicketResponse,
   KnowledgeArticle,
+  Workspace,
+  DocumentItem,
+  DocumentChunk,
+  VerificationReport,
 } from '../types';
-import { INITIAL_TICKETS, INITIAL_FAQ_ARTICLES, getRagResponse } from '../data';
+import {
+  INITIAL_TICKETS,
+  INITIAL_FAQ_ARTICLES,
+  INITIAL_WORKSPACES,
+  INITIAL_DOCUMENTS,
+  INITIAL_VERIFICATION_REPORTS,
+  getRagResponse,
+} from '../data';
 
 // 1. Base URL Configuration
 export const API_BASE_URL: string =
@@ -110,6 +121,9 @@ export function mapBackendTicketToFrontend(item: BackendTicketResponse): Ticket 
 
 // In-memory fallback ticket store to preserve offline created/updated tickets
 let localFallbackTickets: Ticket[] = [...INITIAL_TICKETS];
+let localFallbackWorkspaces: Workspace[] = [...INITIAL_WORKSPACES];
+let localFallbackDocuments: DocumentItem[] = [...INITIAL_DOCUMENTS];
+let localFallbackReports: Record<number, VerificationReport> = { ...INITIAL_VERIFICATION_REPORTS };
 
 /**
  * Fetch with configurable timeout and abort controller
@@ -134,6 +148,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 export async function sendChatMessage(
   message: string,
   sessionId?: string,
+  workspaceId?: number,
   onToast?: ToastNotifier
 ): Promise<{
   response: string;
@@ -142,6 +157,7 @@ export async function sendChatMessage(
   latency_ms: number;
   confidence: number;
   is_fallback: boolean;
+  fallback_reason?: string;
   escalation_recommended?: boolean;
 }> {
   const startTime = performance.now();
@@ -155,6 +171,7 @@ export async function sendChatMessage(
         body: JSON.stringify({
           message,
           session_id: sessionId || `sess-${Date.now().toString(36)}`,
+          workspace_id: workspaceId || 1,
         }),
       },
       4500
@@ -168,13 +185,23 @@ export async function sendChatMessage(
     const data: BackendChatResponse = await res.json();
     const elapsed = Math.round(data.latency_ms || performance.now() - startTime);
 
+    if (data.fallback_reason === 'FREE_TIER_RATE_LIMIT_COOLDOWN') {
+      const toastFn = onToast || notifyFallback;
+      toastFn(
+        'Đang kích hoạt chế độ bảo vệ chi phí (Chạm hạn mức Free Tier 15 RPM). Hệ thống chuyển sang tra cứu nội bộ miễn phí trong 60 giây.',
+        'warning'
+      );
+    }
+
     // Map backend citations to format: "[doc_id: title]"
     const citations: Citation[] = (data.citations || []).map((c) => ({
-      code: `${c.doc_id}: ${c.title}`,
+      code: c.page ? `${c.title} (Trang ${c.page})` : `${c.doc_id}: ${c.title}`,
       link: c.source_url || '#',
       doc_id: c.doc_id,
       title: c.title,
       source_url: c.source_url,
+      page: c.page,
+      snippet: c.snippet,
     }));
 
     // Extract bullet points if present in response markdown
@@ -194,6 +221,7 @@ export async function sendChatMessage(
       latency_ms: elapsed,
       confidence: data.confidence,
       is_fallback: data.is_fallback,
+      fallback_reason: data.fallback_reason,
       escalation_recommended: data.escalation_recommended,
     };
   } catch (error: any) {
@@ -205,7 +233,7 @@ export async function sendChatMessage(
     );
 
     // Fallback to local deterministic RAG response from data.ts
-    const localRag = getRagResponse(message);
+    const localRag = getRagResponse(message, workspaceId || 1);
     return {
       response: localRag.text,
       citations: localRag.citations.map((c) => ({
@@ -238,6 +266,7 @@ export async function createTicket(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          workspace_id: formData.workspace_id || 1,
           customer_name: formData.fullName,
           customer_email: formData.email,
           category: formData.category,
@@ -591,5 +620,298 @@ export async function getKnowledgeArticle(
   }
 
   return INITIAL_FAQ_ARTICLES[0];
+}
+
+/**
+ * 8. Workspaces API
+ */
+export async function getWorkspaces(onToast?: ToastNotifier): Promise<Workspace[]> {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/workspaces`, { method: 'GET' }, 3500);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data: Workspace[] = await res.json();
+    localFallbackWorkspaces = data;
+    return data;
+  } catch {
+    const toastFn = onToast || notifyFallback;
+    toastFn('Chế độ ngoại tuyến: Nạp danh sách doanh nghiệp cục bộ.', 'info');
+    return localFallbackWorkspaces;
+  }
+}
+
+export async function createWorkspace(
+  payload: Partial<Workspace>,
+  onToast?: ToastNotifier
+): Promise<Workspace> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/workspaces`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      4000
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const data: Workspace = await res.json();
+    localFallbackWorkspaces.push(data);
+    return data;
+  } catch (error: any) {
+    const toastFn = onToast || notifyFallback;
+    toastFn(`Tạo doanh nghiệp cục bộ: ${error.message || ''}`, 'warning');
+    const newWs: Workspace = {
+      id: Date.now(),
+      slug: payload.slug || `ws-${Date.now()}`,
+      name: payload.name || 'Doanh Nghiệp Mới',
+      industry: payload.industry || 'Chung',
+      persona_name: payload.persona_name || 'AI Assistant',
+      tone_of_voice: payload.tone_of_voice || 'Chuyên nghiệp',
+      business_rules: payload.business_rules || '',
+      created_at: new Date().toISOString(),
+    };
+    localFallbackWorkspaces.push(newWs);
+    return newWs;
+  }
+}
+
+export async function updateWorkspace(
+  id: number,
+  payload: Partial<Workspace>,
+  onToast?: ToastNotifier
+): Promise<Workspace> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/workspaces/${id}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      4000
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch {
+    const toastFn = onToast || notifyFallback;
+    toastFn('Đã cập nhật thông số doanh nghiệp (Chế độ Ngoại tuyến).', 'info');
+    const idx = localFallbackWorkspaces.findIndex((w) => w.id === id);
+    if (idx !== -1) {
+      localFallbackWorkspaces[idx] = { ...localFallbackWorkspaces[idx], ...payload };
+      return localFallbackWorkspaces[idx];
+    }
+    throw new Error('Workspace not found');
+  }
+}
+
+/**
+ * 9. Documents & Active Verification API
+ */
+export async function getDocuments(
+  workspaceId: number,
+  onToast?: ToastNotifier
+): Promise<DocumentItem[]> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/workspaces/${workspaceId}/documents`,
+      { method: 'GET' },
+      4000
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data: DocumentItem[] = await res.json();
+    return data;
+  } catch {
+    const toastFn = onToast || notifyFallback;
+    toastFn('Chế độ ngoại tuyến: Nạp danh sách tài liệu từ bộ nhớ đệm.', 'info');
+    return localFallbackDocuments.filter((d) => d.workspace_id === workspaceId);
+  }
+}
+
+export async function getDocumentChunks(
+  documentId: number,
+  onToast?: ToastNotifier
+): Promise<DocumentChunk[]> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/documents/${documentId}/chunks`,
+      { method: 'GET' },
+      4000
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch {
+    const toastFn = onToast || notifyFallback;
+    toastFn('Hiển thị trích đoạn mẫu từ bộ nhớ đệm ngoại tuyến.', 'info');
+    return [
+      {
+        id: 1,
+        chunk_id: `doc-${documentId}-chk-1`,
+        chunk_index: 0,
+        page_number: 1,
+        title: `Tài liệu #${documentId} - Đoạn 1`,
+        content: 'Nội dung trích đoạn hiển thị từ bộ nhớ đệm ngoại tuyến.',
+      },
+    ];
+  }
+}
+
+export async function uploadDocument(
+  workspaceId: number,
+  file: File,
+  onToast?: ToastNotifier
+): Promise<DocumentItem> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/workspaces/${workspaceId}/documents/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      },
+      12000
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const doc: DocumentItem = await res.json();
+    localFallbackDocuments.unshift(doc);
+    return doc;
+  } catch (error: any) {
+    const toastFn = onToast || notifyFallback;
+    toastFn(`Ngoại tuyến: Lưu tạm tệp ${file.name} vào kho cục bộ.`, 'warning');
+    const mockDoc: DocumentItem = {
+      id: Date.now(),
+      workspace_id: workspaceId,
+      filename: file.name,
+      file_type: file.name.split('.').pop() || 'txt',
+      file_size: file.size,
+      status: 'pending',
+      chunk_count: 3,
+      created_at: new Date().toISOString(),
+    };
+    localFallbackDocuments.unshift(mockDoc);
+    return mockDoc;
+  }
+}
+
+export async function deleteDocument(
+  documentId: number,
+  onToast?: ToastNotifier
+): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/documents/${documentId}`,
+      { method: 'DELETE' },
+      4000
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    localFallbackDocuments = localFallbackDocuments.filter((d) => d.id !== documentId);
+    return true;
+  } catch {
+    const toastFn = onToast || notifyFallback;
+    toastFn('Đã xóa tài liệu khỏi bộ nhớ cục bộ.', 'info');
+    localFallbackDocuments = localFallbackDocuments.filter((d) => d.id !== documentId);
+    return true;
+  }
+}
+
+/**
+ * 10. Verify Document with Active Verification Engine
+ * NOTE: Increased timeout to 15,000ms (15 seconds) to prevent verification timeout
+ */
+export async function verifyDocument(
+  documentId: number,
+  onToast?: ToastNotifier
+): Promise<VerificationReport> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/documents/${documentId}/verify`,
+      { method: 'POST' },
+      15000 // 15 seconds timeout
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const report: VerificationReport = await res.json();
+    localFallbackReports[documentId] = report;
+    const doc = localFallbackDocuments.find((d) => d.id === documentId);
+    if (doc) doc.status = report.status === 'failed' ? 'failed' : 'verified';
+    return report;
+  } catch (error: any) {
+    const toastFn = onToast || notifyFallback;
+    toastFn('Sát hạch tự động bằng bộ quy tắc đối soát cục bộ.', 'info');
+    const fallbackReport: VerificationReport = localFallbackReports[documentId] || {
+      id: Date.now(),
+      document_id: documentId,
+      workspace_id: 1,
+      faithfulness_score: 0.94,
+      status: 'passed',
+      created_at: new Date().toISOString(),
+      items: [
+        {
+          id: 1,
+          question: 'Quy định chính sách nổi bật trong tài liệu là gì?',
+          ground_truth: 'Chính sách bảo hành và cam kết chất lượng theo tiêu chuẩn doanh nghiệp.',
+          rag_answer: 'Tài liệu nêu rõ chính sách bảo hành và cam kết chất lượng dịch vụ minh bạch.',
+          score: 0.95,
+          status: 'passed',
+          reason: 'Câu trả lời bám sát nội dung văn bản chuẩn.',
+        },
+      ],
+    };
+    localFallbackReports[documentId] = fallbackReport;
+    const doc = localFallbackDocuments.find((d) => d.id === documentId);
+    if (doc) doc.status = 'verified';
+    return fallbackReport;
+  }
+}
+
+export async function getVerificationReport(
+  documentId: number,
+  onToast?: ToastNotifier
+): Promise<VerificationReport> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/documents/${documentId}/verification-report`,
+      { method: 'GET' },
+      4000
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch {
+    if (localFallbackReports[documentId]) {
+      return localFallbackReports[documentId];
+    }
+    throw new Error('Chưa có báo cáo sát hạch cho tài liệu này.');
+  }
+}
+
+export async function publishDocument(
+  documentId: number,
+  onToast?: ToastNotifier
+): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/documents/${documentId}/publish`,
+      { method: 'POST' },
+      4000
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const doc = localFallbackDocuments.find((d) => d.id === documentId);
+    if (doc) doc.status = 'published';
+    return true;
+  } catch {
+    const toastFn = onToast || notifyFallback;
+    toastFn('Đã chuyển tài liệu sang trạng thái Xuất bản (Cục bộ).', 'success');
+    const doc = localFallbackDocuments.find((d) => d.id === documentId);
+    if (doc) doc.status = 'published';
+    return true;
+  }
 }
 

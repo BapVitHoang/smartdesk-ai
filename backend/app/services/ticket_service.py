@@ -2,7 +2,7 @@
 
 import random
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -61,17 +61,41 @@ class TicketService:
         category: str,
         priority: str,
         subject: str,
-        description: str
+        description: str,
+        workspace_id: Optional[int] = 1,
+        db: Optional[AsyncSession] = None
     ) -> str:
         """
-        Generates a professional, empathetic draft resolution using LLM or structured template fallback.
+        Generates a professional, empathetic draft resolution using LLM or structured template fallback
+        aligned with workspace persona and business rules.
         """
+        from app.models.workspace import Workspace
+
+        ws_name = "SmartDesk Cloud Support"
+        persona_name = "SmartDesk Support Specialist"
+        tone_of_voice = "Chuyên nghiệp, ngắn gọn, thân thiện và chính xác về mặt kỹ thuật."
+        business_rules = ""
+
+        if db and workspace_id:
+            try:
+                ws_res = await db.execute(select(Workspace).where(Workspace.id == workspace_id))
+                ws = ws_res.scalar_one_or_none()
+                if ws:
+                    ws_name = ws.name
+                    persona_name = ws.persona_name
+                    tone_of_voice = ws.tone_of_voice
+                    business_rules = ws.business_rules
+            except Exception as e:
+                logger.warning(f"Failed to query workspace {workspace_id} for draft: {e}")
+
         # Search relevant FAQ for grounding the draft
         matched = fallback_service.match_faq(f"{subject} {description}")
         faq_context = matched.get("response", "")
 
         draft_prompt = (
-            f"You are a Senior Customer Support Specialist at SmartDesk AI.\n"
+            f"You are {persona_name} representing '{ws_name}'.\n"
+            f"Tone of voice: {tone_of_voice}.\n"
+            f"Business Rules:\n{business_rules}\n\n"
             f"Draft a polite, professional, and empathetic email reply to the customer.\n\n"
             f"Customer Details:\n"
             f"- Name: {customer_name}\n"
@@ -84,8 +108,8 @@ class TicketService:
             f"1. Greet the customer warmly by their full name.\n"
             f"2. Acknowledge and summarize their specific concern with empathy.\n"
             f"3. Provide clear step-by-step resolution instructions or explain the next investigative steps.\n"
-            f"4. State that their ticket is actively being handled by the support engineering team.\n"
-            f"5. Conclude with a warm closing from 'SmartDesk Support Engineering'."
+            f"4. State that their ticket is actively being handled by {ws_name}.\n"
+            f"5. Conclude with a warm closing from '{persona_name}' / '{ws_name}'."
         )
 
         try:
@@ -101,15 +125,15 @@ class TicketService:
         # Deterministic template fallback
         return (
             f"Dear {customer_name},\n\n"
-            f"Thank you for contacting SmartDesk AI Support. We have received your inquiry regarding \"{subject}\" "
+            f"Thank you for contacting {ws_name}. We have received your inquiry regarding \"{subject}\" "
             f"and our support team has categorized it as [{category}] with [{priority}] priority.\n\n"
             f"Based on our support policies for {category}:\n"
-            f"1. Our engineering team is currently verifying the status of your account and system logs.\n"
-            f"2. In the meantime, if you have any additional error codes, screenshots, or logs, please reply directly to this thread.\n"
+            f"1. Our team is currently reviewing the details of your request.\n"
+            f"2. In the meantime, if you have any additional error codes, screenshots, or receipts, please reply directly to this thread.\n"
             f"3. You will receive an update from a dedicated specialist within our {self.calculate_sla_hours(priority)}-hour SLA window.\n\n"
             f"We appreciate your patience while we investigate this matter for you.\n\n"
             f"Warm regards,\n"
-            f"SmartDesk Support Team"
+            f"{persona_name} - {ws_name}"
         )
 
     async def create_ticket(self, db: AsyncSession, ticket_in: TicketCreate) -> Ticket:
@@ -122,6 +146,7 @@ class TicketService:
         sequence_num = 1001 + current_count
 
         ticket_code = f"#TICK-{sequence_num}"
+        ws_id = ticket_in.workspace_id or 1
 
         # Calculate SLA response hours
         sla_hours = self.calculate_sla_hours(ticket_in.priority.value)
@@ -140,10 +165,13 @@ class TicketService:
             category=ticket_in.category,
             priority=ticket_in.priority.value,
             subject=ticket_in.subject,
-            description=ticket_in.description
+            description=ticket_in.description,
+            workspace_id=ws_id,
+            db=db
         )
 
         db_ticket = Ticket(
+            workspace_id=ticket_in.workspace_id or 1,
             ticket_code=ticket_code,
             customer_name=ticket_in.customer_name,
             customer_email=str(ticket_in.customer_email),

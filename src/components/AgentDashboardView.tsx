@@ -28,6 +28,7 @@ interface AgentDashboardViewProps {
   setDemoState: (state: UIState) => void;
   onUpdateTicketStatus: (ticketId: string, newStatus: TicketStatus, draftReply?: string) => void;
   onToast: (msg: string, type?: ToastType) => void;
+  currentWorkspaceId?: number;
 }
 
 export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
@@ -39,6 +40,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
   setDemoState,
   onUpdateTicketStatus,
   onToast,
+  currentWorkspaceId,
 }) => {
   const [filterType, setFilterType] = useState<'all' | 'open' | 'urgent'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -87,11 +89,13 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
         category?: string;
         priority?: string;
         search?: string;
+        workspace_id?: number;
       } = {};
       if (filterType === 'open') filters.status = 'open';
       if (filterType === 'urgent') filters.priority = 'Urgent';
       if (selectedCategory !== 'all') filters.category = selectedCategory;
       if (searchTerm.trim()) filters.search = searchTerm.trim();
+      if (currentWorkspaceId) filters.workspace_id = currentWorkspaceId;
 
       const fresh = await getTickets(Object.keys(filters).length > 0 ? filters : undefined, onToast);
       if (setTickets && fresh && fresh.length > 0) {

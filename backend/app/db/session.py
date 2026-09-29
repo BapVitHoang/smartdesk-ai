@@ -70,12 +70,36 @@ async def init_db() -> None:
     """Initialize database tables and seed initial FAQ data if empty."""
     global engine, async_session_factory
     from app.models.ticket import Ticket  # noqa: F401
-    from app.models.knowledge import FAQItem  # noqa: F401
+    from app.models.knowledge import FAQItem, KnowledgeChunk  # noqa: F401
+    from app.models.workspace import Workspace  # noqa: F401
+    from app.models.document import Document  # noqa: F401
+    from app.models.verification import VerificationReport, VerificationItem  # noqa: F401
+
+    def _migrate_sqlite_columns(sync_conn):
+        try:
+            ticket_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(tickets)").fetchall()]
+            if ticket_cols and "workspace_id" not in ticket_cols:
+                sync_conn.exec_driver_sql("ALTER TABLE tickets ADD COLUMN workspace_id INTEGER DEFAULT 1")
+            
+            kc_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(knowledge_chunks)").fetchall()]
+            if kc_cols:
+                if "workspace_id" not in kc_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN workspace_id INTEGER DEFAULT 1")
+                if "document_id" not in kc_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN document_id INTEGER")
+                if "chunk_index" not in kc_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN chunk_index INTEGER DEFAULT 0")
+                if "page_number" not in kc_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN page_number INTEGER DEFAULT 1")
+        except Exception as mig_err:
+            logger.warning(f"SQLite auto-migration notice: {mig_err}")
 
     # 1. Synchronize schema, falling back to SQLite if PostgreSQL fails
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            if "sqlite" in engine.url.drivername:
+                await conn.run_sync(_migrate_sqlite_columns)
         logger.info(f"Database schema synchronized successfully on {engine.url.drivername}.")
     except Exception as e:
         logger.warning(
@@ -85,14 +109,50 @@ async def init_db() -> None:
         engine, async_session_factory = create_engine_and_factory(settings.FALLBACK_SQLITE_URL)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(_migrate_sqlite_columns)
         logger.info("Database schema synchronized on fallback SQLite engine.")
 
     # 2. Seed initial data
     try:
         async with async_session_factory() as session:
+            # 2.1 Seed initial Workspaces if empty
+            ws_result = await session.execute(select(Workspace).limit(1))
+            existing_ws = ws_result.scalars().first()
+            if not existing_ws:
+                logger.info("Seeding initial workspaces...")
+                sample_workspaces = [
+                    Workspace(
+                        slug="default",
+                        name="SmartDesk Cloud Support",
+                        industry="IT & SaaS",
+                        persona_name="SmartDesk Assistant",
+                        tone_of_voice="Chuyên nghiệp, ngắn gọn, thân thiện và chính xác về mặt kỹ thuật.",
+                        business_rules="Hỗ trợ xử lý sự cố tài khoản, phân quyền, tích hợp API, thanh toán định kỳ. Luôn bảo vệ an toàn thông tin khách hàng."
+                    ),
+                    Workspace(
+                        slug="smilecare",
+                        name="Nha Khoa Thẩm Mỹ SmileCare",
+                        industry="Y tế & Nha khoa",
+                        persona_name="Bác sĩ SmileCare Bot",
+                        tone_of_voice="Ân cần, chu đáo, đồng cảm, chuyên môn y khoa cao nhưng dễ hiểu.",
+                        business_rules="Tư vấn niềng răng, bọc sứ, tẩy trắng, cấy ghép Implant. Báo giá dịch vụ minh bạch. Không đưa ra chỉ định thuốc kháng sinh khi chưa có đơn khám."
+                    ),
+                    Workspace(
+                        slug="techstore",
+                        name="Hệ Thống Điện Máy TechStore",
+                        industry="Bán lẻ thiết bị công nghệ",
+                        persona_name="TechStore Advisor",
+                        tone_of_voice="Năng động, nhiệt tình, rõ ràng về thông số kỹ thuật và chính sách.",
+                        business_rules="Tư vấn điện thoại, laptop, phụ kiện. Hướng dẫn đổi trả 1 đổi 1 trong 30 ngày nếu lỗi kỹ thuật. Quy định trừ phí phụ kiện nếu mất hộp."
+                    ),
+                ]
+                for ws in sample_workspaces:
+                    session.add(ws)
+                await session.commit()
+                logger.info(f"Successfully seeded {len(sample_workspaces)} workspaces.")
+
             result = await session.execute(select(FAQItem).limit(1))
             existing_faq = result.scalars().first()
-
 
             if not existing_faq:
                 faq_path = settings.resolved_seed_faq_path
@@ -123,6 +183,7 @@ async def init_db() -> None:
                 logger.info("Seeding initial support tickets...")
                 sample_tickets = [
                     Ticket(
+                        workspace_id=1,
                         ticket_code="#TICK-1042",
                         customer_name="Nguyễn Văn An",
                         customer_email="an.nguyen@company.vn",
@@ -136,6 +197,7 @@ async def init_db() -> None:
                         estimated_response_hours=4
                     ),
                     Ticket(
+                        workspace_id=1,
                         ticket_code="#TICK-1041",
                         customer_name="Trần Mai Anh",
                         customer_email="maianh.tran@tech.io",
@@ -149,6 +211,7 @@ async def init_db() -> None:
                         estimated_response_hours=2
                     ),
                     Ticket(
+                        workspace_id=1,
                         ticket_code="#TICK-1039",
                         customer_name="Lê Hoàng Quân",
                         customer_email="quan.le@startup.co",
@@ -166,6 +229,41 @@ async def init_db() -> None:
                     session.add(t)
                 await session.commit()
                 logger.info(f"Successfully seeded {len(sample_tickets)} initial support tickets.")
+
+            # 2.4 Seed sample documents for Workspace 2 (SmileCare) & Workspace 3 (TechStore)
+            from app.models.document import Document
+            from pathlib import Path
+            from app.services.document_service import document_service
+
+            for ws_id, fname, rel_path in [
+                (2, "nha_khoa_smilecare_bang_gia_dich_vu.txt", "sample_documents/nha_khoa_smilecare_bang_gia_dich_vu.txt"),
+                (3, "dien_may_techstore_chinh_sach_doi_tra.txt", "sample_documents/dien_may_techstore_chinh_sach_doi_tra.txt"),
+            ]:
+                doc_res = await session.execute(select(Document).where(Document.workspace_id == ws_id))
+                doc_obj = doc_res.scalars().first()
+                if doc_obj:
+                    if doc_obj.status != "published":
+                        doc_obj.status = "published"
+                        await session.commit()
+                        logger.info(f"Published existing document for workspace {ws_id}.")
+                else:
+                    doc_path = Path("backend/data") / rel_path
+                    if not doc_path.exists():
+                        doc_path = Path("data") / rel_path
+                    if doc_path.exists():
+                        try:
+                            content_bytes = doc_path.read_bytes()
+                            new_doc = await document_service.process_and_store_document(
+                                workspace_id=ws_id,
+                                filename=fname,
+                                file_bytes=content_bytes,
+                                session=session
+                            )
+                            new_doc.status = "published"
+                            await session.commit()
+                            logger.info(f"Successfully seeded and published workspace {ws_id} sample document.")
+                        except Exception as e:
+                            logger.warning(f"Error seeding workspace {ws_id} document: {e}")
     except Exception as e:
         logger.error(f"Error during database initialization: {e}", exc_info=True)
         # For non-fatal database initialization failure, allow fallback

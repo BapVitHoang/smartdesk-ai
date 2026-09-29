@@ -1,10 +1,10 @@
-export type TabType = 'chat' | 'ticket' | 'agent';
+export type TabType = 'chat' | 'ticket' | 'agent' | 'knowledge';
 
 export type UIState = 'success' | 'loading' | 'empty' | 'error';
 
 export type TicketPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 
-export type TicketCategory = 'Authentication' | 'Billing' | 'Bug Report' | 'Feature Request';
+export type TicketCategory = 'Authentication' | 'Billing' | 'Bug Report' | 'Feature Request' | 'General';
 
 export type TicketStatus = 'Open' | 'Pending' | 'Resolved';
 
@@ -14,6 +14,8 @@ export interface Citation {
   doc_id?: string;
   title?: string;
   source_url?: string;
+  page?: number;
+  snippet?: string;
 }
 
 export interface KnowledgeArticle {
@@ -22,6 +24,58 @@ export interface KnowledgeArticle {
   title: string;
   content: string;
   source_url: string;
+}
+
+export interface Workspace {
+  id: number;
+  slug: string;
+  name: string;
+  industry: string;
+  persona_name: string;
+  tone_of_voice: string;
+  business_rules: string;
+  created_at: string;
+}
+
+export interface DocumentItem {
+  id: number;
+  workspace_id: number;
+  filename: string;
+  file_type: string;
+  file_size: number;
+  status: 'pending' | 'processing' | 'verified' | 'published' | 'failed';
+  chunk_count: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface DocumentChunk {
+  id: number;
+  chunk_id: string;
+  chunk_index: number;
+  page_number: number;
+  title: string;
+  content: string;
+}
+
+export interface VerificationItem {
+  id: number;
+  question: string;
+  ground_truth: string;
+  rag_answer: string;
+  score: number;
+  status: 'passed' | 'warning' | 'failed';
+  reason?: string;
+}
+
+export interface VerificationReport {
+  id: number;
+  document_id: number;
+  workspace_id: number;
+  faithfulness_score: number;
+  status: 'passed' | 'warning' | 'failed';
+  created_at: string;
+  items: VerificationItem[];
 }
 
 export interface ChatMessage {
@@ -35,12 +89,15 @@ export interface ChatMessage {
   latency_ms?: number;
   confidence?: number;
   is_fallback?: boolean;
+  fallback_reason?: string;
   escalation_recommended?: boolean;
+  workspace_id?: number;
 }
 
 export interface Ticket {
   id: string;
   ticket_code?: string;
+  workspace_id?: number;
   customer: string;
   email: string;
   subject: string;
@@ -67,6 +124,7 @@ export interface TicketFormData {
   priority: TicketPriority;
   subject: string;
   message: string;
+  workspace_id?: number;
 }
 
 export interface TicketFormErrors {
@@ -90,6 +148,8 @@ export interface BackendCitation {
   doc_id: string;
   title: string;
   source_url: string;
+  page?: number;
+  snippet?: string;
 }
 
 export interface BackendChatResponse {
@@ -98,11 +158,13 @@ export interface BackendChatResponse {
   latency_ms: number;
   confidence: number;
   is_fallback: boolean;
+  fallback_reason?: string;
   escalation_recommended?: boolean;
 }
 
 export interface BackendTicketResponse {
   id: number;
+  workspace_id?: number;
   ticket_code: string;
   customer_name: string;
   customer_email: string;
@@ -117,12 +179,3 @@ export interface BackendTicketResponse {
   created_at: string;
   updated_at?: string | null;
 }
-
-export interface KnowledgeArticle {
-  doc_id: string;
-  category: string;
-  title: string;
-  content: string;
-  source_url: string;
-}
-
