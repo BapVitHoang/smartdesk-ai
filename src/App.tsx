@@ -36,10 +36,10 @@ export default function App() {
     // 1. Register global toast notifier for API fallbacks
     registerApiToastHandler(showToast);
 
-    // 2. Fetch real-time tickets from FastAPI backend
-    const loadInitialTickets = async () => {
+    // 2. Fetch real-time tickets from FastAPI backend for the current workspace
+    const loadTicketsForWorkspace = async () => {
       try {
-        const remoteTickets = await getTickets(undefined, showToast);
+        const remoteTickets = await getTickets({ workspace_id: currentWorkspaceId }, showToast);
         if (remoteTickets && remoteTickets.length > 0) {
           setTickets(remoteTickets);
           setSelectedTicket(remoteTickets[0]);
@@ -49,12 +49,12 @@ export default function App() {
       }
     };
 
-    loadInitialTickets();
+    loadTicketsForWorkspace();
 
     return () => {
       registerApiToastHandler(null);
     };
-  }, []);
+  }, [currentWorkspaceId]);
 
   const handleEscalateToTicket = (prefill?: Partial<TicketFormData>) => {
     setPrefillTicketData(prefill);

@@ -335,6 +335,7 @@ export async function createTicket(
  */
 export async function getTickets(
   filters?: {
+    workspace_id?: number;
     status?: string;
     category?: string;
     priority?: string;
@@ -348,6 +349,7 @@ export async function getTickets(
 
   try {
     const params = new URLSearchParams();
+    if (filters?.workspace_id !== undefined) params.append('workspace_id', String(filters.workspace_id));
     if (filters?.status) params.append('status', filters.status);
     if (filters?.category) params.append('category', filters.category);
     if (filters?.priority) params.append('priority', filters.priority);

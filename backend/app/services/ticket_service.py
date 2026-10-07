@@ -89,9 +89,13 @@ class TicketService:
             except Exception as e:
                 logger.warning(f"Failed to query workspace {workspace_id} for draft: {e}")
 
-        # Search relevant FAQ for grounding the draft
-        matched = fallback_service.match_faq(f"{subject} {description}")
-        faq_context = matched.get("response", "")
+        # Search relevant FAQ for grounding the draft within the tenant's workspace
+        matched = fallback_service.match_faq(
+            f"{subject} {description}",
+            workspace_id=workspace_id,
+            workspace_name=ws_name
+        )
+        faq_context = matched.get("response", "") if matched.get("confidence", 0) >= 0.50 else ""
 
         draft_prompt = (
             f"You are {persona_name} representing '{ws_name}'.\n"
