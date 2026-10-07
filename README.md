@@ -11,16 +11,17 @@ Nền tảng hỗ trợ khách hàng thông minh kết hợp trợ lý AI (RAG),
 2. **Loại bỏ tình trạng AI "ảo giác" (Hallucination):** Ứng dụng mô hình RAG (Retrieval-Augmented Generation) đối soát trực tiếp với cơ sở tri thức (Knowledge Base / FAQ), đồng thời trích dẫn nguồn tài liệu minh bạch (`[Doc #ID: Tiêu đề]`).
 
 ### Tính năng chính
-- **AI Chatbot hỗ trợ RAG & Trích dẫn nguồn:** Tích hợp Google Gemini 1.5 Flash để tổng hợp câu trả lời chính xác, kèm badge trích dẫn tài liệu tham chiếu.
+- **AI Chatbot hỗ trợ RAG & Trích dẫn nguồn:** Tích hợp Google Gemini (`gemini-3.5-flash-lite` - thế hệ mới nhất thay thế `gemini-1.5-flash` đã ngừng cung cấp) để tổng hợp câu trả lời chính xác, kèm badge trích dẫn tài liệu tham chiếu.
 - **Cơ chế Circuit Breaker & Fallback BM25 (< 4.0s):** Nếu gọi API LLM bị timeout (> 4.0s), lỗi mạng hoặc chạm rate limit (429), hệ thống tự động kích hoạt bộ máy so khớp từ khóa BM25 cục bộ trên `seed_faq.json` mà không làm gián đoạn trải nghiệm người dùng.
 - **Phân loại & Điều phối Ticket (Ticket Triage):** Tự động sinh mã ticket chuẩn định dạng `#TICK-XXXX`, gán nhãn danh mục, tính hạn xử lý SLA và gợi ý mức độ khẩn cấp.
 - **AI Copilot cho Hỗ trợ viên:** Tự động soạn trước câu trả lời mẫu cho từng ticket để nhân viên hỗ trợ duyệt, chỉnh sửa hoặc gửi nhanh chóng.
 - **Bảng điều khiển Quản trị (Agent Dashboard):** Giao diện quản lý ticket trực quan với các bộ lọc theo trạng thái, độ ưu tiên, danh mục và thanh tìm kiếm thời gian thực.
+- **Quản trị Tri thức Đa Doanh nghiệp (Multi-Tenant) & Sát hạch AI (Active Verification):** Hỗ trợ nhiều Workspace độc lập (Y tế/Nha khoa, Bán lẻ công nghệ, IT SaaS), nạp tài liệu động (.pdf, .txt, .md), chạy kiểm định 3 bước (Synthetic QA -> RAG Test -> AI Judge) trước khi xuất bản.
 
 ### Công nghệ sử dụng (Tech Stack)
 - **Frontend:** React 19, Vite, Tailwind CSS v4, Lucide Icons, Motion.
 - **Backend:** Python 3.11+, FastAPI (100% Async ASGI), SQLAlchemy 2.0 (Async), SQLite / PostgreSQL (hỗ trợ `pgvector`).
-- **AI & Retrieval:** Google Gemini 1.5 Flash (`gemini-1.5-flash`), BM25 Fallback Engine.
+- **AI & Retrieval:** Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`), Embedding model (`gemini-embedding-001`), BM25 Fallback Engine.
 
 ---
 
@@ -29,23 +30,26 @@ Nền tảng hỗ trợ khách hàng thông minh kết hợp trợ lý AI (RAG),
 ```text
 smartdesk-ai/
 ├── src/                      # Mã nguồn Frontend (React + Vite)
-│   ├── components/           # Header, ChatView, TicketFormView, AgentDashboardView
+│   ├── components/           # Header, ChatView, TicketFormView, AgentDashboardView, KnowledgeManagerView, Footer
+│   ├── services/             # Client kết nối API backend với cơ chế offline fallback (api.ts)
 │   ├── App.tsx               # Điều phối giao diện và trạng thái chính
 │   ├── data.ts               # Dữ liệu mẫu & cấu hình khởi tạo
 │   └── types.ts              # Định nghĩa kiểu dữ liệu TypeScript
 ├── backend/                  # Mã nguồn Backend (FastAPI Async)
 │   ├── app/
-│   │   ├── api/v1/endpoints/ # API routes: chat, tickets, agent, knowledge, health
-│   │   ├── core/             # Cấu hình (config.py), bảo mật, xử lý ngoại lệ
-│   │   ├── db/               # Khởi tạo kết nối & session cơ sở dữ liệu
-│   │   ├── models/           # SQLAlchemy ORM Models (Ticket, FAQItem, KnowledgeChunk)
+│   │   ├── api/v1/endpoints/ # API routes: chat, tickets, agent, knowledge, health, workspaces, documents
+│   │   ├── core/             # Cấu hình (config.py), bảo mật (security.py), xử lý ngoại lệ (exceptions.py)
+│   │   ├── db/               # Khởi tạo kết nối & session cơ sở dữ liệu (session.py)
+│   │   ├── models/           # SQLAlchemy ORM Models (Ticket, FAQItem, KnowledgeChunk, Workspace, Document, Verification)
 │   │   ├── schemas/          # Pydantic v2 schemas cho Request/Response
-│   │   ├── services/         # Nghiệp vụ: LLM, BM25 Fallback, RAG, Ticket Copilot
+│   │   ├── services/         # Nghiệp vụ: LLM, BM25 Fallback, RAG, Ticket Copilot, Document Ingestion, Verification
 │   │   └── main.py           # Điểm khởi chạy ứng dụng FastAPI & CORS
 │   ├── data/
+│   │   ├── sample_documents/ # Tài liệu mẫu thực tế cho các lĩnh vực (SmileCare, TechStore)
 │   │   └── seed_faq.json     # 12 bài viết FAQ chuẩn cho Fallback & Seed dữ liệu
 │   ├── tests/
-│   │   └── test_api.py       # Bộ kiểm thử tự động pytest (httpx.AsyncClient)
+│   │   ├── test_api.py       # Bộ kiểm thử tự động pytest (httpx.AsyncClient)
+│   │   └── test_workspace_and_verification.py # Bộ kiểm thử Workspaces, Ingestion & Verification
 │   ├── .env.example          # Mẫu file cấu hình môi trường backend
 │   ├── Dockerfile            # Cấu hình đóng gói Docker
 │   └── requirements.txt      # Danh sách thư viện Python
@@ -82,6 +86,8 @@ smartdesk-ai/
    ```
 4. Cấu hình các biến chính trong `backend/.env`:
    - `GEMINI_API_KEY`: Khóa API Google Gemini lấy từ [Google AI Studio](https://aistudio.google.com/). *(Nếu để trống, hệ thống sẽ tự động chuyển sang chế độ Fallback BM25)*.
+   - `LLM_MODEL_NAME`: `"gemini-3.5-flash-lite"` (Mô hình LLM chuẩn; thế hệ 1.5 đã ngừng hoạt động).
+   - `EMBEDDING_MODEL_NAME`: `"gemini-embedding-001"` (Mô hình vector hóa; thay thế `text-embedding-004`).
    - `DATABASE_URL`: Mặc định sử dụng SQLite async `sqlite+aiosqlite:///./smartdesk.db` (chạy ngay không cần cài thêm DB server).
    - `LLM_TIMEOUT_SECONDS`: `4.0` (Ngưỡng thời gian tối đa cho cuộc gọi AI trước khi kích hoạt Fallback).
    - `CORS_ORIGINS`: `["http://localhost:3000","http://localhost:5173"]`.
@@ -138,11 +144,12 @@ Bộ test bao gồm:
 
 ## 6. Các lưu ý quan trọng (Important Notes)
 
-1. **Khóa API Gemini (`GEMINI_API_KEY`):**
-   - Không bắt buộc để hệ thống khởi động. Khi không có API key hoặc kết nối mạng bị chặn, hệ thống kích hoạt cơ chế dự phòng **BM25 Deterministic Fallback** dựa trên `seed_faq.json`. Phản hồi trả về sẽ có cờ `"is_fallback": true`.
-2. **Cơ sở dữ liệu (Database):**
-   - Mặc định sử dụng SQLite bất đồng bộ (`smartdesk.db`) để dễ dàng chạy cục bộ mà không cần cài đặt PostgreSQL.
-   - Để sử dụng PostgreSQL với `pgvector`, cập nhật biến `DATABASE_URL` trong file `backend/.env`.
+1. **Khóa API Gemini (`GEMINI_API_KEY`) & Mô hình thế hệ mới:**
+   - Hệ thống vận hành trên Google Gemini (`gemini-3.5-flash-lite`) và embedding (`gemini-embedding-001`). Thử nghiệm trực tiếp cho độ trễ tổng hợp **~922 ms** và độ trễ vector hóa **~491 ms** (đáp ứng tiêu chuẩn phản hồi thời gian thực < 1.5s).
+   - Không bắt buộc API key để khởi động: khi không có key hoặc gặp sự cố mạng/rate limit, hệ thống kích hoạt **BM25 Deterministic Fallback** dựa trên `seed_faq.json` và trả về cờ `"is_fallback": true`.
+2. **Cơ sở dữ liệu & Hành vi Docker / PostgreSQL:**
+   - **Mặc định:** Sử dụng SQLite bất đồng bộ (`smartdesk.db`) để chạy cục bộ tức thì mà không cần cài đặt hoặc bật Docker.
+   - **Môi trường Docker Compose:** Khi khởi động `docker-compose up`, hệ thống kết nối PostgreSQL 16 (`pgvector/pgvector:pg16`). Nếu Docker daemon chưa bật hoặc kết nối PostgreSQL bị gián đoạn, backend tự động kích hoạt cơ chế dự phòng chuyển tiếp sang SQLite cục bộ mà không làm sập ứng dụng.
 3. **Cổng dịch vụ & CORS:**
    - Frontend mặc định chạy ở cổng `3000`, Backend chạy ở cổng `8000`.
    - Nếu bạn thay đổi cổng của một trong hai bên, hãy cập nhật lại biến `CORS_ORIGINS` trong `backend/.env`.

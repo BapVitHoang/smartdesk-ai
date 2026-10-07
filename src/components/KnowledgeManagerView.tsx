@@ -440,7 +440,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
                   Kéo thả tệp vào đây hoặc <span className="text-indigo-600 underline">chọn từ máy tính</span>
                 </div>
                 <p className="text-[11px] text-slate-500 max-w-md">
-                  Hệ thống tự động chạy thuật toán <strong>Recursive Character Splitter</strong> (600-800 ký tự, overlap 100) và tính vector embedding qua Gemini text-embedding-004.
+                  Hệ thống tự động chạy thuật toán <strong>Recursive Character Splitter</strong> (600-800 ký tự, overlap 100) và tính vector embedding qua Gemini gemini-embedding-001.
                 </p>
               </>
             )}

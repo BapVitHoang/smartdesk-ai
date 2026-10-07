@@ -11,7 +11,7 @@ This file outlines the foundational technical rules, architecture constraints, a
 - **Frontend:** React 19 + Vite 6 + Tailwind CSS v4 + TypeScript + Lucide Icons + Motion (Single Page Application, NOT Next.js).
 - **Backend:** FastAPI (Python 3.11+) asynchronous ASGI service.
 - **Database:** PostgreSQL 16 with `pgvector` (Fallback: SQLite/In-memory for local testing).
-- **Primary LLM:** Google Gemini 1.5 Flash (`gemini-1.5-flash`), embeddings via `text-embedding-004`.
+- **Primary LLM:** Google Gemini (`gemini-3.5-flash-lite`, replacing retired Gemini 1.5), embeddings via `gemini-embedding-001`.
 - **Deterministic Non-AI Fallback:** Keyword/BM25 FAQ matcher on curated dataset (`backend/data/seed_faq.json`).
 
 ### 1.2 Mandatory Document Reference Index

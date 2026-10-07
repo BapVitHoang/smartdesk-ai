@@ -1,4 +1,4 @@
-﻿# Final Project Proposal & AI Smoke Test (Homework 2B)
+# Final Project Proposal & AI Smoke Test (Homework 2B)
 
 **Project Name:** SmartDesk AI – Intelligent Customer Support & Knowledge Synthesizer  
 **Tên dự án:** SmartDesk AI – Hệ thống Trợ lý Hỗ trợ Khách hàng Thông minh & Tự động Hóa Tri thức  
@@ -64,7 +64,7 @@ A "Vertical Slice" proves the entire stack works together from frontend UI, thro
 2. **[0:25 - 0:55] RAG Retrieval & AI Synthesis (Backend -> Vector DB -> LLM):**
    - Backend orchestrator vectorizes the query using embeddings.
    - It queries PostgreSQL `pgvector` for top-2 semantic matches from the company knowledge base.
-   - The retrieved document chunks and user query are injected into the grounding prompt and streamed to the LLM (Gemini 1.5 Flash).
+   - The retrieved document chunks and user query are injected into the grounding prompt and streamed to the LLM (Gemini 3.5 Flash Lite).
    - The response streams into the UI token-by-token within ~1.2 seconds, citing *Doc #4: Account Recovery & Admin Verification Procedures*.
 
 3. **[0:55 - 1:20] Fallback Demonstration (Reliability & Fault Tolerance):**
@@ -86,7 +86,7 @@ A "Vertical Slice" proves the entire stack works together from frontend UI, thro
 | **Backend Technology** | **FastAPI (Python 3.11+)** | High asynchronous throughput (ASGI), native Pydantic data validation, first-class Python ecosystem for AI/LLM SDKs and vector operations. |
 | **Data Store** | **PostgreSQL 16 with `pgvector` extension** | Unified database for both transactional relational data (users, chat sessions, tickets) and vector embeddings, avoiding synchronization lag between separate databases. |
 | **Caching & Queue** | **Redis (Optional Phase 2)** | Caching frequent FAQ responses and managing rate-limiting. |
-| **AI / LLM Engine** | **Google Gemini 1.5 Flash API** (with OpenAI GPT-4o-mini as dual backup) | Low latency (~800ms), 1M token context window for comprehensive document context, cost efficiency, and structured JSON output mode. |
+| **AI / LLM Engine** | **Google Gemini 3.5 Flash Lite API** (`gemini-3.5-flash-lite`, with OpenAI GPT-4o-mini as backup) | Sub-second latency (~920ms), 1M token context window for comprehensive document context, cost efficiency, and structured JSON output mode. |
 | **Initial Deployment** | **Vercel (Frontend) + Render / Fly.io (Backend & DB)** | Zero-config continuous deployment from GitHub, SSL enabled out-of-the-box, scalable container execution, minimal DevOps overhead for the 8-week cycle. |
 
 ---
@@ -141,8 +141,8 @@ graph TD
     end
 
     subgraph AI_Services ["AI & External Services"]
-        LLM["Google Gemini 1.5 Flash API / OpenAI"]
-        Embedder["Text-Embedding-004 Model"]
+        LLM["Google Gemini 3.5 Flash Lite API / OpenAI"]
+        Embedder["Gemini-Embedding-001 Model"]
     end
 
     UI -->|HTTPS / WSS| API
@@ -188,10 +188,11 @@ graph TD
 *(Chạy Script Smoke-Test LLM, Ghi nhận Prompt, Response và Độ trễ Latency)*
 
 ### 6.1 Test Execution Details
-- **Test Script Path:** `scripts/smoke_test.py`
-- **Engine / Model Tested:** `gemini-1.5-flash`
+- **Test Script Path:** `scripts/smoke_test.py` / `GET /api/v1/health/smoke-test`
+- **Engine / Model Tested:** `gemini-3.5-flash-lite` (Active model replacing retired `gemini-1.5-flash`)
+- **Embedding Model:** `gemini-embedding-001` (Replacing retired `text-embedding-004`)
 - **Test Metric Recorded:** High-precision round-trip latency (`time.perf_counter()`)
-- **Measured Latency:** **`852.53 ms`** (`0.853 seconds`)
+- **Measured Latency:** **`922.74 ms`** (`0.923 seconds`)
 - **Status:** **PASS (Within acceptable < 1,500ms target)**
 
 ### 6.2 Test Prompt
@@ -212,5 +213,5 @@ We are here to help you regain access securely!
 ```
 
 ### 6.4 Latency & Quality Evaluation
-- **Latency Analysis:** Round-trip latency of **852.53 ms** confirms that Gemini 1.5 Flash easily satisfies real-time interactive chat standards (target < 2,000 ms).
+- **Latency Analysis:** Round-trip latency of **922.74 ms** confirms that Gemini 3.5 Flash Lite easily satisfies real-time interactive chat standards (target < 2,000 ms, budget < 1,500 ms).
 - **Quality Analysis:** The model followed the persona ("CloudDesk SaaS"), concise step-by-step formatting, polite tone, and satisfied the < 100-word constraint with 84 words.

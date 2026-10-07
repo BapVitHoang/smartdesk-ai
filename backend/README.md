@@ -7,10 +7,11 @@ Dịch vụ Backend bất đồng bộ (ASGI) xây dựng bằng **FastAPI**, cu
 ## 1. Thông tin Dịch vụ
 
 ### Các tính năng cốt lõi:
-- **Retrieval-Augmented Generation (RAG):** Sử dụng Google Gemini 1.5 Flash để tổng hợp câu trả lời dựa trên cơ sở tri thức, có trích dẫn tài liệu tham khảo (`[Doc #ID: Tiêu đề]`).
+- **Retrieval-Augmented Generation (RAG):** Sử dụng Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`, thay thế Gemini 1.5 đã ngừng hoạt động) và mô hình vector hóa (`gemini-embedding-001`) để tổng hợp câu trả lời dựa trên cơ sở tri thức, có trích dẫn tài liệu tham khảo (`[Doc #ID: Tiêu đề]`).
 - **Circuit Breaker & Fallback BM25 (< 4.0s):** Tự động chuyển đổi sang tìm kiếm từ khóa/BM25 trên tập dữ liệu `data/seed_faq.json` khi LLM quá hạn (timeout), gặp lỗi 429 hoặc không có API key.
 - **AI Copilot & Ticket Triage:** Tự động sinh mã `#TICK-XXXX`, gán thẻ phân loại, xác định độ ưu tiên, tính toán thời hạn SLA và tạo bản thảo phản hồi khách hàng.
-- **Hỗ trợ Cơ sở dữ liệu linh hoạt:** Mặc định chạy SQLite Async (`aiosqlite`) cho môi trường phát triển cục bộ và hỗ trợ PostgreSQL (`asyncpg` + `pgvector`) cho môi trường triển khai thực tế.
+- **Quản trị Tri thức Đa Doanh nghiệp & Sát hạch AI (Active Verification):** Hệ thống Workspace cách ly tri thức, nạp file PDF/TXT/MD, tự động sinh Synthetic Q&A, chạy RAG Self-Test song song và AI Judge chấm điểm độ trung thực (Faithfulness Score).
+- **Hỗ trợ Cơ sở dữ liệu linh hoạt (Dual-Mode):** Mặc định chạy SQLite Async (`aiosqlite`) cho môi trường phát triển cục bộ và hỗ trợ PostgreSQL (`asyncpg` + `pgvector`) khi chạy Docker Compose.
 
 ---
 
@@ -19,17 +20,19 @@ Dịch vụ Backend bất đồng bộ (ASGI) xây dựng bằng **FastAPI**, cu
 ```text
 backend/
 ├── app/
-│   ├── api/v1/endpoints/   # Các REST endpoints (chat, tickets, agent, health)
-│   ├── core/               # Cấu hình hệ thống, bảo mật (guardrails), xử lý lỗi
-│   ├── db/                 # Khởi tạo kết nối & session cơ sở dữ liệu bất đồng bộ
-│   ├── models/             # SQLAlchemy 2.0 ORM models (Ticket, FAQItem, KnowledgeChunk)
+│   ├── api/v1/endpoints/   # Các REST endpoints (chat, tickets, agent, health, workspaces, documents)
+│   ├── core/               # Cấu hình hệ thống, bảo mật (guardrails), xử lý lỗi RFC 7807
+│   ├── db/                 # Khởi tạo kết nối & session cơ sở dữ liệu bất đồng bộ (session.py)
+│   ├── models/             # SQLAlchemy 2.0 ORM models (Ticket, FAQItem, KnowledgeChunk, Workspace, Document, Verification)
 │   ├── schemas/            # Pydantic v2 schemas chuẩn hóa Request/Response
-│   ├── services/           # Logic nghiệp vụ (LLM, BM25 Fallback, RAG, Ticket Copilot)
+│   ├── services/           # Logic nghiệp vụ (LLM, BM25 Fallback, RAG, Ticket Copilot, DocumentService, VerificationService)
 │   └── main.py             # Điểm khởi tạo ứng dụng FastAPI, cấu hình CORS
 ├── data/
+│   ├── sample_documents/   # Dữ liệu tài liệu mẫu cho các doanh nghiệp (SmileCare, TechStore)
 │   └── seed_faq.json       # Dữ liệu FAQ mẫu phục vụ Fallback & Seed database
 ├── tests/
-│   └── test_api.py         # Bộ kiểm thử tích hợp tự động (pytest + httpx)
+│   ├── test_api.py         # Bộ kiểm thử tích hợp tự động (pytest + httpx)
+│   └── test_workspace_and_verification.py # Bộ kiểm thử Workspaces, Ingestion & Verification
 ├── .env.example            # Mẫu file biến môi trường
 ├── Dockerfile              # Cấu hình container Docker
 └── requirements.txt        # Danh sách thư viện phụ thuộc
@@ -81,12 +84,21 @@ Sau khi khởi động thành công:
 | :--- | :--- | :--- |
 | `POST` | `/api/v1/chat` | Chatbot hỗ trợ khách hàng với RAG, trích dẫn tài liệu & Circuit Breaker |
 | `POST` | `/api/v1/tickets` | Gửi ticket mới (tự sinh mã `#TICK-XXXX`, gán tag và sinh bản thảo trả lời) |
-| `GET` | `/api/v1/tickets` | Lấy danh sách ticket (hỗ trợ lọc theo `status`, `category`, `priority`, `search`) |
+| `GET` | `/api/v1/tickets` | Lấy danh sách ticket (hỗ trợ lọc theo `workspace_id`, `status`, `category`, `priority`, `search`) |
 | `GET` | `/api/v1/tickets/{id}` | Lấy chi tiết ticket theo ID hoặc mã định danh |
 | `PATCH` | `/api/v1/tickets/{id}` | Cập nhật trạng thái ticket hoặc chỉnh sửa bản thảo câu trả lời |
 | `POST` | `/api/v1/agent/tickets/{id}/generate-draft` | AI Copilot tái sinh bản thảo câu trả lời cho ticket |
+| `GET` / `POST` | `/api/v1/workspaces` | Liệt kê danh sách hoặc tạo mới Workspace đa doanh nghiệp |
+| `GET` / `PUT` | `/api/v1/workspaces/{id}` | Xem chi tiết hoặc cập nhật Persona & Quy tắc nghiệp vụ |
+| `POST` | `/api/v1/workspaces/{id}/documents/upload` | Tải lên tài liệu (.pdf, .txt, .md), trích xuất và cắt đoạn (chunking) |
+| `GET` | `/api/v1/workspaces/{id}/documents` | Danh sách tài liệu tri thức của Workspace |
+| `GET` | `/api/v1/documents/{id}/chunks` | Xem chi tiết các đoạn vector chunks của tài liệu |
+| `POST` | `/api/v1/documents/{id}/verify` | Kích hoạt chu trình sát hạch tự động 3 bước (Synthetic QA -> RAG Test -> AI Judge) |
+| `GET` | `/api/v1/documents/{id}/verification-report` | Xem báo cáo sát hạch và điểm độ trung thực (Faithfulness Score) |
+| `POST` | `/api/v1/documents/{id}/publish` | Phê duyệt & xuất bản tài liệu vào Chatbot RAG |
+| `DELETE` | `/api/v1/documents/{id}` | Xóa tài liệu an toàn kèm xóa lan truyền (cascade delete) các chunks/reports |
 | `GET` | `/api/v1/health` | Kiểm tra trạng thái hoạt động của dịch vụ và kết nối cơ sở dữ liệu |
-| `GET` | `/api/v1/health/smoke-test` | Đo lường độ trễ thực tế của kết nối LLM |
+| `GET` | `/api/v1/health/smoke-test` | Đo lường độ trễ thực tế của kết nối LLM (Gemini 3.5 Flash Lite) |
 
 ---
 

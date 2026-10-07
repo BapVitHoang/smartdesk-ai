@@ -130,8 +130,8 @@ Basic operational readiness.
 Executes an actual round-trip test to the configured LLM and returns measured latency.
 ```json
 {
-  "model": "gemini-1.5-flash",
-  "latency_ms": 852.53,
+  "model": "gemini-3.5-flash-lite",
+  "latency_ms": 922.74,
   "status": "PASS",
   "sample_prompt": "You are an AI Customer Support Assistant...",
   "sample_response": "Hello! If you cannot access your registered email..."

@@ -15,8 +15,8 @@ class HealthResponse(BaseModel):
 class SmokeTestResponse(BaseModel):
     """Smoke test benchmarking response executing live LLM round-trip."""
 
-    model: str = Field(..., description="The LLM model tested", examples=["gemini-1.5-flash"])
-    latency_ms: float = Field(..., description="Total round-trip latency in milliseconds", examples=[852.53])
+    model: str = Field(..., description="The LLM model tested", examples=["gemini-3.5-flash-lite"])
+    latency_ms: float = Field(..., description="Total round-trip latency in milliseconds", examples=[922.74])
     status: str = Field(..., description="Test outcome: 'PASS' or 'FAIL'", examples=["PASS"])
     sample_prompt: str = Field(..., description="The prompt dispatched to the model")
     sample_response: str = Field(..., description="Actual response text returned by the model")

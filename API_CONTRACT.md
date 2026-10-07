@@ -18,7 +18,8 @@ Ask questions to the customer support AI assistant with verified citation ground
 ```json
 {
   "message": "How do I reset my password if I lost access to my email?",
-  "session_id": "sess-9a8b7c"
+  "session_id": "sess-9a8b7c",
+  "workspace_id": 1
 }
 ```
 
@@ -30,12 +31,15 @@ Ask questions to the customer support AI assistant with verified citation ground
     {
       "doc_id": "doc-01",
       "title": "How to Reset Your CloudDesk / SmartDesk Password",
-      "source_url": "/faq/auth/password-reset"
+      "source_url": "/faq/auth/password-reset",
+      "page": 1,
+      "snippet": "To reset your password without email access: 1. Go to the login screen..."
     }
   ],
-  "latency_ms": 782.45,
+  "latency_ms": 922.74,
   "confidence": 0.92,
   "is_fallback": false,
+  "fallback_reason": null,
   "escalation_recommended": false
 }
 ```
@@ -265,15 +269,176 @@ Operational readiness probe.
 ---
 
 ### `GET /api/v1/health/smoke-test`
-Executes an actual round-trip test against Google Gemini 1.5 Flash and measures latency.
+Executes an actual round-trip test against Google Gemini 3.5 Flash Lite and measures live latency.
 
 #### Response (HTTP 200 OK)
 ```json
 {
-  "model": "gemini-1.5-flash",
-  "latency_ms": 852.53,
+  "model": "gemini-3.5-flash-lite",
+  "latency_ms": 922.74,
   "status": "PASS",
   "sample_prompt": "You are an AI Customer Support Assistant. Briefly greet the user in one sentence and explain how to reset a password.",
   "sample_response": "Hello! To reset your password, visit the login page, click 'Forgot Password?', and enter your email address to receive a secure reset link."
+}
+```
+
+---
+
+## 6. Multi-Domain Workspaces API
+
+### `GET /api/v1/workspaces`
+Retrieve all registered business tenants / workspaces.
+
+#### Response (HTTP 200 OK)
+```json
+[
+  {
+    "id": 1,
+    "slug": "default",
+    "name": "SmartDesk Cloud Support",
+    "industry": "IT & SaaS",
+    "persona_name": "SmartDesk Assistant",
+    "tone_of_voice": "Chuyên nghiệp, ngắn gọn, thân thiện và chính xác về mặt kỹ thuật.",
+    "business_rules": "Hỗ trợ xử lý sự cố tài khoản, phân quyền, tích hợp API, thanh toán định kỳ. Luôn bảo vệ an toàn thông tin khách hàng.",
+    "created_at": "2026-09-27T08:00:00Z"
+  }
+]
+```
+
+---
+
+### `POST /api/v1/workspaces`
+Register a new business domain workspace.
+
+#### Request Body
+```json
+{
+  "slug": "smilecare",
+  "name": "Nha Khoa Thẩm Mỹ SmileCare",
+  "industry": "Y tế & Nha khoa",
+  "persona_name": "Bác sĩ SmileCare Bot",
+  "tone_of_voice": "Ân cần, chu đáo, đồng cảm, chuyên môn y khoa cao nhưng dễ hiểu.",
+  "business_rules": "Tư vấn niềng răng, bọc sứ, tẩy trắng, cấy ghép Implant. Báo giá minh bạch."
+}
+```
+
+#### Response (HTTP 201 Created)
+```json
+{
+  "id": 2,
+  "slug": "smilecare",
+  "name": "Nha Khoa Thẩm Mỹ SmileCare",
+  "industry": "Y tế & Nha khoa",
+  "persona_name": "Bác sĩ SmileCare Bot",
+  "tone_of_voice": "Ân cần, chu đáo, đồng cảm, chuyên môn y khoa cao nhưng dễ hiểu.",
+  "business_rules": "Tư vấn niềng răng, bọc sứ, tẩy trắng, cấy ghép Implant. Báo giá minh bạch.",
+  "created_at": "2026-09-27T08:30:00Z"
+}
+```
+
+---
+
+### `GET /api/v1/workspaces/{id}`
+Fetch detailed workspace profile and rules by ID.
+
+---
+
+### `PUT /api/v1/workspaces/{id}`
+Update persona attributes, tone of voice, or business rules.
+
+---
+
+## 7. Knowledge Ingestion & Active Verification Studio
+
+### `POST /api/v1/workspaces/{workspace_id}/documents/upload`
+Upload a `.pdf`, `.txt`, or `.md` file for text extraction, recursive chunking (600-800 chars, 100 overlap), and embedding.
+
+#### Request Form Data
+- `file`: Binary file upload (`multipart/form-data`)
+
+#### Response (HTTP 201 Created)
+```json
+{
+  "id": 10,
+  "workspace_id": 2,
+  "filename": "bang_gia_dich_vu_smilecare.txt",
+  "file_type": "txt",
+  "file_size": 2048,
+  "status": "pending",
+  "chunk_count": 3,
+  "created_at": "2026-09-27T09:00:00Z"
+}
+```
+
+---
+
+### `GET /api/v1/documents/{document_id}/chunks`
+Inspect extracted chunks and page locations of a document.
+
+#### Response (HTTP 200 OK)
+```json
+[
+  {
+    "id": 45,
+    "chunk_id": "doc-10-chk-1",
+    "chunk_index": 0,
+    "page_number": 1,
+    "title": "bang_gia_dich_vu_smilecare.txt - Trang 1 (Mục 1)",
+    "content": "BẢNG GIÁ DỊCH VỤ NHA KHOA SMILECARE...",
+    "source_url": "/documents/10/page/1"
+  }
+]
+```
+
+---
+
+### `POST /api/v1/documents/{document_id}/verify`
+Execute the 3-step Active Verification Engine: Synthetic QA Generation $\to$ Parallel RAG Self-Test $\to$ AI Judge Faithfulness Evaluation.
+
+#### Response (HTTP 200 OK)
+```json
+{
+  "id": 4,
+  "document_id": 10,
+  "workspace_id": 2,
+  "faithfulness_score": 0.95,
+  "status": "passed",
+  "created_at": "2026-09-27T09:05:00Z",
+  "items": [
+    {
+      "id": 12,
+      "question": "Chi phí tẩy trắng răng tại SmileCare là bao nhiêu?",
+      "ground_truth": "Tẩy trắng răng bằng công nghệ Laser White có giá 2.500.000 VNĐ một liệu trình 60 phút.",
+      "rag_answer": "Dịch vụ tẩy trắng răng Laser White tại SmileCare có giá 2.500.000 VNĐ cho liệu trình 60 phút.",
+      "score": 0.98,
+      "status": "passed",
+      "reason": "Câu trả lời bám sát và chính xác tuyệt đối với tài liệu gốc."
+    }
+  ]
+}
+```
+
+---
+
+### `POST /api/v1/documents/{document_id}/publish`
+Approve and publish a verified document into live production RAG.
+
+#### Response (HTTP 200 OK)
+```json
+{
+  "id": 10,
+  "status": "published",
+  "message": "Đã xuất bản tài liệu thành công ra Chatbot."
+}
+```
+
+---
+
+### `DELETE /api/v1/documents/{document_id}`
+Safely delete a document with cascade cleanup of all associated chunks, verification reports, and items.
+```json
+{
+  "ok": true,
+  "message": "Đã xóa thành công tài liệu ID 10."
 }
 ```

@@ -53,7 +53,7 @@ Before modifying or generating code:
 
 ### Step 3: Implement Pure Services (`app/services/`)
 1. **`llm_service.py`**:
-   - Wrap Google Gemini 1.5 Flash using `google-genai` or `google-generativeai`.
+   - Wrap Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`) using `google-genai` or `google-generativeai`.
    - Measure real-time latency with `time.perf_counter()`.
    - Strictly wrap calls in `asyncio.wait_for(..., timeout=config.LLM_TIMEOUT_SECONDS)`.
 2. **`fallback_service.py`**:
@@ -62,7 +62,7 @@ Before modifying or generating code:
    - Compute matching score using token overlap / BM25 / Jaccard similarity.
    - Return top match or fallback template with zero LLM dependency.
 3. **`rag_service.py`**:
-   - Embed user query with `text-embedding-004`.
+   - Embed user query with `gemini-embedding-001`.
    - Query similarity against `KnowledgeChunk`.
    - Build grounded prompt with citations: `[Doc #X: title]`.
    - If error or timeout occurs, smoothly invoke `fallback_service.py`.

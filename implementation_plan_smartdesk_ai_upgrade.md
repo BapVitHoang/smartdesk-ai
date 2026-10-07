@@ -16,7 +16,7 @@
    - Danh sách ticket hỗ trợ gắn liền với workspace đó.
 
 2. **Nạp Tri Thức Động (Dynamic Knowledge Ingestion):**  
-   Cho phép Quản trị viên tải lên tài liệu thực tế (`.pdf`, `.txt`, `.md`). Hệ thống tự động bóc tách nội dung văn bản (kèm số trang đối với PDF), chia đoạn thông minh (Recursive Chunking 600-800 ký tự với overlap 100 ký tự), tính toán vector embedding (Gemini `text-embedding-004`) và lưu trữ vào cơ sở dữ liệu.
+   Cho phép Quản trị viên tải lên tài liệu thực tế (`.pdf`, `.txt`, `.md`). Hệ thống tự động bóc tách nội dung văn bản (kèm số trang đối với PDF), chia đoạn thông minh (Recursive Chunking 600-800 ký tự với overlap 100 ký tự), tính toán vector embedding (Gemini `gemini-embedding-001`) và lưu trữ vào cơ sở dữ liệu.
 
 3. **Module Sát Hạch & Thẩm Định Tri Thức Chủ Động (Active Knowledge Verification Engine):**  
    Trước khi đưa tài liệu vào Chatbot trả lời khách hàng, hệ thống bắt buộc chạy qua quy trình thẩm định 3 bước:
@@ -44,7 +44,7 @@ Qua quá trình rà soát code-level, 5 lỗ hổng kỹ thuật và cơ chế F
 flowchart TD
     REQ[Client Request: Chat / Verify / Embedding] --> CB{Kiểm tra Circuit Breaker Cooldown?}
     CB -- Đang trong Cooldown 60s do 429 --> FB[CHẶN GỌI GEMINI: 100% Chuyển sang Fallback Cục bộ]
-    CB -- Bình thường --> API[Gọi Google Gemini 1.5 Flash / text-embedding-004]
+    CB -- Bình thường --> API[Gọi Google Gemini 3.5 Flash Lite / gemini-embedding-001]
     API -- Thành công --> RES[Trả kết quả chuẩn xác]
     API -- Bắt gặp HTTP 429 / Rate Limit / Timeout --> ACT[KÍCH HOẠT COST-GUARD: Set Cooldown 60s]
     ACT --> FB
@@ -52,7 +52,7 @@ flowchart TD
 ```
 
 ### 2.1. Cơ Chế Bảo Vệ Chi Phí Free Tier (Stateful Cost-Guard Circuit Breaker)
-* **Thực trạng Free Tier:** Hạn mức Gemini 1.5 Flash Free Tier là 15 RPM (Requests Per Minute). Khi vượt ngưỡng, Google trả mã lỗi `429 Too Many Requests` hoặc `ResourceExhausted`. Nếu hệ thống tiếp tục retry vô tội vạ, có nguy cơ phát sinh chi phí nếu tài khoản có liên kết thẻ thanh toán.
+* **Thực trạng Free Tier:** Hạn mức Gemini 3.5 Flash Lite Free Tier là 15 RPM (Requests Per Minute). Khi vượt ngưỡng, Google trả mã lỗi `429 Too Many Requests` hoặc `ResourceExhausted`. Nếu hệ thống tiếp tục retry vô tội vạ, có nguy cơ phát sinh chi phí nếu tài khoản có liên kết thẻ thanh toán.
 * **Quy tắc bảo vệ:**
   1. Trong `llm_service.py` và `embedding_service.py`, duy trì biến trạng thái:  
      `is_rate_limited: bool = False`, `cooldown_until: float = 0.0`.
@@ -98,7 +98,7 @@ flowchart TD
     subgraph Studio["1. Quản Trị Viên (Knowledge Studio Tab)"]
         W1[Workspace Profile: Tên, Ngành nghề, Persona, Business Rules] --> W2[Upload File: PDF / TXT / MD]
         W2 --> DS[DocumentService: Bóc tách Text & Recursive Chunking 600-800 ký tự]
-        DS --> ES[EmbeddingService: Gemini text-embedding-004 + Throttling 5 chunks/batch]
+        DS --> ES[EmbeddingService: Gemini gemini-embedding-001 + Throttling 5 chunks/batch]
         ES --> DB[(Storage: Chunks kèm embedding JSON / Vector)]
         
         %% Pipeline Sát Hạch Tri Thức

@@ -19,8 +19,8 @@ class Settings(BaseSettings):
 
     # AI & Google Gemini Model Parameters
     GEMINI_API_KEY: str = ""
-    LLM_MODEL_NAME: str = "gemini-1.5-flash"
-    EMBEDDING_MODEL_NAME: str = "text-embedding-004"
+    LLM_MODEL_NAME: str = "gemini-3.5-flash-lite"
+    EMBEDDING_MODEL_NAME: str = "gemini-embedding-001"
 
     # Circuit Breaker & Strict Latency Budget (Max 4.0s)
     LLM_TIMEOUT_SECONDS: float = 4.0
@@ -35,8 +35,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "*"
+        "http://127.0.0.1:5173"
     ]
 
     # Seed FAQ File Path
