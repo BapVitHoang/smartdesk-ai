@@ -31,9 +31,9 @@ class VerificationService:
         """
         if not raw_text or not raw_text.strip():
             return {
-                "score": 0.85,
-                "status": "passed",
-                "reason": "Tự động phê duyệt theo chuẩn đối soát nội bộ."
+                "score": 0.0,
+                "status": "failed",
+                "reason": "Không nhận được phản hồi đánh giá từ bộ máy suy luận."
             }
 
         text = raw_text.strip()
@@ -59,11 +59,11 @@ class VerificationService:
         try:
             return json.loads(text)
         except Exception:
-            logger.warning(f"Could not parse JSON from LLM response: {text[:100]}... Using default fallback.")
+            logger.warning(f"Could not parse JSON from LLM response: {text[:100]}... Verification failed.")
             return {
-                "score": 0.85,
-                "status": "passed",
-                "reason": "Tự động đối soát và phê duyệt dữ liệu kiến thức cơ sở."
+                "score": 0.0,
+                "status": "failed",
+                "reason": "Không thể phân tích cấu trúc JSON từ kết quả đánh giá của AI Judge."
             }
 
     async def generate_synthetic_qa(
@@ -189,14 +189,20 @@ class VerificationService:
         rag_tokens = set(re.findall(r"\w+", rag_answer.lower()))
 
         if not gt_tokens or not rag_tokens:
-            return 0.80, "warning", "Dữ liệu đối soát ngắn, tạm duyệt ở mức cảnh báo."
+            return 0.30, "failed", "Dữ liệu đối soát không đủ token để thẩm định."
 
         overlap = len(gt_tokens.intersection(rag_tokens))
         ratio = overlap / len(gt_tokens)
 
-        # Rescale ratio to a realistic faithfulness range (0.6 - 0.95)
-        score = round(min(0.95, max(0.60, 0.60 + ratio * 0.35)), 2)
-        status_str = "passed" if score >= 0.85 else "warning"
+        # Scale faithfulness range (0.0 - 0.95) based on actual lexical overlap
+        score = round(min(0.95, ratio), 2)
+        if score >= 0.70:
+            status_str = "passed"
+        elif score >= 0.40:
+            status_str = "warning"
+        else:
+            status_str = "failed"
+
         reason = f"Đối soát tự động nội bộ: Độ khớp từ vựng đạt {int(ratio * 100)}%."
         return score, status_str, reason
 
@@ -326,113 +332,129 @@ class VerificationService:
 
         start_time = time.perf_counter()
 
-        # 2. Generate Synthetic QA
-        qa_pairs = await self.generate_synthetic_qa(list(chunks))
-        if not qa_pairs:
-            qa_pairs = self._generate_rule_based_qa(list(chunks))
+        try:
+            # 2. Generate Synthetic QA
+            qa_pairs = await self.generate_synthetic_qa(list(chunks))
+            if not qa_pairs:
+                qa_pairs = self._generate_rule_based_qa(list(chunks))
 
-        # 3. Independent Verification Sandbox Test (DECOUPLED from Customer Chatbot)
-        questions = [qa["question"] for qa in qa_pairs]
-        ws_name = "Doanh nghiệp"
-        if doc.workspace_id:
-            ws_res = await session.execute(select(Workspace).where(Workspace.id == doc.workspace_id))
-            ws_obj = ws_res.scalar_one_or_none()
-            if ws_obj:
-                ws_name = ws_obj.name
+            # 3. Independent Verification Sandbox Test (DECOUPLED from Customer Chatbot)
+            questions = [qa["question"] for qa in qa_pairs]
+            ws_name = "Doanh nghiệp"
+            if doc.workspace_id:
+                ws_res = await session.execute(select(Workspace).where(Workspace.id == doc.workspace_id))
+                ws_obj = ws_res.scalar_one_or_none()
+                if ws_obj:
+                    ws_name = ws_obj.name
 
-        rag_tasks = [
-            self.answer_sandbox_query(
-                query=q,
-                chunks=list(chunks),
-                workspace_name=ws_name
+            rag_tasks = [
+                self.answer_sandbox_query(
+                    query=q,
+                    chunks=list(chunks),
+                    workspace_name=ws_name
+                )
+                for q in questions
+            ]
+            rag_answers = await asyncio.gather(*rag_tasks)
+
+            # 4. Evaluate each QA with AI Judge
+            judge_tasks = [
+                self.evaluate_faithfulness(qa["ground_truth"], rag_ans)
+                for qa, rag_ans in zip(qa_pairs, rag_answers)
+            ]
+            judge_results = await asyncio.gather(*judge_tasks)
+
+            # 5. Compile Verification Items & Report
+            total_score = 0.0
+            has_failed = False
+            has_warning = False
+
+            # Clear any existing report for this document
+            existing_report_res = await session.execute(
+                select(VerificationReport).where(VerificationReport.document_id == document_id)
             )
-            for q in questions
-        ]
-        rag_answers = await asyncio.gather(*rag_tasks)
+            existing_report = existing_report_res.scalar_one_or_none()
+            if existing_report:
+                from sqlalchemy import delete
+                await session.execute(
+                    delete(VerificationItem).where(VerificationItem.report_id == existing_report.id)
+                )
+                await session.delete(existing_report)
+                await session.flush()
 
-        # 4. Evaluate each QA with AI Judge
-        judge_tasks = [
-            self.evaluate_faithfulness(qa["ground_truth"], rag_ans)
-            for qa, rag_ans in zip(qa_pairs, rag_answers)
-        ]
-        judge_results = await asyncio.gather(*judge_tasks)
-
-        # 5. Compile Verification Items & Report
-        total_score = 0.0
-        has_failed = False
-        has_warning = False
-
-        # Clear any existing report for this document
-        existing_report_res = await session.execute(
-            select(VerificationReport).where(VerificationReport.document_id == document_id)
-        )
-        existing_report = existing_report_res.scalar_one_or_none()
-        if existing_report:
-            from sqlalchemy import delete
-            await session.execute(
-                delete(VerificationItem).where(VerificationItem.report_id == existing_report.id)
+            report = VerificationReport(
+                document_id=doc.id,
+                workspace_id=doc.workspace_id,
+                faithfulness_score=0.0,
+                status="passed"
             )
-            await session.delete(existing_report)
+            session.add(report)
             await session.flush()
 
-        report = VerificationReport(
-            document_id=doc.id,
-            workspace_id=doc.workspace_id,
-            faithfulness_score=0.0,
-            status="passed"
-        )
-        session.add(report)
-        await session.flush()
+            for qa, rag_ans, (score, status_str, reason) in zip(qa_pairs, rag_answers, judge_results):
+                total_score += score
+                if status_str == "failed":
+                    has_failed = True
+                elif status_str == "warning":
+                    has_warning = True
 
-        for qa, rag_ans, (score, status_str, reason) in zip(qa_pairs, rag_answers, judge_results):
-            total_score += score
-            if status_str == "failed":
-                has_failed = True
-            elif status_str == "warning":
-                has_warning = True
+                item = VerificationItem(
+                    report_id=report.id,
+                    question=qa["question"],
+                    ground_truth=qa["ground_truth"],
+                    rag_answer=rag_ans,
+                    score=score,
+                    status=status_str,
+                    reason=reason
+                )
+                session.add(item)
 
-            item = VerificationItem(
-                report_id=report.id,
-                question=qa["question"],
-                ground_truth=qa["ground_truth"],
-                rag_answer=rag_ans,
-                score=score,
-                status=status_str,
-                reason=reason
+            avg_score = round(total_score / max(1, len(qa_pairs)), 2)
+            report.faithfulness_score = avg_score
+
+            if has_failed or avg_score < 0.60:
+                report.status = "failed"
+                doc.status = "failed"
+            elif has_warning or avg_score < 0.85:
+                report.status = "warning"
+                doc.status = "verified"
+            else:
+                report.status = "passed"
+                doc.status = "verified"
+
+            await session.commit()
+            await session.refresh(report)
+
+            elapsed = round(time.perf_counter() - start_time, 2)
+            logger.info(
+                f"Completed active verification for Document {doc.id} in {elapsed}s: "
+                f"Score={avg_score}, Status={report.status}"
             )
-            session.add(item)
-
-        avg_score = round(total_score / max(1, len(qa_pairs)), 2)
-        report.faithfulness_score = avg_score
-
-        if has_failed or avg_score < 0.60:
-            report.status = "failed"
+            return report
+        except Exception as exc:
+            logger.error(f"Active verification failed for Document {doc.id}: {exc}", exc_info=True)
             doc.status = "failed"
-        elif has_warning or avg_score < 0.85:
-            report.status = "warning"
-            doc.status = "verified"
-        else:
-            report.status = "passed"
-            doc.status = "verified"
-
-        await session.commit()
-        await session.refresh(report)
-
-        elapsed = round(time.perf_counter() - start_time, 2)
-        logger.info(
-            f"Completed active verification for Document {doc.id} in {elapsed}s: "
-            f"Score={avg_score}, Status={report.status}"
-        )
-        return report
+            try:
+                await session.commit()
+            except Exception:
+                await session.rollback()
+            raise
 
     async def publish_document(self, document_id: int, session: AsyncSession) -> Document:
         """
         Activates document into the live knowledge base (status = 'published').
+        Requires document to have passed verification (status == 'verified').
         """
         doc_result = await session.execute(select(Document).where(Document.id == document_id))
         doc = doc_result.scalar_one_or_none()
         if not doc:
             raise ValueError(f"Không tìm thấy tài liệu ID {document_id}")
+
+        if doc.status != "verified":
+            raise ValueError(
+                f"Tài liệu ID {document_id} chưa đạt kiểm định (trạng thái hiện tại: '{doc.status}'). "
+                f"Chỉ tài liệu đã qua sát hạch thành công ('verified') mới được xuất bản vào RAG."
+            )
 
         doc.status = "published"
         await session.commit()

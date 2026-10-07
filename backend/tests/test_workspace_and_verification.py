@@ -107,6 +107,11 @@ async def test_document_verification_pipeline(client: AsyncClient):
     assert upload_resp.status_code == 201
     doc_id = upload_resp.json()["id"]
 
+    # Try publishing unverified document (must fail with 400 Bad Request)
+    unverified_pub = await client.post(f"/api/v1/documents/{doc_id}/publish")
+    assert unverified_pub.status_code == 400
+    assert "chưa đạt kiểm định" in unverified_pub.json()["detail"]
+
     # Trigger Verification
     verify_resp = await client.post(f"/api/v1/documents/{doc_id}/verify")
     assert verify_resp.status_code == 200
@@ -126,6 +131,18 @@ async def test_document_verification_pipeline(client: AsyncClient):
     assert pub_resp.status_code == 200
     pub_data = pub_resp.json()
     assert pub_data["status"] == "published"
+
+
+def test_clean_json_response_fail_closed():
+    """Verify that unparseable or empty responses fail closed with score 0.0 and status failed."""
+    from app.services.verification_service import verification_service
+    res1 = verification_service.clean_json_response("")
+    assert res1["status"] == "failed"
+    assert res1["score"] == 0.0
+
+    res2 = verification_service.clean_json_response("Invalid JSON response content")
+    assert res2["status"] == "failed"
+    assert res2["score"] == 0.0
 
 
 @pytest.mark.asyncio
