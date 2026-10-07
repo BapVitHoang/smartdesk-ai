@@ -93,7 +93,7 @@ class EmbeddingService:
         try:
             return await asyncio.wait_for(
                 self._call_gemini_embedding(text),
-                timeout=settings.LLM_TIMEOUT_SECONDS
+                timeout=min(2.0, settings.LLM_TIMEOUT_SECONDS)
             )
         except Exception as exc:
             err_str = str(exc)

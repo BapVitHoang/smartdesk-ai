@@ -174,7 +174,7 @@ export async function sendChatMessage(
           workspace_id: workspaceId || 1,
         }),
       },
-      4500
+      8000
     );
 
     if (!res.ok) {
@@ -275,7 +275,7 @@ export async function createTicket(
           description: formData.message,
         }),
       },
-      4500
+      10000
     );
 
     if (!res.ok) {
@@ -478,7 +478,7 @@ export async function regenerateAiDraft(
       {
         method: 'POST',
       },
-      4500
+      8000
     );
 
     if (!res.ok) {

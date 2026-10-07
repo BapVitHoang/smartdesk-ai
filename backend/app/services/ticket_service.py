@@ -1,6 +1,7 @@
 """Ticket lifecycle management, SLA estimation, auto-tagging, and AI Copilot drafting."""
 
 import random
+import re
 import logging
 from typing import List, Tuple, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -140,12 +141,23 @@ class TicketService:
         """
         Creates a new ticket, assigns #TICK-XXXX code, auto-tags, and pre-populates AI draft.
         """
-        # Get count to determine next sequence number
-        count_result = await db.execute(select(func.count(Ticket.id)))
-        current_count = count_result.scalar_one() or 0
-        sequence_num = 1001 + current_count
-
+        # Determine next sequence number by finding max existing code to avoid collision with seed data
+        result = await db.execute(select(Ticket.ticket_code))
+        existing_codes = result.scalars().all()
+        max_num = 1000
+        for code in existing_codes:
+            m = re.search(r"(\d+)$", code)
+            if m:
+                val = int(m.group(1))
+                if val > max_num:
+                    max_num = val
+        sequence_num = max(max_num + 1, 1001)
         ticket_code = f"#TICK-{sequence_num}"
+        existing_set = set(existing_codes)
+        while ticket_code in existing_set:
+            sequence_num += 1
+            ticket_code = f"#TICK-{sequence_num}"
+
         ws_id = ticket_in.workspace_id or 1
 
         # Calculate SLA response hours

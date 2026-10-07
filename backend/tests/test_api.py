@@ -214,3 +214,25 @@ async def test_list_and_get_knowledge_articles(client: AsyncClient):
     assert "content" in item
 
 
+@pytest.mark.asyncio
+async def test_ticket_code_collision_resistance(client: AsyncClient):
+    """Test creating multiple tickets sequentially to ensure ticket_code uniqueness and zero collisions."""
+    created_codes = set()
+    for i in range(10):
+        payload = {
+            "customer_name": f"Sequential User {i}",
+            "customer_email": f"seq_{i}@example.com",
+            "category": "Technical",
+            "priority": "Low",
+            "subject": f"Sequential Test Subject {i}",
+            "description": f"Testing ticket sequence generation {i}"
+        }
+        res = await client.post("/api/v1/tickets", json=payload)
+        assert res.status_code == 201
+        data = res.json()
+        code = data["ticket_code"]
+        assert code not in created_codes, f"Duplicate ticket code detected: {code}"
+        created_codes.add(code)
+
+
+
