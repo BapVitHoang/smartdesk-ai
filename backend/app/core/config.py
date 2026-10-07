@@ -8,6 +8,11 @@ import os
 from pathlib import Path
 
 
+BACKEND_DIR: Path = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT: Path = BACKEND_DIR.parent
+DEFAULT_SQLITE_PATH: str = (BACKEND_DIR / "smartdesk.db").as_posix()
+
+
 class Settings(BaseSettings):
     """Centralized application configuration."""
 
@@ -27,8 +32,8 @@ class Settings(BaseSettings):
     RAG_CONFIDENCE_THRESHOLD: float = 0.65
 
     # Database Configuration (PostgreSQL 16 with pgvector or SQLite async fallback)
-    DATABASE_URL: str = "sqlite+aiosqlite:///./smartdesk.db"
-    FALLBACK_SQLITE_URL: str = "sqlite+aiosqlite:///./smartdesk.db"
+    DATABASE_URL: str = f"sqlite+aiosqlite:///{DEFAULT_SQLITE_PATH}"
+    FALLBACK_SQLITE_URL: str = f"sqlite+aiosqlite:///{DEFAULT_SQLITE_PATH}"
 
     # CORS Allowed Origins
     CORS_ORIGINS: Union[List[str], str] = [
@@ -39,14 +44,33 @@ class Settings(BaseSettings):
     ]
 
     # Seed FAQ File Path
-    SEED_FAQ_PATH: str = "data/seed_faq.json"
+    SEED_FAQ_PATH: str = (BACKEND_DIR / "data" / "seed_faq.json").as_posix()
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=[
+            str(PROJECT_ROOT / ".env"),
+            str(BACKEND_DIR / ".env")
+        ],
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=True
     )
+
+    @field_validator("DATABASE_URL", "FALLBACK_SQLITE_URL", mode="before")
+    @classmethod
+    def resolve_sqlite_path(cls, v: str) -> str:
+        """Resolve relative SQLite paths to absolute paths within backend dir."""
+        if isinstance(v, str):
+            prefix = "sqlite+aiosqlite:///"
+            if v.startswith(prefix):
+                rel_path = v[len(prefix):]
+                if rel_path.startswith("./"):
+                    rel_path = rel_path[2:]
+                path_obj = Path(rel_path)
+                if not path_obj.is_absolute() and not (len(rel_path) > 1 and rel_path[1] == ":"):
+                    abs_path = (BACKEND_DIR / rel_path).resolve().as_posix()
+                    return f"{prefix}{abs_path}"
+        return v
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
