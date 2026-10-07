@@ -41,6 +41,30 @@ export function registerApiToastHandler(fn: ToastNotifier | null) {
   globalToastNotifier = fn;
 }
 
+export class ApiError extends Error {
+  statusCode: number;
+  detail: string;
+
+  constructor(statusCode: number, detail: string) {
+    super(detail || `HTTP ${statusCode}`);
+    this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.detail = detail;
+  }
+}
+
+export function isNetworkError(error: any): boolean {
+  return (
+    error instanceof TypeError ||
+    error?.name === 'AbortError' ||
+    (typeof error?.message === 'string' &&
+      (error.message.includes('Failed to fetch') ||
+        error.message.includes('NetworkError') ||
+        error.message.includes('aborted') ||
+        error.message.includes('fetch failed')))
+  );
+}
+
 function notifyFallback(msg: string, type: ToastType = 'warning') {
   if (globalToastNotifier) {
     globalToastNotifier(msg, type);
@@ -179,7 +203,7 @@ export async function sendChatMessage(
 
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.detail || `Server error: HTTP ${res.status}`);
+      throw new ApiError(res.status, errData.detail || `Lỗi máy chủ: HTTP ${res.status}`);
     }
 
     const data: BackendChatResponse = await res.json();
@@ -225,6 +249,12 @@ export async function sendChatMessage(
       escalation_recommended: data.escalation_recommended,
     };
   } catch (error: any) {
+    if (error instanceof ApiError) {
+      const toastFn = onToast || notifyFallback;
+      toastFn(error.detail || `Lỗi máy chủ: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
+
     const elapsed = Math.round(performance.now() - startTime);
     const toastFn = onToast || notifyFallback;
     toastFn(
@@ -280,7 +310,7 @@ export async function createTicket(
 
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.detail || `Server error: HTTP ${res.status}`);
+      throw new ApiError(res.status, errData.detail || `Lỗi tạo ticket: HTTP ${res.status}`);
     }
 
     const data: BackendTicketResponse = await res.json();
@@ -290,6 +320,11 @@ export async function createTicket(
     localFallbackTickets = [mappedTicket, ...localFallbackTickets];
     return mappedTicket;
   } catch (error: any) {
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi tạo ticket: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
+
     toastFn(
       'Không thể kết nối đến máy chủ. Ticket đã được lưu an toàn vào bộ nhớ cục bộ.',
       'warning'
@@ -361,7 +396,8 @@ export async function getTickets(
     const res = await fetchWithTimeout(url, { method: 'GET' }, 4000);
 
     if (!res.ok) {
-      throw new Error(`Server returned HTTP ${res.status}`);
+      const errData = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, errData.detail || `Lỗi máy chủ: HTTP ${res.status}`);
     }
 
     const data: BackendTicketResponse[] = await res.json();
@@ -371,6 +407,11 @@ export async function getTickets(
     localFallbackTickets = mapped;
     return mapped;
   } catch (error: any) {
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi tải danh sách ticket: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
+
     toastFn(
       'Không thể kết nối Backend để tải danh sách ticket. Đang sử dụng dữ liệu dự phòng.',
       'warning'
@@ -408,7 +449,8 @@ export async function updateTicketStatus(
     );
 
     if (!res.ok) {
-      throw new Error(`Server returned HTTP ${res.status}`);
+      const errData = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, errData.detail || `Lỗi máy chủ: HTTP ${res.status}`);
     }
 
     const data: BackendTicketResponse = await res.json();
@@ -421,6 +463,11 @@ export async function updateTicketStatus(
 
     return updated;
   } catch (error: any) {
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi cập nhật ticket: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
+
     toastFn(
       'Không thể cập nhật máy chủ. Đã ghi nhận thay đổi trên giao diện người dùng.',
       'warning'
@@ -805,20 +852,26 @@ export async function deleteDocument(
   documentId: number,
   onToast?: ToastNotifier
 ): Promise<boolean> {
+  const toastFn = onToast || notifyFallback;
   try {
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/documents/${documentId}`,
       { method: 'DELETE' },
       4000
     );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.detail || `HTTP ${res.status}`);
+    }
     localFallbackDocuments = localFallbackDocuments.filter((d) => d.id !== documentId);
     return true;
-  } catch {
-    const toastFn = onToast || notifyFallback;
-    toastFn('Đã xóa tài liệu khỏi bộ nhớ cục bộ.', 'info');
-    localFallbackDocuments = localFallbackDocuments.filter((d) => d.id !== documentId);
-    return true;
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi xóa tài liệu: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
+    toastFn('Không thể kết nối máy chủ để xóa tài liệu.', 'warning');
+    throw error;
   }
 }
 
@@ -830,6 +883,7 @@ export async function verifyDocument(
   documentId: number,
   onToast?: ToastNotifier
 ): Promise<VerificationReport> {
+  const toastFn = onToast || notifyFallback;
   try {
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/documents/${documentId}/verify`,
@@ -838,7 +892,7 @@ export async function verifyDocument(
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
+      throw new ApiError(res.status, err.detail || `HTTP ${res.status}`);
     }
     const report: VerificationReport = await res.json();
     localFallbackReports[documentId] = report;
@@ -846,31 +900,12 @@ export async function verifyDocument(
     if (doc) doc.status = report.status === 'failed' ? 'failed' : 'verified';
     return report;
   } catch (error: any) {
-    const toastFn = onToast || notifyFallback;
-    toastFn('Sát hạch tự động bằng bộ quy tắc đối soát cục bộ.', 'info');
-    const fallbackReport: VerificationReport = localFallbackReports[documentId] || {
-      id: Date.now(),
-      document_id: documentId,
-      workspace_id: 1,
-      faithfulness_score: 0.94,
-      status: 'passed',
-      created_at: new Date().toISOString(),
-      items: [
-        {
-          id: 1,
-          question: 'Quy định chính sách nổi bật trong tài liệu là gì?',
-          ground_truth: 'Chính sách bảo hành và cam kết chất lượng theo tiêu chuẩn doanh nghiệp.',
-          rag_answer: 'Tài liệu nêu rõ chính sách bảo hành và cam kết chất lượng dịch vụ minh bạch.',
-          score: 0.95,
-          status: 'passed',
-          reason: 'Câu trả lời bám sát nội dung văn bản chuẩn.',
-        },
-      ],
-    };
-    localFallbackReports[documentId] = fallbackReport;
-    const doc = localFallbackDocuments.find((d) => d.id === documentId);
-    if (doc) doc.status = 'verified';
-    return fallbackReport;
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi sát hạch tài liệu: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
+    toastFn('Không thể kết nối máy chủ để sát hạch tài liệu.', 'warning');
+    throw error;
   }
 }
 
@@ -898,22 +933,27 @@ export async function publishDocument(
   documentId: number,
   onToast?: ToastNotifier
 ): Promise<boolean> {
+  const toastFn = onToast || notifyFallback;
   try {
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/documents/${documentId}/publish`,
       { method: 'POST' },
       4000
     );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.detail || `HTTP ${res.status}`);
+    }
     const doc = localFallbackDocuments.find((d) => d.id === documentId);
     if (doc) doc.status = 'published';
     return true;
-  } catch {
-    const toastFn = onToast || notifyFallback;
-    toastFn('Đã chuyển tài liệu sang trạng thái Xuất bản (Cục bộ).', 'success');
-    const doc = localFallbackDocuments.find((d) => d.id === documentId);
-    if (doc) doc.status = 'published';
-    return true;
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi xuất bản: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
+    toastFn('Không thể kết nối máy chủ để xuất bản tài liệu.', 'warning');
+    throw error;
   }
 }
 

@@ -133,9 +133,8 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
       onUpdateTicketStatus(selectedTicket.id, 'Resolved', agentReplyText);
       setSelectedTicket(updated);
       onToast(`Đã gửi phản hồi đến ${selectedTicket.customer} (#${selectedTicket.id}) và đánh dấu Resolved!`, 'success');
-    } catch {
-      onUpdateTicketStatus(selectedTicket.id, 'Resolved', agentReplyText);
-      onToast(`Đã gửi phản hồi cho #${selectedTicket.id} và đánh dấu Resolved!`, 'success');
+    } catch (err: any) {
+      onToast(err?.detail || err?.message || `Không thể gửi phản hồi cho #${selectedTicket.id}.`, 'warning');
     } finally {
       setAgentSending(false);
     }
