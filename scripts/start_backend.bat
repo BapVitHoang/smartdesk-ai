@@ -7,7 +7,7 @@ echo       KHOI DONG SMARTDESK AI FASTAPI BACKEND
 echo ===================================================
 echo.
 
-cd /d "%~dp0backend"
+cd /d "%~dp0..\backend"
 
 :: Kiem tra python
 where python >nul 2>nul

@@ -3,6 +3,7 @@
 from typing import AsyncGenerator
 import json
 import logging
+from pathlib import Path
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     AsyncSession,
@@ -11,7 +12,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy import select
 
-from app.core.config import settings
+from app.core.config import BACKEND_DIR, settings
 from app.db.base import Base
 
 logger = logging.getLogger("smartdesk.db")
@@ -51,6 +52,11 @@ def create_engine_and_factory(url: str):
 
 
 engine, async_session_factory = create_engine_and_factory(settings.DATABASE_URL)
+
+
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """Return the active async session factory (safe across SQLite fallback re-binds)."""
+    return async_session_factory
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -232,7 +238,6 @@ async def init_db() -> None:
 
             # 2.4 Seed sample documents for Workspace 2 (SmileCare) & Workspace 3 (TechStore)
             from app.models.document import Document
-            from pathlib import Path
             from app.services.document_service import document_service
 
             for ws_id, fname, rel_path in [
@@ -247,9 +252,9 @@ async def init_db() -> None:
                         await session.commit()
                         logger.info(f"Published existing document for workspace {ws_id}.")
                 else:
-                    doc_path = Path("backend/data") / rel_path
+                    doc_path = BACKEND_DIR / "data" / rel_path
                     if not doc_path.exists():
-                        doc_path = Path("data") / rel_path
+                        doc_path = Path("backend/data") / rel_path
                     if doc_path.exists():
                         try:
                             content_bytes = doc_path.read_bytes()

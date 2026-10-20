@@ -7,7 +7,7 @@ echo           KHOI DONG SMARTDESK AI WEB APP
 echo ===================================================
 echo.
 
-cd /d "%~dp0"
+cd /d "%~dp0..\frontend"
 
 :: 1. Kiem tra Node.js
 where node >nul 2>nul

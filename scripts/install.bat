@@ -7,11 +7,11 @@ echo        CAI DAT THU VIEN CHO SMARTDESK AI
 echo ===================================================
 echo.
 
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 :: 1. Cai dat Frontend (Node.js)
 echo [1/2] Dang cai dat thu vien Frontend (npm install)...
-call npm install
+call npm install --prefix frontend
 if %errorlevel% neq 0 (
     echo [ERROR] Cai dat Frontend that bai!
     pause
@@ -36,7 +36,7 @@ if %errorlevel% equ 0 (
 
 echo.
 echo ===================================================
-echo [SUCCESS] Hoan tat cai dat! Chay start_all.bat de khoi dong ca he thong.
+echo [SUCCESS] Hoan tat cai dat! Chay scripts\start_all.bat de khoi dong ca he thong.
 echo ===================================================
 echo.
 pause
