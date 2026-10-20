@@ -1,5 +1,5 @@
 """Pytest fixtures for SmartDesk AI test suite.
-Provides isolated temporary database and clean test environment.
+Provides isolated temporary database, clean test environment, and auth clients.
 """
 
 import os
@@ -51,7 +51,34 @@ async def setup_test_database():
 
 @pytest_asyncio.fixture
 async def client():
-    """Asynchronous HTTP test client fixture."""
+    """Default asynchronous HTTP test client with Admin privileges."""
+    transport = ASGITransport(app=app)
+    headers = {"Authorization": "Bearer demo_jwt_token_for_admin@smartdesk.ai"}
+    async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def admin_client():
+    """Authenticated Admin test client."""
+    transport = ASGITransport(app=app)
+    headers = {"Authorization": "Bearer demo_jwt_token_for_admin@smartdesk.ai"}
+    async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def user_client():
+    """Authenticated Customer test client (an.nguyen@company.vn)."""
+    transport = ASGITransport(app=app)
+    headers = {"Authorization": "Bearer demo_jwt_token_for_an.nguyen@company.vn"}
+    async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def unauth_client():
+    """Unauthenticated HTTP test client (no Authorization header)."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
