@@ -85,7 +85,7 @@ flowchart TD
 ---
 
 ### 2.4. Bảo Toàn Tương Thích Ngược (Zero-Breaking Backward Compatibility)
-* Giữ nguyên hợp đồng trong [`API_CONTRACT.md`](file:///d:/SPKT_2023/year_4/newtech/smartdesk-ai/API_CONTRACT.md).
+* Giữ nguyên hợp đồng trong [`API_CONTRACT.md`](file:///d:/SPKT_2023/year_4/newtech/smartdesk-ai/docs/API_CONTRACT.md).
 * Mọi API nhận `workspace_id: Optional[int] = None`. Nếu không truyền, hệ thống tự động gán vào **Default Workspace (ID: 1)**.
 * Toàn bộ 9 tests cũ trong [`backend/tests/test_api.py`](file:///d:/SPKT_2023/year_4/newtech/smartdesk-ai/backend/tests/test_api.py) đảm bảo tiếp tục PASS 100%.
 
@@ -115,7 +115,7 @@ flowchart TD
         DB -.->|Dual-Mode Cosine Similarity| RR
         RR --> PB[Dynamic Prompt Builder: Ráp Persona + Context + Rules]
         PB --> CB_CHECK{Cost-Guard Circuit Breaker Check}
-        CB_CHECK -- Bình thường --> LLM[Gemini 1.5 Flash: Temperature 0.2]
+        CB_CHECK -- Bình thường --> LLM[Gemini 3.5 Flash Lite: Temperature 0.2]
         CB_CHECK -- Rate Limited 429 Cooldown --> FB_LOCAL[Fallback BM25 Nội Bộ Miễn Phí]
         LLM --> C3[Câu trả lời chuẩn xác kèm Trích dẫn File & Trang]
         FB_LOCAL --> C3
@@ -412,7 +412,7 @@ Kế hoạch được chia thành **6 Phase tuần tự**. AI Agent thực hiệ
 ### Phase 5: Giao Diện Quản Trị Tri Thức, Đồng Bộ Workspace & Sát Hạch (React Frontend)
 - **Mục tiêu:** Mở rộng giao diện người dùng với Tab Quản lý Tri thức mới, tăng timeout API thẩm định lên 15s, đồng bộ Workspace từ Chat sang Ticket và hiển thị thông báo Free Tier thân thiện.
 
-- [x] **Bước 5.1: Cập nhật Kiểu Dữ Liệu `src/types.ts`**
+- [x] **Bước 5.1: Cập nhật Kiểu Dữ Liệu `frontend/src/types.ts`**
   - Mở rộng `TabType`:
     ```typescript
     export type TabType = 'chat' | 'ticket' | 'agent' | 'knowledge';
@@ -424,7 +424,7 @@ Kế hoạch được chia thành **6 Phase tuần tự**. AI Agent thực hiệ
     - `VerificationReport`: `id`, `document_id`, `workspace_id`, `faithfulness_score`, `status`, `items: VerificationItem[]`.
   - Mở rộng `ChatMessage` và `TicketFormData` để hỗ trợ `workspace_id?: number`.
 
-- [x] **Bước 5.2: Bổ sung API Client & Mock Fallback Trong `src/services/api.ts`**
+- [x] **Bước 5.2: Bổ sung API Client & Mock Fallback Trong `frontend/src/services/api.ts`**
   - Trong `src/data.ts`: Thêm mock data cho `INITIAL_WORKSPACES`, `INITIAL_DOCUMENTS`, `INITIAL_VERIFICATION_REPORTS`.
   - Trong `src/services/api.ts`:
     - `getWorkspaces()`, `createWorkspace()`, `updateWorkspace()`.
@@ -435,7 +435,7 @@ Kế hoạch được chia thành **6 Phase tuần tự**. AI Agent thực hiệ
       *"Đang kích hoạt chế độ bảo vệ chi phí (Chạm hạn mức Free Tier 15 RPM). Hệ thống chuyển sang tra cứu nội bộ miễn phí trong 60 giây."*
     - Tất cả các hàm đều có Graceful Fallback sang `src/data.ts` kèm toast cảnh báo khi Backend offline.
 
-- [x] **Bước 5.3: Cập nhật Header & Điều Hướng Trong `src/components/Header.tsx`**
+- [x] **Bước 5.3: Cập nhật Header & Điều Hướng Trong `frontend/src/components/Header.tsx`**
   - Thêm Tab thứ 4 trên thanh điều hướng:
     ```tsx
     <button onClick={() => setActiveTab('knowledge')}>
@@ -445,7 +445,7 @@ Kế hoạch được chia thành **6 Phase tuần tự**. AI Agent thực hiệ
     ```
   - Cập nhật cả Desktop Menu và Mobile Drawer Menu.
 
-- [x] **Bước 5.4: Tạo Component Mới `src/components/KnowledgeManagerView.tsx`**
+- [x] **Bước 5.4: Tạo Component Mới `frontend/src/components/KnowledgeManagerView.tsx`**
   Giao diện được thiết kế chuyên nghiệp, chia thành 3 khu vực chính:
   1. **Thanh Chọn Workspace & Cài Đặt Persona:**
      - Dropdown chọn nhanh Workspace đang quản lý (Default, Nha Khoa SmileCare, Điện Máy TechStore) hoặc nút `[+ Thêm Doanh Nghiệp]`.
@@ -467,7 +467,7 @@ Kế hoạch được chia thành **6 Phase tuần tự**. AI Agent thực hiệ
        - Cột 4: Điểm số & Badge trạng thái (`Đạt`, `Cảnh báo`, `Lỗi`).
      - Nút chốt hành động: `[Phê duyệt & Xuất bản ra Chatbot]` để kích hoạt tài liệu.
 
-- [x] **Bước 5.5: Cập nhật `src/components/ChatView.tsx` & `src/components/TicketFormView.tsx`**
+- [x] **Bước 5.5: Cập nhật `frontend/src/components/ChatView.tsx` & `frontend/src/components/TicketFormView.tsx`**
   - Trong `ChatView.tsx`:
     - Thêm thanh **Chọn Lĩnh Vực / Doanh Nghiệp** ngay đầu màn hình Chatbot để người dùng dễ dàng chuyển đổi qua lại giữa các Workspace.
     - Hiển thị Persona Badge của Bot tương ứng.
@@ -476,7 +476,7 @@ Kế hoạch được chia thành **6 Phase tuần tự**. AI Agent thực hiệ
   - Trong `TicketFormView.tsx`:
     - Nhận `workspace_id` được truyền từ ChatView để gán đúng Doanh nghiệp tiếp nhận.
 
-- [x] **Bước 5.6: Cập nhật `src/App.tsx`**
+- [x] **Bước 5.6: Cập nhật `frontend/src/App.tsx`**
   - Quản lý state `currentWorkspaceId: number`.
   - Tích hợp `KnowledgeManagerView` khi `activeTab === 'knowledge'`.
 
@@ -499,7 +499,7 @@ Kế hoạch được chia thành **6 Phase tuần tự**. AI Agent thực hiệ
   - **Tài liệu 2:** `backend/data/sample_documents/dien_may_techstore_chinh_sach_doi_tra.txt`  
     (Chính sách 1 đổi 1 trong 30 ngày, điều kiện giữ nguyên tem bảo hành, khấu trừ phụ kiện thiếu, quy trình tiếp nhận bảo hành laptop).
 
-- [x] **Bước 6.2: Cập nhật Tài Liệu Nghiệm Thu `TEST_ACCEPTANCE.md`**
+- [x] **Bước 6.2: Cập nhật Tài Liệu Nghiệm Thu `docs/TEST_ACCEPTANCE.md`**
   - Bổ sung **Scenario 5:** Upload tài liệu thực tế và thực hiện Sát hạch Kiến thức tự động (AI Verification).
   - Bổ sung **Scenario 6:** Multi-Domain Chat Switching (Chuyển đổi lĩnh vực và kiểm tra tính cách ly tri thức giữa các Workspace).
   - Bổ sung **Scenario 7:** Cost-Guard Circuit Breaker (Kiểm tra cơ chế ngắt kết nối an toàn khi tài khoản Free Tier chạm rate limit).

@@ -35,7 +35,7 @@ backend/
 │   │   ├── knowledge.py            # Pydantic Schemas cho bài viết tri thức
 │   │   └── health.py               # Pydantic Schemas cho Health check & Smoke test
 │   └── services/
-│       ├── llm_service.py          # Wrapper kết nối Google Gemini 1.5 Flash (Timeout 4s)
+│       ├── llm_service.py          # Wrapper kết nối Google Gemini 3.5 Flash Lite / Ollama (Timeout 4s)
 │       ├── fallback_service.py     # Thuật toán tìm kiếm BM25 thuần Python (Zero-LLM Fallback)
 │       ├── rag_service.py          # Điều phối quy trình RAG (Truy xuất context -> Gọi AI -> Fallback)
 │       └── ticket_service.py       # Tính SLA, phân loại AI tags và soạn trước câu trả lời mẫu
@@ -170,7 +170,7 @@ backend/
 *   **Vị trí:** `backend/app/services/ticket_service.py`
 *   **Vai trò:** Tự động hóa các nghiệp vụ hỗ trợ khách hàng.
 *   **Các tính năng chính:**
-    *   `calculate_sla_hours(priority)`: Gán cam kết thời gian phản hồi: Urgent (2h), High (6h), Medium (12h), Low (24h).
+    *   `calculate_sla_hours(priority)`: Gán cam kết thời gian phản hồi: Urgent (2h), High (4h), Medium (8h), Low (24h).
     *   `extract_ai_tags()`: Phân tích nội dung tiêu đề và mô tả để tự động gán nhãn chuyên môn (VD: `2FA Recovery`, `Refund Request`, `Rate Limit 429`).
     *   `generate_draft_reply()`: Dùng AI tổng hợp câu trả lời lịch sự, đầy đủ lời chào tên khách hàng, hướng dẫn chi tiết các bước xử lý để nhân viên hỗ trợ sẵn sàng sử dụng.
     *   `create_ticket()`: Tự động đánh số thứ tự tiếp theo dạng `#TICK-104x` và lưu bản ghi vào CSDL.

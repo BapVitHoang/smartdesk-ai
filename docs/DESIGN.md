@@ -1,7 +1,7 @@
 # SmartDesk AI – UI/UX & System Design Document
 > **Project:** SmartDesk AI – Intelligent Customer Support & Knowledge Synthesizer  
 > **Document:** Enterprise UI/UX & Interaction Design Specifications  
-> **Target Platform:** Responsive Web (React 19 + Vite + Tailwind CSS v4)
+> **Target Platform:** Responsive Web (React 19 + Vite 6 + Tailwind CSS v4)
 
 ---
 
@@ -42,7 +42,7 @@ Designed around a clean, enterprise-grade SaaS aesthetic utilizing Tailwind CSS 
   - `text-xs` (12px, Regular/SemiBold): Badges, timestamps, citations, error captions.
 
 ### 2.3 Iconography & Component Tokens
-- **Icon Set:** `lucide-react` (e.g., `MessageSquare`, `LifeBuoy`, `Inbox`, `AlertCircle`, `CheckCircle2`, `RefreshCw`, `Send`, `FileText`).
+- **Icon Set:** `lucide-react` (e.g., `MessageSquare`, `LifeBuoy`, `Inbox`, `AlertCircle`, `CheckCircle2`, `RefreshCw`, `Send`, `FileText`, `BookOpen`).
 - **Corner Radii:** Cards and panels (`rounded-xl`), buttons and inputs (`rounded-lg`), badges and pills (`rounded-full`).
 - **Elevation:** Subtle shadows (`shadow-sm`, `shadow-md`) to separate overlay states without visual clutter.
 
@@ -51,14 +51,14 @@ Designed around a clean, enterprise-grade SaaS aesthetic utilizing Tailwind CSS 
 ## 3. Information Architecture & Navigation
 
 ```
-+-----------------------------------------------------------------------------------+
-|  [Logo] SmartDesk AI                 (Demo State: [Loading] [Empty] [Success] [Error]) |
-|  Navigation Tabs: [ 💬 AI Chat Assistant ]  [ 📝 Submit Ticket ]  [ 📥 Agent Triage ] |
-+-----------------------------------------------------------------------------------+
-|                                                                                   |
-|                                [ ACTIVE SCREEN VIEW ]                             |
-|                                                                                   |
-+-----------------------------------------------------------------------------------+
++---------------------------------------------------------------------------------------------------+
+|  [Logo] SmartDesk AI                           (Demo State: [Loading] [Empty] [Success] [Error])   |
+|  Navigation Tabs: [ 1. AI Chat ] [ 2. Submit Ticket ] [ 3. Agent Triage ] [ 4. Knowledge Studio ]  |
++---------------------------------------------------------------------------------------------------+
+|                                                                                                   |
+|                                        [ ACTIVE SCREEN VIEW ]                                     |
+|                                                                                                   |
++---------------------------------------------------------------------------------------------------+
 ```
 
 - **Top Navigation Bar:**
@@ -74,6 +74,7 @@ Designed around a clean, enterprise-grade SaaS aesthetic utilizing Tailwind CSS 
 ### 4.1 Screen 1: Customer AI Chat Assistant (RAG Interaction)
 - **Purpose:** Provide immediate, citation-backed answers to customer questions with one-click fallback escalation.
 - **Key UI Elements:**
+  - **Workspace Selector & Persona Banner:** Allows switching between business domains (Default IT SaaS, Nha Khoa SmileCare, Điện Máy TechStore).
   - **Quick Prompts / FAQ Pills:** Clickable chips for common questions (*"Password Reset", "Billing Cycle", "API Token"*).
   - **Conversation Timeline:**
     - User message bubbles (Right-aligned, indigo background).
@@ -82,7 +83,7 @@ Designed around a clean, enterprise-grade SaaS aesthetic utilizing Tailwind CSS 
     - **Feedback Actions:** "Helpful" / "Not helpful" icons for instant user feedback.
   - **Fallback Card:** Appears if AI confidence is low or error state is triggered:
     - *"AI was unable to resolve this with certainty. Review verified FAQ articles or escalate to a human specialist."*
-    - Button: **[Escalate to Priority Ticket]** (pre-fills context into Screen 2).
+    - Button: **[Escalate to Priority Ticket]** (pre-fills context and workspace into Screen 2).
   - **Chat Input Bar:** Text input with send button and character counter.
 
 ---
@@ -96,17 +97,10 @@ Designed around a clean, enterprise-grade SaaS aesthetic utilizing Tailwind CSS 
 | :--- | :--- | :--- | :--- |
 | **Full Name** | Text Input | Required, min 2 characters | *"Please enter your full name."* |
 | **Customer Email**| Email Input | Required, RFC 5322 regex match | *"Please provide a valid email address."* |
-| **Category** | Select Dropdown | Required, must select one valid option | *"Please select a support category."* |
+| **Category** | Select Dropdown | Required (`Authentication`, `Billing`, `Bug Report`, `Feature Request`, `General`) | *"Please select a support category."* |
 | **Priority** | Radio / Pill Select| Required (`Low`, `Medium`, `High`, `Urgent`)| Default set to `Medium` |
 | **Subject** | Text Input | Required, min 5 characters | *"Subject must be at least 5 characters."* |
 | **Description** | Textarea (4 rows)| Required, min 15 characters | *"Please describe your issue (min 15 chars)."* |
-
-- **Validation Behaviors:**
-  - **Inline Feedback:** Red border (`border-rose-500`) and error text (`text-rose-600 text-xs`) appear immediately if a touched field is invalid upon submission or blur.
-  - **Submission State:**
-    1. Clicking "Submit Ticket" sets `isSubmitting = true` (disables button, shows spinner).
-    2. Simulated network latency of 800ms.
-    3. Triggers **Success State**: Displays a success card with generated ticket ID (e.g., `#TICK-1042`), estimated response time, and a button to view in the Agent Queue.
 
 ---
 
@@ -122,7 +116,12 @@ Designed around a clean, enterprise-grade SaaS aesthetic utilizing Tailwind CSS 
     - **AI Suggested Draft Box:**
       - Pre-populated draft resolution generated based on policy documents.
       - Editable textarea allowing the agent to customize before sending.
-      - Action buttons: **[Approve & Send Draft]**, **[Reject / Write Manually]**.
+      - Action buttons: **[Approve & Send Draft]**, **[Regenerate Draft]**.
+
+---
+
+### 4.4 Screen 4: Knowledge Ingestion & Active Verification Studio
+- **Purpose:** Allow workspace administrators to configure persona/rules, upload `.pdf`/`.txt`/`.md` documents, run 3-stage AI verification (Synthetic QA -> RAG Self-Test -> AI Judge), and publish verified chunks into live RAG.
 
 ---
 
@@ -136,26 +135,10 @@ To ensure high enterprise resilience and rigorous UX standards, the UI explicitl
 +-------------------------------------------------------------------------------+
 ```
 
-### 5.1 Loading State
-- **Visuals:** Skeleton placeholders with animated pulses (`animate-pulse`) for ticket list items, message bubbles, and stats cards.
-- **Purpose:** Communicates active data retrieval or AI token synthesis without UI freezing.
-
-### 5.2 Empty State
-- **Visuals:** Centered illustrated icon (`Inbox` / `CheckCircle2`), cheerful headline *"No Tickets in Queue"*, descriptive body *"All customer inquiries have been resolved. Good job!"*, and a *"Create Test Ticket"* action button.
-- **Purpose:** Prevents confusing blank space when no items match filters.
-
-### 5.3 Success State (Normal Operations)
-- **Visuals:** Full rendering of interactive mock data:
-  - 4-5 populated support tickets spanning different categories (`Billing`, `Bug`, `Authentication`).
-  - Active chat thread with structured AI markdown and verified citation link.
-  - Toast banner confirming successful operations.
-
-### 5.4 Error / Outage State
-- **Visuals:** Prominent alert banner with `rose-50` background, `rose-600` border, and alert icon:
-  - Title: *"AI Inference Service Unavailable (Simulated Error 503)"*
-  - Description: *"Failed to connect to the LLM orchestrator. Deterministic fallback mode is active."*
-  - CTA Buttons: **[Retry Connection]** and **[Use Rule-Based FAQs]**.
-- **Purpose:** Directly satisfies User Story 2 (Non-AI Fallback) by showing how the frontend gracefully guides the user rather than crashing.
+1. **Loading State:** Skeleton placeholders with animated pulses (`animate-pulse`) for ticket list items, message bubbles, and stats cards.
+2. **Empty State:** Centered illustrated icon (`Inbox` / `CheckCircle2`), headline *"No Tickets in Queue"*, and a *"Create Test Ticket"* action button.
+3. **Success State (Normal Operations):** Full rendering of interactive data, citations, and toast confirmations.
+4. **Error / Outage State:** Prominent alert banner with `amber-50` / `rose-50` background explaining deterministic fallback mode with CTA buttons.
 
 ---
 
@@ -164,18 +147,20 @@ To ensure high enterprise resilience and rigorous UX standards, the UI explicitl
 For ease of maintainability, code cleanliness, and scalability, the UI skeleton is structured into modular components matching `AGENTS.md`:
 
 ```text
-src/
+frontend/src/
 ├── components/
-│   ├── Header.tsx             # Top navigation, active tab switcher, health badge, demo state
-│   ├── ChatView.tsx           # Screen 1: Customer RAG chat, citation pills & feedback
-│   ├── TicketFormView.tsx     # Screen 2: Form with client-side validation & SLA calculation
-│   ├── AgentDashboardView.tsx # Screen 3: Agent queue, filters & AI draft reply Copilot
-│   └── Footer.tsx             # System status badge, latency summary, copyright
+│   ├── Header.tsx               # Top navigation, active tab switcher, health badge, demo state
+│   ├── ChatView.tsx             # Screen 1: Customer RAG chat, citation pills & feedback
+│   ├── TicketFormView.tsx       # Screen 2: Form with client-side validation & SLA calculation
+│   ├── AgentDashboardView.tsx   # Screen 3: Agent queue, filters & AI draft reply Copilot
+│   ├── KnowledgeManagerView.tsx # Screen 4: Multi-tenant workspace persona & verification studio
+│   └── Footer.tsx               # System status badge, latency summary, copyright
+├── features/                    # Modular feature extensions
 ├── services/
-│   └── api.ts                 # Central API client with dual-mode automatic offline fallback
-├── data.ts                    # Local fallback mock dataset & deterministic RAG fallback
-├── types.ts                   # Canonical TypeScript interfaces & enums
-└── App.tsx                    # Main layout combining screens & demo states
+│   └── api.ts                   # Central API client with dual-mode automatic offline fallback
+├── data.ts                      # Local fallback mock dataset & deterministic RAG fallback
+├── types.ts                     # Canonical TypeScript interfaces & enums
+└── App.tsx                      # Main layout combining screens & demo states
 ```
 
 ---
@@ -184,9 +169,9 @@ src/
 
 | Criteria | Verification Step | Status |
 | :--- | :--- | :--- |
-| **Main Navigation** | Switch between Chat, Form, and Agent views seamlessly | Designed |
-| **2-3 Essential Screens** | Customer Chat, Submit Ticket Form, Agent Dashboard | Designed |
-| **Form with Validation** | Email regex, required fields, character limits, error messages | Designed |
-| **4 UI States** | Dedicated toggles for Loading, Empty, Success, and Error | Designed |
-| **Responsive Web Layout** | Flex/grid layouts with mobile collapsing breakpoints | Designed |
-| **AI Generation Record** | Prompts and human review decisions logged in `AI_REVIEW_LOG.md` | Prepared |
+| **Main Navigation** | Switch between Chat, Form, Agent, and Knowledge views seamlessly | Verified |
+| **Essential Screens** | Customer Chat, Submit Ticket Form, Agent Dashboard, Knowledge Studio | Verified |
+| **Form with Validation** | Email regex, required fields, character limits, error messages | Verified |
+| **4 UI States** | Dedicated toggles for Loading, Empty, Success, and Error | Verified |
+| **Responsive Web Layout** | Flex/grid layouts with mobile collapsing breakpoints | Verified |
+| **AI Generation Record** | Prompts and human review decisions logged in [`AI_USAGE.md`](../AI_USAGE.md) | Verified |

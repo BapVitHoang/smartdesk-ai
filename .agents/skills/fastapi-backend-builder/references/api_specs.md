@@ -1,6 +1,6 @@
 # SmartDesk AI - API Specifications (v1)
 
-This reference document defines the exact contract between the FastAPI backend and the Next.js frontend according to `DESIGN.md`.
+This reference document defines the exact contract between the FastAPI backend and the React 19 + Vite 6 SPA frontend according to `docs/DESIGN.md` and `docs/API_CONTRACT.md`.
 
 ---
 
@@ -13,7 +13,8 @@ Ask a question to the customer support AI assistant with citation grounding and 
 ```json
 {
   "message": "How do I reset my password if I lost access to my email?",
-  "session_id": "sess-9a8b7c"
+  "session_id": "sess-9a8b7c",
+  "workspace_id": 1
 }
 ```
 
@@ -95,8 +96,8 @@ List and filter tickets for the Support Agent Triage Dashboard.
 
 **Query Parameters:**
 - `status`: `open` | `in_progress` | `resolved`
-- `category`: `Authentication` | `Billing` | `Technical Bug` | `Feature Request`
-- `priority`: `Low` | `Medium` | `High` | `Urgent`
+- `category`: `Authentication` | `Billing` | `Bug Report` | `Feature Request` | `General` (alias `Technical Bug` is also accepted)
+- `priority`: `Low` | `Medium` | `High` | `Urgent` (SLA hours: `Low=24`, `Medium=8`, `High=4`, `Urgent=2`)
 - `search`: String query matching subject or customer name.
 - `skip`: Integer (default 0)
 - `limit`: Integer (default 20)

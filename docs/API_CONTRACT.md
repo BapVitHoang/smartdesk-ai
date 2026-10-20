@@ -1,8 +1,53 @@
 # SmartDesk AI - Formal API Specifications & Contract (v1)
 
-> **Specification Version:** 1.0.0  
+> **Specification Version:** 1.1.0 (Frozen Contract)  
 > **Base URL:** `http://localhost:8000/api/v1`  
-> **Architecture Status:** Full Enterprise System Integration (Frontend & Backend)
+> **Architecture Status:** Full Enterprise System Integration (React 19 Vite SPA & FastAPI Async Backend)
+
+---
+
+## 0. Canonical Domain Enums, SLA Rules & Standard Error Format
+
+### 0.1 Ticket Categories (Canonical & Aliases)
+- **Canonical Categories (`TicketCategory`):**
+  - `"Authentication"` — Login, 2FA, SSO, password recovery.
+  - `"Billing"` — Invoices, subscriptions, refunds, payment gateways.
+  - `"Bug Report"` — System errors, crashes, API timeouts, defects.
+  - `"Feature Request"` — Product enhancements, roadmap suggestions.
+  - `"General"` — General inquiries and uncategorized support requests.
+- **Accepted Alias:** `"Technical Bug"` is accepted by the backend for backward compatibility and maps to `"Bug Report"`.
+
+### 0.2 Priority Levels & Canonical SLA Hours
+| Priority Level | Canonical Value | Target SLA (`estimated_response_hours`) |
+| :--- | :--- | :--- |
+| Urgent / Critical | `"Urgent"` | **2 hours** |
+| High Priority | `"High"` | **4 hours** |
+| Medium / Normal | `"Medium"` | **8 hours** |
+| Low Priority | `"Low"` | **24 hours** |
+
+### 0.3 Ticket Status Lifecycle Mapping
+| Lifecycle Phase | Backend Status (`TicketStatus`) | Frontend UI Status (`Ticket['status']`) |
+| :--- | :--- | :--- |
+| Initial Submission | `"open"` | `"Open"` |
+| Under Review / Triaged | `"in_progress"` | `"Pending"` |
+| Solved & Approved | `"resolved"` | `"Resolved"` |
+
+### 0.4 Standardized Error Response Schema (RFC 7807 Style)
+All HTTP 4xx and 5xx errors return a consistent JSON structure:
+```json
+{
+  "detail": "Human-readable explanation of the error",
+  "error_code": "MACHINE_READABLE_CODE",
+  "status_code": 400,
+  "details": {}
+}
+```
+Canonical `error_code` values:
+- `PROMPT_SECURITY_VIOLATION` (HTTP 400): Prompt injection or security guardrail triggered.
+- `VALIDATION_ERROR` (HTTP 422 / 400): Request body or query parameter failed validation.
+- `TICKET_NOT_FOUND` / `RESOURCE_NOT_FOUND` (HTTP 404): Requested entity does not exist.
+- `UNAUTHORIZED` / `FORBIDDEN` (HTTP 401 / 403): Missing or insufficient authentication/role permissions.
+- `INTERNAL_SERVER_ERROR` (HTTP 500): Unexpected server error (sanitized, never leaks stack traces).
 
 ---
 
@@ -58,6 +103,7 @@ Ask questions to the customer support AI assistant with verified citation ground
   "latency_ms": 4012.30,
   "confidence": 0.55,
   "is_fallback": true,
+  "fallback_reason": "FREE_TIER_RATE_LIMIT_COOLDOWN",
   "escalation_recommended": true
 }
 ```
@@ -82,6 +128,7 @@ Submit a new support inquiry or escalate from an unresolved chat session.
 #### Request Body
 ```json
 {
+  "workspace_id": 1,
   "customer_name": "Nguyen Van A",
   "customer_email": "nguyenvana@example.com",
   "category": "Authentication",
@@ -95,6 +142,7 @@ Submit a new support inquiry or escalate from an unresolved chat session.
 ```json
 {
   "id": 1042,
+  "workspace_id": 1,
   "ticket_code": "#TICK-1042",
   "customer_name": "Nguyen Van A",
   "customer_email": "nguyenvana@example.com",
@@ -108,7 +156,7 @@ Submit a new support inquiry or escalate from an unresolved chat session.
     "Urgent",
     "2FA Recovery"
   ],
-  "ai_draft_reply": "Dear Nguyen Van A,\n\nThank you for contacting SmartDesk AI Support. We have received your inquiry regarding \"Lost 2FA recovery token for corporate account\" and our support team has categorized it as [Authentication] with [Urgent] priority.\n\nBased on our support policies for Authentication:\n1. Our engineering team is currently verifying the status of your account and system logs.\n2. In the meantime, if you have any additional error codes, screenshots, or logs, please reply directly to this thread.\n3. You will receive an update from a dedicated specialist within our 2-hour SLA window.\n\nWe appreciate your patience while we investigate this matter for you.\n\nWarm regards,\nSmartDesk Support Team",
+  "ai_draft_reply": "Dear Nguyen Van A,\n\nThank you for contacting SmartDesk AI Support...",
   "estimated_response_hours": 2,
   "created_at": "2026-09-13T15:30:00Z",
   "updated_at": "2026-09-13T15:30:00Z"
@@ -121,34 +169,13 @@ Submit a new support inquiry or escalate from an unresolved chat session.
 Retrieve and filter tickets for the Support Agent Triage Dashboard.
 
 #### Query Parameters
+- `workspace_id`: Optional tenant filter (`1`, `2`, `3`, ...).
 - `status`: Optional filter (`open`, `in_progress`, `resolved`, `closed`).
-- `category`: Optional filter (`Authentication`, `Billing`, `Technical Bug`, `Feature Request`).
+- `category`: Optional filter (`Authentication`, `Billing`, `Bug Report`, `Feature Request`, `General`; alias `Technical Bug` is also supported).
 - `priority`: Optional filter (`Low`, `Medium`, `High`, `Urgent`).
 - `search`: Optional query string matching subject, customer name, email, or `#TICK-XXXX`.
 - `skip`: Pagination offset (default: 0).
 - `limit`: Page size (default: 20, max: 100).
-
-#### Response (HTTP 200 OK)
-```json
-[
-  {
-    "id": 1042,
-    "ticket_code": "#TICK-1042",
-    "customer_name": "Nguyen Van A",
-    "customer_email": "nguyenvana@example.com",
-    "category": "Authentication",
-    "priority": "Urgent",
-    "subject": "Lost 2FA recovery token for corporate account",
-    "description": "I changed my phone number...",
-    "status": "open",
-    "ai_tags": ["Authentication", "Urgent", "2FA Recovery"],
-    "ai_draft_reply": "Dear Nguyen Van A...",
-    "estimated_response_hours": 2,
-    "created_at": "2026-09-13T15:30:00Z",
-    "updated_at": "2026-09-13T15:30:00Z"
-  }
-]
-```
 
 ---
 
@@ -163,52 +190,12 @@ Update ticket status or customize the pre-populated AI draft reply.
 }
 ```
 
-#### Response (HTTP 200 OK)
-```json
-{
-  "id": 1042,
-  "ticket_code": "#TICK-1042",
-  "customer_name": "Nguyen Van A",
-  "customer_email": "nguyenvana@example.com",
-  "category": "Authentication",
-  "priority": "Urgent",
-  "subject": "Lost 2FA recovery token for corporate account",
-  "description": "I changed my phone number...",
-  "status": "in_progress",
-  "ai_tags": ["Authentication", "Urgent", "2FA Recovery"],
-  "ai_draft_reply": "Dear Nguyen Van A, I have manually verified your security profile and reset your MFA device. Please check your recovery phone.",
-  "estimated_response_hours": 2,
-  "created_at": "2026-09-13T15:30:00Z",
-  "updated_at": "2026-09-13T15:35:10Z"
-}
-```
-
 ---
 
 ## 3. Agent AI Copilot
 
 ### `POST /api/v1/agent/tickets/{ticket_id}/generate-draft`
 Regenerate a tailored AI draft response for a ticket.
-
-#### Response (HTTP 200 OK)
-```json
-{
-  "id": 1042,
-  "ticket_code": "#TICK-1042",
-  "customer_name": "Nguyen Van A",
-  "customer_email": "nguyenvana@example.com",
-  "category": "Authentication",
-  "priority": "Urgent",
-  "subject": "Lost 2FA recovery token for corporate account",
-  "description": "I changed my phone number...",
-  "status": "open",
-  "ai_tags": ["Authentication", "Urgent", "2FA Recovery"],
-  "ai_draft_reply": "Dear Nguyen Van A,\n\nWe understand that you are locked out due to an authenticator change. As an urgent priority ticket, our Tier 2 security team has initiated an identity verification protocol...",
-  "estimated_response_hours": 2,
-  "created_at": "2026-09-13T15:30:00Z",
-  "updated_at": "2026-09-13T15:36:00Z"
-}
-```
 
 ---
 
@@ -218,37 +205,11 @@ Regenerate a tailored AI draft response for a ticket.
 Retrieve verified FAQ knowledge articles supporting RAG grounding with optional category or keyword search.
 
 #### Query Parameters
-- `category`: Optional category filter (`Authentication`, `Billing`, `Technical Bug`, etc.)
+- `category`: Optional category filter (`Authentication`, `Billing`, `Bug Report`, `Feature Request`, `General`)
 - `search`: Keyword search matching title or content
-
-#### Response (HTTP 200 OK)
-```json
-[
-  {
-    "doc_id": "doc-01",
-    "category": "Authentication",
-    "title": "How to Reset Your CloudDesk / SmartDesk Password",
-    "content": "To reset your password without email access: 1. Go to the login screen...",
-    "source_url": "/faq/auth/password-reset"
-  }
-]
-```
-
----
 
 ### `GET /api/v1/knowledge/{doc_id}`
 Fetch a specific knowledge article by its document identifier (e.g. `doc-01`).
-
-#### Response (HTTP 200 OK)
-```json
-{
-  "doc_id": "doc-01",
-  "category": "Authentication",
-  "title": "How to Reset Your CloudDesk / SmartDesk Password",
-  "content": "To reset your password without email access: 1. Go to the login screen...",
-  "source_url": "/faq/auth/password-reset"
-}
-```
 
 ---
 
@@ -257,7 +218,6 @@ Fetch a specific knowledge article by its document identifier (e.g. `doc-01`).
 ### `GET /api/v1/health`
 Operational readiness probe.
 
-#### Response (HTTP 200 OK)
 ```json
 {
   "status": "ok",
@@ -266,21 +226,8 @@ Operational readiness probe.
 }
 ```
 
----
-
 ### `GET /api/v1/health/smoke-test`
-Executes an actual round-trip test against Google Gemini 3.5 Flash Lite and measures live latency.
-
-#### Response (HTTP 200 OK)
-```json
-{
-  "model": "gemini-3.5-flash-lite",
-  "latency_ms": 922.74,
-  "status": "PASS",
-  "sample_prompt": "You are an AI Customer Support Assistant. Briefly greet the user in one sentence and explain how to reset a password.",
-  "sample_response": "Hello! To reset your password, visit the login page, click 'Forgot Password?', and enter your email address to receive a secure reset link."
-}
-```
+Executes an actual round-trip test against the active AI provider (`gemini-3.5-flash-lite` or `qwen2.5:3b`) and measures live latency.
 
 ---
 
@@ -289,59 +236,11 @@ Executes an actual round-trip test against Google Gemini 3.5 Flash Lite and meas
 ### `GET /api/v1/workspaces`
 Retrieve all registered business tenants / workspaces.
 
-#### Response (HTTP 200 OK)
-```json
-[
-  {
-    "id": 1,
-    "slug": "default",
-    "name": "SmartDesk Cloud Support",
-    "industry": "IT & SaaS",
-    "persona_name": "SmartDesk Assistant",
-    "tone_of_voice": "Chuyên nghiệp, ngắn gọn, thân thiện và chính xác về mặt kỹ thuật.",
-    "business_rules": "Hỗ trợ xử lý sự cố tài khoản, phân quyền, tích hợp API, thanh toán định kỳ. Luôn bảo vệ an toàn thông tin khách hàng.",
-    "created_at": "2026-09-27T08:00:00Z"
-  }
-]
-```
-
----
-
 ### `POST /api/v1/workspaces`
 Register a new business domain workspace.
 
-#### Request Body
-```json
-{
-  "slug": "smilecare",
-  "name": "Nha Khoa Thẩm Mỹ SmileCare",
-  "industry": "Y tế & Nha khoa",
-  "persona_name": "Bác sĩ SmileCare Bot",
-  "tone_of_voice": "Ân cần, chu đáo, đồng cảm, chuyên môn y khoa cao nhưng dễ hiểu.",
-  "business_rules": "Tư vấn niềng răng, bọc sứ, tẩy trắng, cấy ghép Implant. Báo giá minh bạch."
-}
-```
-
-#### Response (HTTP 201 Created)
-```json
-{
-  "id": 2,
-  "slug": "smilecare",
-  "name": "Nha Khoa Thẩm Mỹ SmileCare",
-  "industry": "Y tế & Nha khoa",
-  "persona_name": "Bác sĩ SmileCare Bot",
-  "tone_of_voice": "Ân cần, chu đáo, đồng cảm, chuyên môn y khoa cao nhưng dễ hiểu.",
-  "business_rules": "Tư vấn niềng răng, bọc sứ, tẩy trắng, cấy ghép Implant. Báo giá minh bạch.",
-  "created_at": "2026-09-27T08:30:00Z"
-}
-```
-
----
-
 ### `GET /api/v1/workspaces/{id}`
 Fetch detailed workspace profile and rules by ID.
-
----
 
 ### `PUT /api/v1/workspaces/{id}`
 Update persona attributes, tone of voice, or business rules.
@@ -353,92 +252,14 @@ Update persona attributes, tone of voice, or business rules.
 ### `POST /api/v1/workspaces/{workspace_id}/documents/upload`
 Upload a `.pdf`, `.txt`, or `.md` file for text extraction, recursive chunking (600-800 chars, 100 overlap), and embedding.
 
-#### Request Form Data
-- `file`: Binary file upload (`multipart/form-data`)
-
-#### Response (HTTP 201 Created)
-```json
-{
-  "id": 10,
-  "workspace_id": 2,
-  "filename": "bang_gia_dich_vu_smilecare.txt",
-  "file_type": "txt",
-  "file_size": 2048,
-  "status": "pending",
-  "chunk_count": 3,
-  "created_at": "2026-09-27T09:00:00Z"
-}
-```
-
----
-
 ### `GET /api/v1/documents/{document_id}/chunks`
 Inspect extracted chunks and page locations of a document.
-
-#### Response (HTTP 200 OK)
-```json
-[
-  {
-    "id": 45,
-    "chunk_id": "doc-10-chk-1",
-    "chunk_index": 0,
-    "page_number": 1,
-    "title": "bang_gia_dich_vu_smilecare.txt - Trang 1 (Mục 1)",
-    "content": "BẢNG GIÁ DỊCH VỤ NHA KHOA SMILECARE...",
-    "source_url": "/documents/10/page/1"
-  }
-]
-```
-
----
 
 ### `POST /api/v1/documents/{document_id}/verify`
 Execute the 3-step Active Verification Engine: Synthetic QA Generation $\to$ Parallel RAG Self-Test $\to$ AI Judge Faithfulness Evaluation.
 
-#### Response (HTTP 200 OK)
-```json
-{
-  "id": 4,
-  "document_id": 10,
-  "workspace_id": 2,
-  "faithfulness_score": 0.95,
-  "status": "passed",
-  "created_at": "2026-09-27T09:05:00Z",
-  "items": [
-    {
-      "id": 12,
-      "question": "Chi phí tẩy trắng răng tại SmileCare là bao nhiêu?",
-      "ground_truth": "Tẩy trắng răng bằng công nghệ Laser White có giá 2.500.000 VNĐ một liệu trình 60 phút.",
-      "rag_answer": "Dịch vụ tẩy trắng răng Laser White tại SmileCare có giá 2.500.000 VNĐ cho liệu trình 60 phút.",
-      "score": 0.98,
-      "status": "passed",
-      "reason": "Câu trả lời bám sát và chính xác tuyệt đối với tài liệu gốc."
-    }
-  ]
-}
-```
-
----
-
 ### `POST /api/v1/documents/{document_id}/publish`
 Approve and publish a verified document into live production RAG.
 
-#### Response (HTTP 200 OK)
-```json
-{
-  "id": 10,
-  "status": "published",
-  "message": "Đã xuất bản tài liệu thành công ra Chatbot."
-}
-```
-
----
-
 ### `DELETE /api/v1/documents/{document_id}`
 Safely delete a document with cascade cleanup of all associated chunks, verification reports, and items.
-```json
-{
-  "ok": true,
-  "message": "Đã xóa thành công tài liệu ID 10."
-}
-```

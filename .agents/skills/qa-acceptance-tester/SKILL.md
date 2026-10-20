@@ -8,7 +8,7 @@ description: >-
 
 # QA Acceptance Tester Skill for SmartDesk AI
 
-This skill guides the AI assistant through executing automated tests and verifying the four core acceptance test scenarios defined in [`TEST_ACCEPTANCE.md`](../../../TEST_ACCEPTANCE.md).
+This skill guides the AI assistant through executing automated tests and verifying the four core acceptance test scenarios defined in [`TEST_ACCEPTANCE.md`](../../../docs/TEST_ACCEPTANCE.md).
 
 ---
 
@@ -19,8 +19,8 @@ Before declaring any feature or bugfix complete, run the following verification 
 ### Step 1: Frontend TypeScript & Build Check
 ```bash
 # In the project root
-npm run lint
-npm run build
+npm run lint --prefix frontend
+npm run build --prefix frontend
 ```
 - **Assertion:** No TypeScript errors, Vite successfully outputs bundles into `dist/`.
 
@@ -62,7 +62,7 @@ curl http://localhost:8000/api/v1/health/smoke-test
 
 ## 3. Regression Checklist
 
-- [ ] Does `src/services/api.ts` handle network disconnections without uncaught promises?
+- [ ] Does `frontend/src/services/api.ts` handle network disconnections without uncaught promises?
 - [ ] Are ticket statuses mapped correctly between backend (`open`, `in_progress`, `resolved`) and frontend (`Open`, `Pending`, `Resolved`)?
 - [ ] Are all user-facing strings in Vietnamese?
 - [ ] Is there any hardcoded API key in git? (Must be clean!)
