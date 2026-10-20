@@ -161,7 +161,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
     <div id="screen-agent-dashboard" className="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
       
       {/* CỘT TRÁI: DANH SÁCH TICKET HOẶC TRẠNG THÁI SKELETON / EMPTY / ERROR */}
-      <div className="w-full md:w-5/12 lg:w-4/12 border-r border-slate-200 bg-white flex flex-col h-full overflow-hidden shrink-0">
+      <div className="w-full md:w-5/12 lg:w-4/12 border-r border-slate-200 bg-white flex flex-col h-1/2 md:h-full overflow-hidden shrink-0">
         
         {/* List Header */}
         <div className="p-4 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between shrink-0">

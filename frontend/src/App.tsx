@@ -164,6 +164,7 @@ export default function App() {
             onToast={showToast}
             currentWorkspaceId={currentWorkspaceId}
             setCurrentWorkspaceId={setCurrentWorkspaceId}
+            demoState={demoState}
           />
         )}
 
@@ -175,6 +176,7 @@ export default function App() {
             initialData={prefillTicketData}
             onToast={showToast}
             currentWorkspaceId={currentWorkspaceId}
+            demoState={demoState}
           />
         )}
 

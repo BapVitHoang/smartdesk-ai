@@ -21,7 +21,8 @@ import {
   TicketCategory, 
   TabType,
   ToastType,
-  Workspace
+  Workspace,
+  DemoState
 } from '../types';
 import { createTicket, getWorkspaces } from '../services/api';
 
@@ -32,6 +33,7 @@ interface TicketFormViewProps {
   initialData?: Partial<TicketFormData>;
   onToast: (msg: string, type?: ToastType) => void;
   currentWorkspaceId?: number;
+  demoState?: DemoState;
 }
 
 export const TicketFormView: React.FC<TicketFormViewProps> = ({
@@ -41,6 +43,7 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
   initialData,
   onToast,
   currentWorkspaceId = 1,
+  demoState,
 }) => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [formData, setFormData] = useState<TicketFormData>({

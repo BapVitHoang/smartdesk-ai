@@ -24,7 +24,8 @@ import {
   TicketFormData, 
   TicketCategory, 
   TicketPriority,
-  Workspace
+  Workspace,
+  DemoState
 } from '../types';
 import { getRagResponse } from '../data';
 import { sendChatMessage, getKnowledgeArticle, getWorkspaces } from '../services/api';
@@ -37,6 +38,7 @@ interface ChatViewProps {
   onToast: (msg: string, type?: ToastType) => void;
   currentWorkspaceId?: number;
   setCurrentWorkspaceId?: (id: number) => void;
+  demoState?: DemoState;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -47,6 +49,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onToast,
   currentWorkspaceId = 1,
   setCurrentWorkspaceId,
+  demoState,
 }) => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [chatInput, setChatInput] = useState('');
