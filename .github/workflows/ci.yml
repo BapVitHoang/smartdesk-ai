@@ -53,9 +53,8 @@ jobs:
           pip install -r backend/requirements.txt
 
       - name: Run pytest test suite
-        working-directory: backend
         run: |
-          python -m pytest tests/ -v
+          python -m pytest backend/tests/ -v
         env:
           GEMINI_API_KEY: ""
-          PYTHONPATH: .
+          PYTHONPATH: backend
