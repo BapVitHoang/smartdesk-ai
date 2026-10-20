@@ -4,7 +4,6 @@ from typing import List, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import json
-import os
 from pathlib import Path
 
 
@@ -22,12 +21,21 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = False
 
-    # AI & Google Gemini Model Parameters
+    # AI Provider: "gemini" | "ollama"
+    AI_PROVIDER: str = "gemini"
     GEMINI_API_KEY: str = ""
     LLM_MODEL_NAME: str = "gemini-3.5-flash-lite"
+    LLM_FALLBACK_MODEL_NAME: str = "gemini-2.5-flash-lite"
     EMBEDDING_MODEL_NAME: str = "gemini-embedding-001"
 
-    # Circuit Breaker & Strict Latency Budget (Max 4.0s)
+    # Local Ollama Settings
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_LLM_MODEL: str = "qwen2.5:3b"
+    OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
+    OLLAMA_TIMEOUT_SECONDS: float = 30.0
+    OLLAMA_KEEP_ALIVE: str = "30m"
+
+    # Circuit Breaker & Strict Latency Budget (Max 4.0s for Cloud Gemini)
     LLM_TIMEOUT_SECONDS: float = 4.0
     RAG_CONFIDENCE_THRESHOLD: float = 0.65
 
@@ -43,8 +51,9 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173"
     ]
 
-    # Seed FAQ File Path
+    # Seed FAQ & Externalized Prompts Paths
     SEED_FAQ_PATH: str = (BACKEND_DIR / "data" / "seed_faq.json").as_posix()
+    PROMPTS_PATH: str = (BACKEND_DIR / "data" / "prompts.json").as_posix()
 
     model_config = SettingsConfigDict(
         env_file=[
@@ -94,13 +103,12 @@ class Settings(BaseSettings):
         direct_path = Path(self.SEED_FAQ_PATH)
         if direct_path.exists():
             return direct_path
-        
-        # Check relative to this file's parent directories
+
         backend_root = Path(__file__).resolve().parent.parent.parent
         resolved = backend_root / self.SEED_FAQ_PATH
         if resolved.exists():
             return resolved
-            
+
         return direct_path
 
 

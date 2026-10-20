@@ -23,12 +23,22 @@ class TicketStatusEnum(str, Enum):
 
 
 class TicketCategoryEnum(str, Enum):
-    """Standard support ticket categories."""
+    """Canonical support ticket categories (with backward-compatible alias)."""
     AUTHENTICATION = "Authentication"
     BILLING = "Billing"
-    TECHNICAL_BUG = "Technical Bug"
+    BUG_REPORT = "Bug Report"
+    TECHNICAL_BUG = "Technical Bug"  # Accepted alias for Bug Report
     FEATURE_REQUEST = "Feature Request"
     GENERAL = "General"
+
+
+CANONICAL_TICKET_CATEGORIES: List[str] = [
+    "Authentication",
+    "Billing",
+    "Bug Report",
+    "Feature Request",
+    "General",
+]
 
 
 class TicketCreate(BaseModel):
@@ -55,7 +65,7 @@ class TicketCreate(BaseModel):
         ...,
         min_length=2,
         max_length=64,
-        description="Issue category (e.g., Authentication, Billing, Technical Bug)",
+        description="Issue category (Authentication, Billing, Bug Report, Feature Request, General; alias Technical Bug accepted)",
         examples=["Authentication"]
     )
     priority: TicketPriorityEnum = Field(
@@ -130,7 +140,7 @@ class TicketResponse(BaseModel):
     )
     estimated_response_hours: int = Field(
         ...,
-        description="SLA estimated response time in hours",
+        description="SLA estimated response time in hours (Urgent=2, High=4, Medium=8, Low=24)",
         examples=[2]
     )
     created_at: datetime = Field(..., description="Timestamp when ticket was created")

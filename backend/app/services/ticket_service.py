@@ -1,11 +1,10 @@
 """Ticket lifecycle management, SLA estimation, auto-tagging, and AI Copilot drafting."""
 
-import random
 import re
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from app.models.ticket import Ticket
 from app.schemas.ticket import TicketCreate
@@ -22,11 +21,11 @@ class TicketService:
         """Determines expected response SLA hours according to urgency level."""
         mapping = {
             "Urgent": 2,
-            "High": 6,
-            "Medium": 12,
+            "High": 4,
+            "Medium": 8,
             "Low": 24
         }
-        return mapping.get(priority, 12)
+        return mapping.get(priority, 8)
 
     def extract_ai_tags(self, category: str, priority: str, subject: str, description: str) -> List[str]:
         """

@@ -78,7 +78,7 @@ class VerificationService:
 
         # If LLM rate limited, generate rule-based fallback QA pairs
         from app.services.embedding_service import embedding_service
-        if embedding_service.is_rate_limited() or not llm_service.api_key:
+        if embedding_service.is_rate_limited() or not llm_service.is_available():
             return self._generate_rule_based_qa(chunks)
 
         # Select up to 3 chunks to test
@@ -142,7 +142,7 @@ class VerificationService:
         Returns: (score [0.0 - 1.0], status ['passed' | 'warning' | 'failed'], reason)
         """
         from app.services.embedding_service import embedding_service
-        if embedding_service.is_rate_limited() or not llm_service.api_key:
+        if embedding_service.is_rate_limited() or not llm_service.is_available():
             # Deterministic token overlap score when LLM is unavailable
             return self._deterministic_judge(ground_truth, rag_answer)
 

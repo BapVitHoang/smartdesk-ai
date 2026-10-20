@@ -7,6 +7,7 @@ import math
 import random
 import time
 from typing import Any, Dict, List, Optional
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,11 +22,24 @@ class EmbeddingService:
     """Manages vector embeddings, rate limiting, and dual-mode vector search."""
 
     def __init__(self) -> None:
+        self.provider = (settings.AI_PROVIDER or "gemini").lower()
         self.rate_limited_until: float = 0.0
         self.api_key: str = settings.GEMINI_API_KEY
         self.model_name: str = settings.EMBEDDING_MODEL_NAME
         self._client: Any = None
-        self._init_client()
+
+        # Ollama local settings
+        self.ollama_base_url = settings.OLLAMA_BASE_URL.rstrip("/")
+        self.ollama_model = settings.OLLAMA_EMBEDDING_MODEL
+        self.ollama_timeout = settings.OLLAMA_TIMEOUT_SECONDS
+
+        if self.provider == "gemini":
+            self._init_client()
+        else:
+            logger.info(
+                f"Initialized EmbeddingService with local provider '{self.provider}' "
+                f"(Model: {self.ollama_model}, Endpoint: {self.ollama_base_url})."
+            )
 
     def _init_client(self) -> None:
         """Initializes Gemini API client if API key is provided."""
@@ -48,7 +62,9 @@ class EmbeddingService:
                 self._sdk_type = None
 
     def is_rate_limited(self) -> bool:
-        """Check whether the service is currently in Free Tier rate limit cooldown."""
+        """Check whether the service is currently in Free Tier rate limit cooldown (Gemini only)."""
+        if self.provider == "ollama":
+            return False
         return time.time() < self.rate_limited_until
 
     def generate_pseudo_embedding(self, text: str, dim: int = 768) -> List[float]:
@@ -80,9 +96,12 @@ class EmbeddingService:
 
     async def get_text_embedding(self, text: str) -> List[float]:
         """
-        Calculates vector embedding with Cost-Guard circuit breaker.
-        Falls back automatically to pseudo-embeddings on 429 / cooldown.
+        Calculates vector embedding with Cost-Guard circuit breaker (Gemini) or local Ollama.
+        Falls back automatically to pseudo-embeddings on failure.
         """
+        if self.provider == "ollama":
+            return await self._call_ollama_embedding(text)
+
         if self.is_rate_limited():
             logger.debug("[Cost-Guard] Embedding rate-limit cooldown active. Using pseudo-embedding.")
             return self.generate_pseudo_embedding(text)
@@ -106,6 +125,38 @@ class EmbeddingService:
             else:
                 logger.warning(f"Embedding API call error ({exc}). Falling back to pseudo-embedding.")
             return self.generate_pseudo_embedding(text)
+
+    async def _call_ollama_embedding(self, text: str) -> List[float]:
+        """Get embedding for a single text using Ollama /api/embed."""
+        batch = await self._call_ollama_embedding_batch([text])
+        if batch and len(batch) > 0:
+            return batch[0]
+        return self.generate_pseudo_embedding(text)
+
+    async def _call_ollama_embedding_batch(self, texts: List[str]) -> List[List[float]]:
+        """Get embeddings for a list of texts using Ollama /api/embed."""
+        if not texts:
+            return []
+
+        url = f"{self.ollama_base_url}/api/embed"
+        payload = {
+            "model": self.ollama_model,
+            "input": texts
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.ollama_timeout) as client:
+                resp = await client.post(url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    embs = data.get("embeddings", [])
+                    if embs and len(embs) == len(texts):
+                        return embs
+                logger.warning(f"Ollama embedding returned HTTP {resp.status_code}: {resp.text}")
+        except Exception as exc:
+            logger.warning(f"Ollama embedding API call error ({exc}). Falling back to pseudo-embedding.")
+
+        return [self.generate_pseudo_embedding(t) for t in texts]
 
     async def _call_gemini_embedding(self, text: str) -> List[float]:
         """Synchronous wrapper for Gemini Embedding SDK calls."""
@@ -140,10 +191,24 @@ class EmbeddingService:
         self, texts: List[str], batch_size: int = 5
     ) -> List[List[float]]:
         """
-        Computes embeddings in small batches (max 5 items) with 0.5s throttling to protect Free Tier limits.
+        Computes embeddings in small batches.
+        For Ollama: processes directly via /api/embed without throttling.
+        For Gemini: throttles with 0.5s pause to protect Free Tier limits.
         """
-        all_embeddings: List[List[float]] = []
+        if not texts:
+            return []
 
+        if self.provider == "ollama":
+            # Ollama handles native batching efficiently
+            all_embeddings: List[List[float]] = []
+            ollama_batch_size = 20
+            for i in range(0, len(texts), ollama_batch_size):
+                batch = texts[i : i + ollama_batch_size]
+                batch_res = await self._call_ollama_embedding_batch(batch)
+                all_embeddings.extend(batch_res)
+            return all_embeddings
+
+        all_embeddings: List[List[float]] = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
             batch_tasks = [self.get_text_embedding(t) for t in batch]

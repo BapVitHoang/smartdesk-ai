@@ -1,9 +1,10 @@
-"""Google Gemini 1.5 Flash client wrapper with latency tracking, strict timeout, and Cost-Guard Circuit Breaker."""
+"""Google Gemini 3.5 Flash Lite / Ollama client wrapper with latency tracking, strict timeout, model fallback, and Cost-Guard Circuit Breaker."""
 
 import asyncio
 import time
 import logging
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Any
+import httpx
 
 from app.core.config import settings
 from app.core.exceptions import LLMTimeoutException, LLMServiceException
@@ -23,15 +24,30 @@ SYSTEM_INSTRUCTION = (
 
 
 class LLMService:
-    """Async Google Gemini 1.5 Flash Service Wrapper with Cost-Guard Circuit Breaker."""
+    """Async LLM Service Wrapper supporting Google Gemini and Local Ollama with Cost-Guard Circuit Breaker."""
 
     def __init__(self) -> None:
+        self.provider = (settings.AI_PROVIDER or "gemini").lower()
         self.api_key = settings.GEMINI_API_KEY
         self.model_name = settings.LLM_MODEL_NAME
+        self.fallback_model_name = getattr(settings, "LLM_FALLBACK_MODEL_NAME", "gemini-2.5-flash-lite")
         self.timeout_seconds = settings.LLM_TIMEOUT_SECONDS
         self.cooldown_until: float = 0.0
         self._client: Any = None
-        self._init_client()
+
+        # Ollama local settings
+        self.ollama_base_url = settings.OLLAMA_BASE_URL.rstrip("/")
+        self.ollama_model = settings.OLLAMA_LLM_MODEL
+        self.ollama_timeout = settings.OLLAMA_TIMEOUT_SECONDS
+        self.ollama_keep_alive = settings.OLLAMA_KEEP_ALIVE
+
+        if self.provider == "gemini":
+            self._init_client()
+        else:
+            logger.info(
+                f"Initialized LLMService with local provider '{self.provider}' "
+                f"(Model: {self.ollama_model}, Endpoint: {self.ollama_base_url})."
+            )
 
     def _init_client(self) -> None:
         """Initializes Gemini API client if API key is provided."""
@@ -61,8 +77,16 @@ class LLMService:
                 self._client = None
                 self._sdk_type = None
 
+    def is_available(self) -> bool:
+        """Check if active AI provider is configured and ready."""
+        if self.provider == "ollama":
+            return True
+        return bool(self._client and self.api_key and self.api_key != "YOUR_GEMINI_API_KEY_HERE")
+
     def is_in_cooldown(self) -> bool:
-        """Check if Cost-Guard is in cooldown due to 429 Rate Limit."""
+        """Check if Cost-Guard is in cooldown due to 429 Rate Limit (Gemini only)."""
+        if self.provider == "ollama":
+            return False
         return time.time() < self.cooldown_until
 
     async def generate_response(
@@ -72,16 +96,16 @@ class LLMService:
         temperature: float = 0.2
     ) -> Tuple[str, float]:
         """
-        Executes an async generation request with hard 4.0s timeout and latency measurement.
+        Executes an async generation request with provider-specific timeout and latency measurement.
         
         Returns:
             Tuple[str, float]: (generated_text, latency_ms)
             
         Raises:
-            LLMTimeoutException: If execution exceeds 4.0s.
+            LLMTimeoutException: If execution exceeds timeout budget.
             LLMServiceException: If API key is missing, API errors out, or rate limit cooldown is active.
         """
-        # Cost-Guard Circuit Breaker Check
+        # Cost-Guard Circuit Breaker Check (Gemini)
         if self.is_in_cooldown():
             logger.warning(
                 f"[Cost-Guard] Currently in Free Tier cooldown for another {round(self.cooldown_until - time.time(), 1)}s. "
@@ -89,28 +113,38 @@ class LLMService:
             )
             raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
 
-        if not self._client:
-            self._init_client()
-
-        if not self._client or not self.api_key or self.api_key == "YOUR_GEMINI_API_KEY_HERE":
-            raise LLMServiceException("Gemini API key is not configured or client failed to initialize.")
+        if not self.is_available():
+            raise LLMServiceException(f"AI provider '{self.provider}' is not configured or client failed to initialize.")
 
         start_time = time.perf_counter()
         effective_system_prompt = system_prompt or SYSTEM_INSTRUCTION
+        effective_timeout = self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
 
         try:
-            # Wrap asynchronous call within timeout budget (4.0s)
-            response_text = await asyncio.wait_for(
-                self._execute_api_call(prompt, effective_system_prompt, temperature),
-                timeout=self.timeout_seconds
-            )
+            if self.provider == "ollama":
+                response_text = await asyncio.wait_for(
+                    self._execute_ollama_call(prompt, effective_system_prompt, temperature),
+                    timeout=effective_timeout
+                )
+            else:
+                if not self._client:
+                    self._init_client()
+                if not self._client or not self.api_key or self.api_key == "YOUR_GEMINI_API_KEY_HERE":
+                    raise LLMServiceException("Gemini API key is not configured or client failed to initialize.")
+                response_text = await asyncio.wait_for(
+                    self._execute_api_call(prompt, effective_system_prompt, temperature),
+                    timeout=effective_timeout
+                )
+
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
             return response_text, elapsed_ms
 
         except asyncio.TimeoutError:
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            logger.warning(f"LLM API call timed out after {elapsed_ms}ms (Threshold: {self.timeout_seconds}s)")
+            logger.warning(f"LLM API call timed out after {elapsed_ms}ms (Threshold: {effective_timeout}s)")
             raise LLMTimeoutException(f"LLM call timed out after {elapsed_ms}ms")
+        except (LLMServiceException, LLMTimeoutException):
+            raise
         except Exception as e:
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
             err_str = str(e)
@@ -121,22 +155,76 @@ class LLMService:
             logger.error(f"LLM API execution error after {elapsed_ms}ms: {str(e)}", exc_info=True)
             raise LLMServiceException(f"LLM execution failed: {str(e)}")
 
+    async def _execute_ollama_call(self, prompt: str, system_prompt: str, temperature: float) -> str:
+        """Executes generation call via Ollama async REST API."""
+        url = f"{self.ollama_base_url}/api/chat"
+        payload = {
+            "model": self.ollama_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "stream": False,
+            "options": {
+                "temperature": temperature
+            },
+            "keep_alive": self.ollama_keep_alive
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.ollama_timeout) as client:
+                resp = await client.post(url, json=payload)
+                if resp.status_code != 200:
+                    raise LLMServiceException(f"Ollama returned HTTP {resp.status_code}: {resp.text}")
+                data = resp.json()
+                content = data.get("message", {}).get("content", "")
+                return content or ""
+        except httpx.ConnectError:
+            raise LLMServiceException(f"Cannot connect to Ollama at {self.ollama_base_url}. Please ensure Ollama is running.")
+        except httpx.TimeoutException:
+            raise LLMTimeoutException(f"Ollama request timed out after {self.ollama_timeout}s")
+        except Exception as exc:
+            if isinstance(exc, (LLMServiceException, LLMTimeoutException)):
+                raise
+            raise LLMServiceException(f"Ollama request error: {str(exc)}")
+
     async def _execute_api_call(self, prompt: str, system_prompt: str, temperature: float) -> str:
-        """Internal dispatcher executing SDK generation call asynchronously."""
+        """Internal dispatcher executing SDK generation call asynchronously with secondary model fallback."""
         if self._sdk_type == "genai":
             # google-genai client
             def _sync_call() -> str:
                 from google.genai import types
-                response = self._client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_prompt,
-                        temperature=temperature,
-                        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-                    )
+                cfg = types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=temperature,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                 )
-                return response.text or ""
+                try:
+                    response = self._client.models.generate_content(
+                        model=self.model_name,
+                        contents=prompt,
+                        config=cfg,
+                    )
+                    return response.text or ""
+                except Exception as primary_err:
+                    err_msg = str(primary_err)
+                    if (
+                        self.fallback_model_name
+                        and self.fallback_model_name != self.model_name
+                        and ("404" in err_msg or "NOT_FOUND" in err_msg)
+                    ):
+                        logger.warning(
+                            f"Primary model '{self.model_name}' unavailable ({err_msg}); "
+                            f"retrying with fallback model '{self.fallback_model_name}'."
+                        )
+                        response = self._client.models.generate_content(
+                            model=self.fallback_model_name,
+                            contents=prompt,
+                            config=cfg,
+                        )
+                        return response.text or ""
+                    raise
+
             return await asyncio.to_thread(_sync_call)
 
         elif self._sdk_type == "generativeai":
