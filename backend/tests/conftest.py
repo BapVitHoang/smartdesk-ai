@@ -3,10 +3,16 @@ Provides isolated temporary database and clean test environment.
 """
 
 import os
+import sys
 import tempfile
 from pathlib import Path
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
+
+# Ensure backend root is always on sys.path
+backend_dir = Path(__file__).resolve().parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 # 1. Configure isolated test database environment BEFORE importing application
 _temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)

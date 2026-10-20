@@ -45,6 +45,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
         run: |
@@ -52,7 +53,9 @@ jobs:
           pip install -r backend/requirements.txt
 
       - name: Run pytest test suite
+        working-directory: backend
         run: |
-          pytest backend/tests/ -v
+          python -m pytest tests/ -v
         env:
           GEMINI_API_KEY: ""
+          PYTHONPATH: .
