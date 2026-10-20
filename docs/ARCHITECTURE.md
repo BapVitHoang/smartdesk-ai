@@ -87,16 +87,16 @@ smartdesk-ai/
 
 ---
 
-## 2. Module Ownership Matrix (3-Developer / Multi-Agent Boundaries)
+## 2. Module Ownership Matrix (3-Developer / Workstream Boundaries)
 
-To prevent merge conflicts during parallel development, every file belongs to a designated owner:
+To prevent merge conflicts during parallel development, every file in the repository belongs to exactly ONE designated owner:
 
-| Owner Role | Owned Backend Modules | Owned Frontend & Infra Modules | Owned Test Files |
+| Developer / Role | Owned Backend Modules | Owned Frontend, Infra & Docs | Dedicated Test Suites |
 | :--- | :--- | :--- | :--- |
-| **Owner 1: AI, RAG & Verification Lead** | `services/llm_service.py`, `embedding_service.py`, `rag_service.py`, `fallback_service.py`, `verification_service.py`, `agent_tools.py`, `core/prompts.py`, `core/security.py`, `endpoints/chat.py`, `endpoints/documents.py`, `endpoints/knowledge.py`, `data/prompts.json` | `features/chat/`, `features/telemetry/` | `test_rag_module.py`, `test_ollama_provider.py` |
-| **Owner 2: Platform, Auth & Tickets Lead** | `services/ticket_service.py`, `document_service.py`, `db/session.py`, `models/*`, `endpoints/tickets.py`, `endpoints/agent.py`, `endpoints/workspaces.py`, `endpoints/health.py`, `endpoints/auth.py` *(extension)* | `features/auth/` | `test_tickets_module.py`, `test_auth_module.py` |
-| **Owner 3: Frontend UX, DevOps & QA Lead** | — | `components/*`, `data.ts`, `docker-compose.yml`, `.github/workflows/ci.yml`, `docs/*`, `scripts/*` | `test_workspace_and_verification.py` |
-| **Integration Owner (Shared Gatekeeper)** | `api/v1/api.py`, `core/config.py`, `core/exceptions.py`, `schemas/*`, `main.py` | `types.ts`, `services/api.ts`, `App.tsx`, `docs/API_CONTRACT.md` | `test_api.py` |
+| **Dev A (Owner 1: AI Engine Lead)** | `services/llm_service.py`, `rag_service.py`, `fallback_service.py`, `verification_service.py`, `agent_tools.py`, `core/prompts.py`, `endpoints/chat.py`, `chat_stream.py`, `chat_actions.py`, `knowledge.py`, `backend/data/*`, `backend/scripts/*`, `Modelfile` | `docs/notes/A.md`, `docs/notes/A-ai-usage.md`, `docs/requests/A.md` | `backend/tests/test_rag_module.py`, `test_ollama_provider.py`, `backend/tests/ai/*` |
+| **Dev B (Owner 2: Platform & Data Lead)** | `services/ticket_service.py`, `document_service.py`, `embedding_service.py`, `ai_usage_logger.py`, `core/deps.py`, `core/security.py`, `db/base.py`, `session.py`, `seed/*`, `models/*`, `endpoints/tickets.py`, `agent.py`, `workspaces.py`, `documents.py`, `auth.py`, `ai_usage.py`, `health.py` | `docker-compose.yml`, `docs/notes/B.md`, `docs/notes/B-ai-usage.md`, `docs/requests/B.md` | `backend/tests/test_tickets_module.py`, `test_auth_module.py`, `test_workspace_and_verification.py`, `backend/tests/platform/*` |
+| **Dev C (Owner 3: Frontend UX, QA & Docs Lead)** | `backend/Dockerfile`, `backend/PYTHON_FILES_EXPLANATION.md`, `backend/README.md` | `frontend/src/*`, `frontend/Dockerfile`, `frontend/nginx.conf`, `README.md`, `AI_USAGE.md`, `docs/DESIGN.md`, `docs/PROPOSAL.md`, `docs/TEST_ACCEPTANCE.md`, `docs/REPORT.md`, `docs/PRESENTATION_AND_DEMO.md`, `docs/adr/*`, `docs/audit/*`, `docs/notes/*`, `scripts/*.bat` | `backend/tests/test_api.py`, `backend/tests/common/*` |
+| **Integrator / Hoang (Shared Gatekeeper)** | `api/v1/api.py`, `core/config.py`, `core/exceptions.py`, `schemas/*`, `models/__init__.py`, `requirements.txt`, `.env.example`, `conftest.py`, `pytest.ini` | `frontend/package*.json`, `tsconfig.json`, `vite.config.ts`, `types.ts`, `types/index.ts`, `services/api.ts`, `services/api/index.ts`, `services/api/client.ts`, `docs/spec/CONTRACTS.md`, `docs/API_CONTRACT.md`, `AGENTS.md`, `.cursorrules`, `.gitattributes`, `.gitignore`, `.github/**`, `scripts/check_ownership.py`, `scripts/verify_setup.ps1` | All shared test fixtures |
 
 ### Strict Collaboration Rules
 1. **Do Not Edit Outside Your Module:** An agent or developer assigned to a task for Owner 1 must not modify Owner 2's services or Owner 3's UI components unless explicitly designated as an integration task.

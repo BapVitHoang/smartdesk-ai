@@ -33,7 +33,9 @@ You are an expert fullstack AI engineer working on SmartDesk AI. Strictly adhere
 - Ticket IDs must follow format `#TICK-XXXX`. Priority must be one of: `Low`, `Medium`, `High`, `Urgent`.
 
 ## 5. Module Ownership, Security & Verification
-- Do NOT edit files outside your assigned module (`docs/ARCHITECTURE.md`). Shared contract files (`api.py`, `config.py`, `types.ts`, `api.ts`, `App.tsx`, `API_CONTRACT.md`) require Integration Owner review.
+- Strict Workstreams: Dev A / Owner 1 (AI Engine), Dev B / Owner 2 (Platform & Data), Dev C / Owner 3 (Frontend & Docs), Integrator / Hoang (Frozen Shared Contracts).
+- Do NOT edit files outside your assigned module (`docs/ARCHITECTURE.md` and `docs/plan/WORKSTREAMS.md`).
+- Run `python scripts/check_ownership.py --staged` before every commit.
 - Do NOT hardcode or commit API keys, `.env`, or `*.db` files.
 - Use Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
-- Run `pytest backend/tests/ -v` and `npm run lint --prefix frontend && npm run build --prefix frontend` before every commit.
+- Run `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` before starting work.

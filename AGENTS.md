@@ -161,39 +161,48 @@ backend/app/
 
 ## 6. Multi-Agent & Team Collaboration Rules (Strict Conflict Prevention)
 
-1. **Module Ownership Boundaries ("Stay in Your Lane"):**
-   - **Owner 1 (AI, RAG, Guardrails & Telemetry):**
-     - Owns `backend/app/services/rag_service.py`, `llm_service.py`, `embedding_service.py`, `fallback_service.py`, `verification_service.py`, `agent_tools.py`, `ai_usage_logger.py`.
-     - Owns `backend/app/core/prompts.py`, `backend/app/core/security.py`, `backend/app/schemas/ai_structured.py`.
-     - Owns `backend/app/api/v1/endpoints/chat.py`, `chat_stream.py`, `chat_actions.py`, `ai_usage.py`.
-     - Owns `frontend/src/features/chat/`, `frontend/src/features/telemetry/`, `frontend/src/services/api/chat.ts`, `frontend/src/services/api/telemetry.ts`.
-     - Owns `backend/tests/test_rag_module.py`, `backend/tests/test_ollama_provider.py`, `backend/tests/test_eval_cases.py`.
-   - **Owner 2 (Platform, Auth, Workspaces & Tickets):**
-     - Owns `backend/app/services/ticket_service.py`, `document_service.py`.
-     - Owns `backend/app/db/session.py`, `backend/app/db/base.py`, `backend/app/db/seed/`, `backend/app/models/*`, `backend/app/core/deps.py`.
-     - Owns `backend/app/api/v1/endpoints/tickets.py`, `agent.py`, `workspaces.py`, `documents.py`, `auth.py`, `health.py`.
-     - Owns `frontend/src/features/agent/`, `frontend/src/features/auth/`, `frontend/src/features/knowledge/`.
-     - Owns `frontend/src/services/api/tickets.ts`, `workspaces.ts`, `documents.ts`, `auth.ts`.
-     - Owns `backend/tests/test_tickets_module.py`, `test_auth_module.py`, `test_workspace_and_verification.py`.
-   - **Owner 3 (Frontend UX, DevOps & QA):**
-     - Owns `frontend/src/components/*`, `frontend/src/App.tsx`, `frontend/src/main.tsx`, `frontend/src/data.ts`.
-     - Owns `frontend/src/services/mocks/*`, `docker-compose.yml`, `Dockerfile*`, `scripts/*`, `.github/workflows/*`, `docs/*`.
+1. **Role Mapping & Module Ownership Boundaries ("Stay in Your Lane"):**
+   - **Dev A / Owner 1 (AI Engine, RAG, Structured Output, Guardrails & Eval):**
+     - Owns `backend/app/services/llm_service.py`, `rag_service.py`, `fallback_service.py`, `verification_service.py`, `agent_tools.py`.
+     - Owns `backend/app/core/prompts.py`, `backend/app/api/v1/endpoints/chat.py`, `chat_stream.py`, `chat_actions.py`, `knowledge.py`.
+     - Owns `backend/data/prompts.json`, `seed_faq.json`, `finetune_alpaca.jsonl`, `sample_documents/*`, `eval_dataset.json`.
+     - Owns `backend/scripts/run_eval.py`, `reembed_chunks.py`, `export_finetune_dataset.py`, `Modelfile`.
+     - Owns `backend/tests/test_rag_module.py`, `test_ollama_provider.py`, `backend/tests/ai/*`.
+     - Owns `docs/notes/A.md`, `docs/notes/A-ai-usage.md`, `docs/requests/A.md`.
+   - **Dev B / Owner 2 (Platform, Auth, Database, Workspaces, Tickets & Docker DB):**
+     - Owns `backend/app/services/ticket_service.py`, `document_service.py`, `embedding_service.py`, `ai_usage_logger.py`.
+     - Owns `backend/app/core/deps.py`, `backend/app/core/security.py`.
+     - Owns `backend/app/db/base.py`, `session.py`, `seed/*`, `models/*`.
+     - Owns `backend/app/api/v1/endpoints/tickets.py`, `agent.py`, `workspaces.py`, `documents.py`, `auth.py`, `ai_usage.py`, `health.py`.
+     - Owns `backend/tests/test_tickets_module.py`, `test_auth_module.py`, `test_workspace_and_verification.py`, `backend/tests/platform/*`.
+     - Owns `docker-compose.yml`, `docs/notes/B.md`, `docs/notes/B-ai-usage.md`, `docs/requests/B.md`.
+   - **Dev C / Owner 3 (Frontend UX, Mocks, QA Tests & Capstone Documentation):**
+     - Owns `frontend/src/*` (components, features, services/api, services/mocks, data.ts, App.tsx, main.tsx, index.css).
+     - Owns `frontend/Dockerfile`, `frontend/nginx.conf`, `frontend/index.html`, `frontend/metadata.json`.
+     - Owns `backend/Dockerfile`, `backend/PYTHON_FILES_EXPLANATION.md`, `backend/README.md`.
+     - Owns `backend/tests/test_api.py`, `backend/tests/common/*`.
+     - Owns `README.md`, `AI_USAGE.md`, `docs/DESIGN.md`, `docs/PROPOSAL.md`, `docs/TEST_ACCEPTANCE.md`, `docs/REPORT.md`, `docs/PRESENTATION_AND_DEMO.md`, `docs/adr/*`, `docs/audit/*`, `docs/notes/*`, `docs/requests/C.md`, `scripts/*.bat`.
+   - **Integrator / Hoang (Architecture, Shared Contracts & Integration Reviewer):**
+     - Exclusively owns `backend/app/core/config.py`, `backend/app/core/exceptions.py`, `backend/requirements.txt`, `backend/.env.example`.
+     - Exclusively owns `backend/app/api/v1/api.py`, `backend/app/models/__init__.py`, `backend/app/schemas/*`, `backend/tests/conftest.py`, `pytest.ini`.
+     - Exclusively owns `frontend/.env.example`, `frontend/package.json`, `frontend/package-lock.json`, `frontend/tsconfig.json`, `frontend/vite.config.ts`.
+     - Exclusively owns `frontend/src/types.ts`, `frontend/src/types/index.ts`, `frontend/src/services/api.ts`, `frontend/src/services/api/index.ts`, `frontend/src/services/api/client.ts`.
+     - Exclusively owns `docs/spec/CONTRACTS.md`, `docs/API_CONTRACT.md`, `AGENTS.md`, `.cursorrules`, `.gitattributes`, `.gitignore`, `.github/**`, `scripts/check_ownership.py`, `scripts/verify_setup.ps1`.
    - **Rule:** Do NOT edit files outside your assigned module without explicit coordination.
 2. **Frozen Shared Files Policy:**
-   - The following shared integration files may ONLY be modified through the **Integration Owner** (Lead):
-     - `backend/app/api/v1/api.py`, `backend/app/core/config.py`, `backend/app/main.py`
-     - `frontend/src/types.ts`, `frontend/src/types/*`
-     - `frontend/src/services/api.ts`, `frontend/src/services/api/client.ts`, `frontend/src/services/api/index.ts`
-     - `docs/API_CONTRACT.md`, `docs/spec/CONTRACTS.md`
-   - To request a change to frozen files, create a request file in `docs/requests/<your_name>.md` using `docs/requests/template.md`.
+   - Frozen shared integration files may ONLY be modified through the **Integration Owner** (Hoang).
+   - To request a change to frozen files, create a request file in `docs/requests/<dev>.md` using `docs/requests/template.md`.
 3. **Automated Ownership Verification:**
    - Run `python scripts/check_ownership.py --staged` before committing.
    - Any attempt to commit cross-module files or frozen shared files on a feature branch will be blocked with exit code 1.
 4. **Git Branch & Commit Convention:**
-   - Branch naming: `feat/<owner>-<module>`, `fix/<owner>-<issue>`, `docs/<owner>-<topic>`.
+   - Branch naming: `feature/a-ai-engine` (Dev A), `feature/b-platform` (Dev B), `feature/c-frontend-docs` (Dev C).
+   - Daily rebase on `main` / integration branch.
    - Commit messages MUST follow Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
    - NEVER use `git push --force`, `git reset --hard`, or commit `.env` / `*.db` files.
 5. **Mandatory Pre-Commit Verification Gate:**
-   - Every commit MUST pass both checks with 0 errors before committing:
+   - Every commit MUST pass all checks with 0 errors before committing:
+     - Verify environment & toolchain: `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1`
      - Backend: `python -m pytest backend/tests/ -v`
      - Frontend: `npm run lint --prefix frontend; npm run build --prefix frontend`
+     - Ownership: `python scripts/check_ownership.py --staged`
