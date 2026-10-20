@@ -44,8 +44,11 @@ class RAGService:
                     session=session,
                     only_published=True
                 )
+                min_score = getattr(settings, "RAG_MIN_SIMILARITY_SCORE", 0.25)
                 for chk in similar_chunks:
-                    # Filter out low-relevance chunks if score < 0.2
+                    chunk_score = chk.get("score", 0.8)
+                    if chunk_score < min_score:
+                        continue
                     docs.append({
                         "doc_id": chk["chunk_id"],
                         "title": chk["title"],
@@ -54,12 +57,13 @@ class RAGService:
                         "source_url": chk["source_url"],
                         "page": chk.get("page_number", 1),
                         "snippet": chk["content"][:160] + "..." if len(chk["content"]) > 160 else chk["content"],
-                        "score": chk.get("score", 0.8)
+                        "score": chunk_score
                     })
             except Exception as e:
                 logger.warning(f"Workspace chunk retrieval failed: {e}")
 
-        # 2. For default workspace or if no chunks found, blend with curated FAQ items
+        # 2. For default workspace or if no chunks found, blend with curated FAQ items with deduplication
+        seen_doc_ids = {d["doc_id"] for d in docs}
         if len(docs) < top_k and ws_id == 1:
             if session:
                 try:
@@ -68,34 +72,42 @@ class RAGService:
                     if db_items:
                         scored = fallback_service.bm25.score(query)
                         if scored:
-                            for item_doc, score_val in scored[: top_k - len(docs)]:
-                                docs.append({
-                                    "doc_id": item_doc["doc_id"],
-                                    "title": item_doc["title"],
-                                    "content": item_doc["content"],
-                                    "category": item_doc.get("category", "General"),
-                                    "source_url": item_doc.get("source_url", "/docs"),
-                                    "page": 1,
-                                    "snippet": item_doc["content"][:160] + "...",
-                                    "score": 0.85
-                                })
+                            for item_doc, score_val in scored:
+                                if len(docs) >= top_k:
+                                    break
+                                if item_doc["doc_id"] not in seen_doc_ids:
+                                    seen_doc_ids.add(item_doc["doc_id"])
+                                    docs.append({
+                                        "doc_id": item_doc["doc_id"],
+                                        "title": item_doc["title"],
+                                        "content": item_doc["content"],
+                                        "category": item_doc.get("category", "General"),
+                                        "source_url": item_doc.get("source_url", "/docs"),
+                                        "page": 1,
+                                        "snippet": item_doc["content"][:160] + "...",
+                                        "score": min(0.95, round(score_val / 10.0, 2)) if score_val else 0.85
+                                    })
                 except Exception as e:
                     logger.warning(f"Database FAQ retrieval failed: {e}")
 
             if len(docs) < top_k:
                 ranked = fallback_service.bm25.score(query)
                 if ranked:
-                    for doc_item, _ in ranked[: top_k - len(docs)]:
-                        docs.append({
-                            "doc_id": doc_item["doc_id"],
-                            "title": doc_item["title"],
-                            "content": doc_item["content"],
-                            "category": doc_item.get("category", "General"),
-                            "source_url": doc_item.get("source_url", "/docs"),
-                            "page": 1,
-                            "snippet": doc_item["content"][:160] + "...",
-                            "score": 0.80
-                        })
+                    for doc_item, score_val in ranked:
+                        if len(docs) >= top_k:
+                            break
+                        if doc_item["doc_id"] not in seen_doc_ids:
+                            seen_doc_ids.add(doc_item["doc_id"])
+                            docs.append({
+                                "doc_id": doc_item["doc_id"],
+                                "title": doc_item["title"],
+                                "content": doc_item["content"],
+                                "category": doc_item.get("category", "General"),
+                                "source_url": doc_item.get("source_url", "/docs"),
+                                "page": 1,
+                                "snippet": doc_item["content"][:160] + "...",
+                                "score": 0.80
+                            })
 
         return docs[:top_k]
 
@@ -245,13 +257,25 @@ class RAGService:
 
             total_latency_ms = round((time.perf_counter() - overall_start) * 1000, 2)
 
+            # Dynamic confidence and refusal detection
+            top_score = max((d.get("score", 0.0) for d in docs), default=0.0)
+            refusal_keywords = [
+                "không có thông tin", "chưa có thông tin", "không thể tìm thấy",
+                "không được đề cập", "gửi ticket", "liên hệ bộ phận hỗ trợ",
+                "không có trong tài liệu", "không thuộc phạm vi", "tôi không biết"
+            ]
+            is_refusal = any(kw in response_text.lower() for kw in refusal_keywords) or len(docs) == 0
+            confidence = round(top_score, 2) if (top_score > 0 and not is_refusal) else 0.45
+            confidence_threshold = getattr(settings, "RAG_CONFIDENCE_THRESHOLD", 0.65)
+            escalation_recommended = is_refusal or (confidence < confidence_threshold)
+
             return ChatResponse(
                 response=response_text.strip(),
                 citations=citations,
                 latency_ms=total_latency_ms,
-                confidence=0.92,
+                confidence=confidence,
                 is_fallback=False,
-                escalation_recommended=False
+                escalation_recommended=escalation_recommended
             )
 
         except (LLMTimeoutException, LLMServiceException, Exception) as exc:
@@ -264,7 +288,7 @@ class RAGService:
                 f"Routing immediately to FallbackService..."
             )
 
-            fallback_data = fallback_service.match_faq(query, workspace_id=ws_id, workspace_name=ws_name)
+            fallback_data = fallback_service.match_faq(query, workspace_id=ws_id, workspace_name=ws_name, docs=docs)
 
             return ChatResponse(
                 response=fallback_data["response"],

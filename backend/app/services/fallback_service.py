@@ -148,7 +148,8 @@ class FallbackService:
         self,
         query: str,
         workspace_id: Optional[int] = 1,
-        workspace_name: Optional[str] = None
+        workspace_name: Optional[str] = None,
+        docs: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Matches customer query deterministically against verified knowledge base.
@@ -161,8 +162,34 @@ class FallbackService:
             )
         )
 
-        # 1. Non-default workspaces do NOT leak default IT SaaS FAQs
+        # 1. Non-default workspaces: match against provided published chunks if available
         if ws_id != 1:
+            if docs:
+                chunk_engine = BM25Engine()
+                chunk_engine.fit(docs)
+                ranked_chunks = chunk_engine.score(query)
+                if ranked_chunks and ranked_chunks[0][1] > 0.0:
+                    top_chk, raw_score = ranked_chunks[0]
+                    confidence = min(0.85, max(0.40, round(raw_score / 10.0, 2)))
+                    return {
+                        "response": (
+                            f"Hệ thống trợ lý AI thời gian thực đang trong chế độ dự phòng. "
+                            f"Dựa trên Cơ sở tri thức của {ws_label}, dưới đây là thông tin liên quan nhất từ '{top_chk['title']}':\n\n"
+                            f"{top_chk['content']}\n\n"
+                            f"Quý khách có thể gửi ticket hỗ trợ nếu cần tư vấn thêm."
+                        ),
+                        "citations": [
+                            {
+                                "doc_id": top_chk["doc_id"],
+                                "title": top_chk["title"],
+                                "source_url": top_chk.get("source_url", "/docs")
+                            }
+                        ],
+                        "confidence": confidence,
+                        "is_fallback": True,
+                        "escalation_recommended": confidence < 0.65
+                    }
+
             return {
                 "response": (
                     f"Hiện tại hệ thống trợ lý AI đang tạm thời gián đoạn kết nối thời gian thực. "

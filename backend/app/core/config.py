@@ -22,11 +22,17 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # AI Provider: "gemini" | "ollama"
+    # Primary Cloud LLM (GA Google Gemini 3.5 Flash Lite)
     AI_PROVIDER: str = "gemini"
     GEMINI_API_KEY: str = ""
     LLM_MODEL_NAME: str = "gemini-3.5-flash-lite"
+    LLM_FALLBACK_MODEL: str = ""
     LLM_FALLBACK_MODEL_NAME: str = "gemini-2.5-flash-lite"
     EMBEDDING_MODEL_NAME: str = "gemini-embedding-001"
+
+    # Token Pricing for REQ-22 Observability (GA Gemini 3.5 Flash Lite rates per 1M tokens)
+    LLM_INPUT_COST_PER_MILLION: float = 0.30
+    LLM_OUTPUT_COST_PER_MILLION: float = 2.50
 
     # Local Ollama Settings
     OLLAMA_BASE_URL: str = "http://localhost:11434"
@@ -37,7 +43,20 @@ class Settings(BaseSettings):
 
     # Circuit Breaker & Strict Latency Budget (Max 4.0s for Cloud Gemini)
     LLM_TIMEOUT_SECONDS: float = 4.0
+    RATE_LIMIT_COOLDOWN_SECONDS: int = 60
     RAG_CONFIDENCE_THRESHOLD: float = 0.65
+    RAG_MIN_SIMILARITY_SCORE: float = 0.25
+
+    # Document Chunking
+    CHUNK_SIZE: int = 700
+    CHUNK_OVERLAP: int = 100
+
+    # Authentication & RBAC (Hybrid OAuth2 + Demo Login)
+    JWT_SECRET_KEY: str = "smartdesk-secret-key-change-in-production-2026"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    GOOGLE_OAUTH_CLIENT_ID: str = ""
+    DEMO_LOGIN_ENABLED: bool = True
 
     # Database Configuration (PostgreSQL 16 with pgvector or SQLite async fallback)
     DATABASE_URL: str = f"sqlite+aiosqlite:///{DEFAULT_SQLITE_PATH}"

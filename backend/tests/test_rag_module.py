@@ -49,3 +49,24 @@ def test_bm25_fallback_deterministic_match() -> None:
     assert result["is_fallback"] is True
     assert isinstance(result["citations"], list)
     assert len(result["citations"]) >= 1
+
+
+def test_bm25_fallback_with_custom_chunks_workspace_2() -> None:
+    """Verify BM25 fallback matches custom published chunks for Workspace 2."""
+    custom_chunks = [
+        {
+            "doc_id": "doc-2-chk-1",
+            "title": "Bảng giá nha khoa SmileCare",
+            "content": "Dịch vụ tẩy trắng răng Laser Whitening trọn gói 2.500.000 VNĐ.",
+            "source_url": "/workspaces/2/docs/1"
+        }
+    ]
+    res = fallback_service.match_faq(
+        query="Chi phí tẩy trắng răng bao nhiêu?",
+        workspace_id=2,
+        workspace_name="Nha Khoa SmileCare",
+        docs=custom_chunks
+    )
+    assert res["is_fallback"] is True
+    assert "tẩy trắng răng" in res["response"].lower()
+    assert res["citations"][0]["doc_id"] == "doc-2-chk-1"
