@@ -11,19 +11,21 @@ This file outlines the foundational technical rules, architecture constraints, m
 - **Frontend:** React 19 + Vite 6 + Tailwind CSS v4 + TypeScript + Lucide Icons + Motion (Single Page Application, NOT Next.js).
 - **Backend:** FastAPI (Python 3.11+) asynchronous ASGI service.
 - **Database:** PostgreSQL 16 with `pgvector` (Fallback: Async SQLite `aiosqlite` with in-Python cosine similarity for local development/testing).
-- **Primary Cloud LLM:** Google Gemini (`gemini-3.5-flash-lite` primary, automatic fallback to `gemini-2.5-flash-lite`; replacing retired `gemini-1.5-flash`), embeddings via `gemini-embedding-001` (replacing retired `text-embedding-004`).
+- **Primary Cloud LLM:** Google Gemini GA `gemini-3.5-flash-lite` (verified available on Google API; minimal thinking budget `thinking_budget=0` to ensure < 1,500ms latency), embeddings via `gemini-embedding-001`. Optional `LLM_FALLBACK_MODEL` env var (empty by default; no silent rewriting). Real token cost tracking: input $0.30/1M, output $2.50/1M.
 - **Local AI Provider (Dual-Mode):** Ollama (`qwen2.5:3b` + `nomic-embed-text`) via `AI_PROVIDER=ollama`.
 - **Deterministic Non-AI Fallback:** Pure-Python Okapi BM25 FAQ matcher on curated dataset (`backend/data/seed_faq.json`) + deterministic SHA-256 768-dim unit pseudo-embeddings when offline or rate-limited.
+- **Team Size:** 3 Developers (Dev A / Owner 1, Dev B / Owner 2, Dev C / Owner 3 + Integration Owner).
 
 ### 1.2 Mandatory Document Reference Index
 Before implementing any task, the AI assistant MUST consult the following canonical documents:
 1. **System Architecture & Module Ownership:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) - Folder ownership, shared files policy, and extension points.
 2. **API Specifications & Schemas:** [`docs/API_CONTRACT.md`](./docs/API_CONTRACT.md) - Full request/response schemas, error codes, and HTTP status contracts.
-3. **UI/UX & Design Tokens:** [`docs/DESIGN.md`](./docs/DESIGN.md) - Brand colors, typography hierarchy, UI state handling, and component specs.
-4. **Acceptance Test Matrix:** [`docs/TEST_ACCEPTANCE.md`](./docs/TEST_ACCEPTANCE.md) - Core acceptance test scenarios and automated verification instructions.
-5. **Project Proposal & Traceability:** [`docs/PROPOSAL.md`](./docs/PROPOSAL.md) - User stories (`US-01..US-12`) and Requirement Traceability Matrix.
-6. **AI Usage & Verification Log:** [`AI_USAGE.md`](./AI_USAGE.md) & [`docs/adr/`](./docs/adr/) - AI collaboration log and Architecture Decision Records (`ADR-001..004`).
-7. **General Overview & Startup:** [`README.md`](./README.md) - Quickstart guide and Windows batch script definitions (`scripts/start.bat`, `scripts/start_all.bat`, `scripts/start_backend.bat`, `scripts/install.bat`).
+3. **Internal Interface Contracts:** [`docs/spec/CONTRACTS.md`](./docs/spec/CONTRACTS.md) - Frozen signatures for dependencies, structured AI schemas, and logging stubs.
+4. **UI/UX & Design Tokens:** [`docs/DESIGN.md`](./docs/DESIGN.md) - Brand colors, typography hierarchy, UI state handling, and component specs.
+5. **Acceptance Test Matrix:** [`docs/TEST_ACCEPTANCE.md`](./docs/TEST_ACCEPTANCE.md) - Core acceptance test scenarios and automated verification instructions.
+6. **Project Proposal & Traceability:** [`docs/PROPOSAL.md`](./docs/PROPOSAL.md) - User stories (`US-01..US-12`) and Requirement Traceability Matrix.
+7. **AI Usage & Verification Log:** [`AI_USAGE.md`](./AI_USAGE.md) & [`docs/adr/`](./docs/adr/) - AI collaboration log and Architecture Decision Records (`ADR-001..004`).
+8. **General Overview & Startup:** [`README.md`](./README.md) - Quickstart guide and Windows batch script definitions (`scripts/start.bat`, `scripts/start_all.bat`, `scripts/start_backend.bat`, `scripts/install.bat`).
 
 ---
 
@@ -33,23 +35,47 @@ Before implementing any task, the AI assistant MUST consult the following canoni
 All frontend code is structured under `frontend/src/`:
 ```text
 frontend/src/
-├── components/                  # Core views & shared navigation
+├── components/                  # Core views & shared navigation (thin coordinators)
 │   ├── Header.tsx               # Top navigation, active tab switcher, demo state switcher
 │   ├── ChatView.tsx             # Customer RAG chat, citation badges, workspace selector
 │   ├── TicketFormView.tsx       # Ticket submission form, SLA preview, live validation
 │   ├── AgentDashboardView.tsx   # Agent triage table, filtering, AI copilot draft review
 │   ├── KnowledgeManagerView.tsx # Workspace persona config, doc upload, AI verification studio
 │   └── Footer.tsx               # System status badge, latency summary, copyright
-├── features/                    # Modular feature extensions (auth, telemetry, tools)
+├── features/                    # Modular feature components ("Stay in Your Lane")
+│   ├── agent/                   # TicketToolbar, TicketList, TicketDetail (Owner 2)
+│   ├── auth/                    # LoginSwitcher, UserProfileBadge (Owner 2)
+│   ├── chat/                    # CitationBadge, ChatMessageList (Owner 1)
+│   ├── knowledge/               # VerificationTrace, DocumentUploader (Owner 2)
+│   └── telemetry/               # TelemetryPanel, CostGuardGauge (Owner 1)
 ├── services/
-│   └── api.ts                   # Central API client module with dual-mode offline fallback
+│   ├── api/                     # Modular API client services
+│   │   ├── client.ts            # Base URL, fetchWithTimeout, auth headers, ApiError
+│   │   ├── chat.ts              # RAG query & SSE token streaming (Owner 1)
+│   │   ├── tickets.ts           # Ticket creation, filtering, triage & SLA mapping (Owner 2)
+│   │   ├── workspaces.ts        # Workspace persona management (Owner 2)
+│   │   ├── documents.ts         # Document upload, chunking & active verification (Owner 2)
+│   │   ├── auth.ts              # Hybrid OAuth2 & demo authentication (Owner 2)
+│   │   ├── telemetry.ts         # Token usage & cost-guard stats (Owner 1)
+│   │   └── index.ts             # Central API client barrel export
+│   ├── api.ts                   # Central API client facade (FROZEN CONTRACT)
+│   └── mocks/                   # Fixture mocks for local offline development (Owner 3)
+├── types/                       # Modular TypeScript definitions
+│   ├── common.ts                # TabType, UIState, DemoState, Toast
+│   ├── chat.ts                  # Citation, ChatMessage, BackendChatResponse
+│   ├── ticket.ts                # Ticket, TicketFormData, BackendTicketResponse
+│   ├── workspace.ts             # Workspace model
+│   ├── document.ts              # KnowledgeArticle, DocumentItem, VerificationReport
+│   ├── auth.ts                  # User, UserRole, AuthTokenResponse
+│   ├── telemetry.ts             # AIUsageStats, AIUsageLogItem
+│   └── index.ts                 # Central types barrel export
+├── types.ts                     # Canonical TypeScript interfaces facade (FROZEN CONTRACT)
 ├── data.ts                      # Local fallback mock dataset & deterministic RAG fallback
-├── types.ts                     # Canonical TypeScript interfaces & enums (FROZEN CONTRACT)
 └── App.tsx                      # Main application coordinator & active tab state management
 ```
 
 ### 2.2 Frontend State & API Client Rules
-- **Centralized API Calls:** NEVER call `fetch()` or `axios` directly inside UI components. ALL network calls must go through [`frontend/src/services/api.ts`](./frontend/src/services/api.ts).
+- **Centralized API Calls:** NEVER call `fetch()` or `axios` directly inside UI components. ALL network calls must go through [`frontend/src/services/api/`](./frontend/src/services/api/) or the facade [`frontend/src/services/api.ts`](./frontend/src/services/api.ts).
 - **Dual-Mode Graceful Fallback:** If the backend API is offline or unreachable (`TypeError` / network timeout):
   1. Do NOT crash the application or display unhandled blank screens.
   2. Automatically fallback to local data in `frontend/src/data.ts` (`INITIAL_TICKETS`, `getRagResponse`).
@@ -76,12 +102,12 @@ frontend/src/
 All backend source code is structured under `backend/app/`:
 ```text
 backend/app/
-├── core/         # Settings (config.py), externalized prompts (prompts.py), security, exceptions
-├── db/           # Async database session (session.py) & declarative Base (base.py)
-├── models/       # SQLAlchemy 2.0 ORM models (Ticket, FAQItem, KnowledgeChunk, Workspace, Document, Verification)
-├── schemas/      # Pydantic v2 schemas for Request/Response validation (FROZEN CONTRACT)
-├── services/     # Business logic (RAG, LLM, Embedding, Fallback, Ticket Copilot, Document, Verification, Agent Tools)
-└── api/v1/       # FastAPI APIRouters (chat, tickets, agent, knowledge, workspaces, documents, health)
+├── core/         # Settings (config.py), externalized prompts (prompts.py), security, deps.py (auth dependencies)
+├── db/           # Async database session (session.py), declarative Base (base.py) & seed/ (modular seeders)
+├── models/       # SQLAlchemy 2.0 ORM models (Ticket, FAQItem, KnowledgeChunk, Workspace, Document, Verification, User, AIUsageLog)
+├── schemas/      # Pydantic v2 schemas for Request/Response validation & ai_structured.py (FROZEN CONTRACT)
+├── services/     # Business logic (RAG, LLM, Embedding, Fallback, Ticket Copilot, Document, Verification, Agent Tools, AI Usage Logger)
+└── api/v1/       # FastAPI APIRouters (chat, chat_stream, chat_actions, tickets, agent, knowledge, workspaces, documents, auth, ai_usage, health)
 ```
 
 ### 3.2 Async/Await & Concurrency
@@ -100,7 +126,7 @@ backend/app/
 - **Latency Target:** First token / simple query response target is **< 1,500ms** (p95 < 2,000ms).
 - **Timeout Threshold:** External calls to Google Gemini API must timeout at **4.0 seconds max** (`LLM_TIMEOUT_SECONDS=4.0`).
 - **Model Fallback Chain:**
-  1. Primary Cloud LLM: `gemini-3.5-flash-lite` (automatic retry on `gemini-2.5-flash-lite` if model unavailable).
+  1. Primary Cloud LLM: `gemini-3.5-flash-lite` with minimal thinking budget (`thinking_budget=0`).
   2. Local LLM Mode: `qwen2.5:3b` via Ollama when `AI_PROVIDER=ollama`.
   3. Deterministic Non-AI Fallback: If the LLM call times out, returns HTTP 429 (`ResourceExhausted`), or encounters an exception, activate the 60s Cost-Guard cooldown (`cooldown_until = now + 60s`), route immediately to `FallbackService` (BM25 matcher on `seed_faq.json`), and return `"is_fallback": true`.
 
@@ -108,7 +134,7 @@ backend/app/
 - **Externalized Prompts:** System prompts are versioned in `backend/data/prompts.json` and loaded via `backend/app/core/prompts.py`.
 - **System Prompt Constraint:** Enforce `temperature: 0.2` for customer-facing RAG. Instruct the model strictly to answer only from provided context or recommend escalating to a human support agent.
 - **Citation Badges:** Every RAG-generated answer must extract and return structured source citations (`doc_id`, `title`, `source_url`, `page`, `snippet`).
-- **Security & Guardrails:** Incoming queries must pass through `core/security.py` (`sanitize_input`, `check_prompt_injection`). If prompt injection is detected, reject immediately with HTTP 400 (`PROMPT_SECURITY_VIOLATION`).
+- **Security & Guardrails:** Incoming queries must pass through `core/security.py` (`sanitize_input`, `check_prompt_injection`). If prompt injection is detected, reject immediately with HTTP 400 (`PROMPT_SECURITY_VIOLATION`). PII (emails, phone numbers, CCCD/IDs) must be redacted before sending to external cloud models.
 
 ---
 
@@ -122,7 +148,7 @@ backend/app/
   - `Medium`: **8 hours**
   - `Low`: **24 hours**
 - **Canonical Categories:** `"Authentication"`, `"Billing"`, `"Bug Report"`, `"Feature Request"`, `"General"`.
-  - *Alias Rule:* Backend accepts `"Technical Bug"` as a backward-compatible alias and normalizes or maps it alongside `"Bug Report"`.
+  - *Alias Rule:* Backend accepts `"Technical Bug"` as a backward-compatible alias and normalizes it to `"Bug Report"`.
 
 ### 5.2 Status Mapping Between Backend and Frontend
 | Lifecycle Phase | Backend Status (DB/API) | Frontend Status (UI/Types) | Color Badge |
@@ -131,27 +157,43 @@ backend/app/
 | Under Review / Triaged | `"in_progress"` | `"Pending"` | Amber (`amber-500`) |
 | Solved & Approved | `"resolved"` | `"Resolved"` | Emerald (`emerald-600`) |
 
-Use helper functions `mapBackendStatusToFrontend()` and `mapFrontendStatusToBackend()` in `frontend/src/services/api.ts`.
-
 ---
 
 ## 6. Multi-Agent & Team Collaboration Rules (Strict Conflict Prevention)
 
 1. **Module Ownership Boundaries ("Stay in Your Lane"):**
-   - **Owner 1 (AI, RAG & Verification):** Owns `rag_service.py`, `llm_service.py`, `embedding_service.py`, `fallback_service.py`, `verification_service.py`, `agent_tools.py`, `core/prompts.py`, `core/security.py`, `endpoints/chat.py`, `endpoints/documents.py`, `tests/test_rag_module.py`.
-   - **Owner 2 (Platform, Auth, Workspaces & Tickets):** Owns `ticket_service.py`, `document_service.py`, `db/session.py`, `models/*`, `endpoints/tickets.py`, `endpoints/agent.py`, `endpoints/workspaces.py`, `endpoints/health.py`, `tests/test_tickets_module.py`, `tests/test_auth_module.py`.
-   - **Owner 3 (Frontend UX, DevOps & QA):** Owns `frontend/src/components/*`, `frontend/src/features/*`, `docker-compose.yml`, `.github/workflows/ci.yml`, `docs/*`.
+   - **Owner 1 (AI, RAG, Guardrails & Telemetry):**
+     - Owns `backend/app/services/rag_service.py`, `llm_service.py`, `embedding_service.py`, `fallback_service.py`, `verification_service.py`, `agent_tools.py`, `ai_usage_logger.py`.
+     - Owns `backend/app/core/prompts.py`, `backend/app/core/security.py`, `backend/app/schemas/ai_structured.py`.
+     - Owns `backend/app/api/v1/endpoints/chat.py`, `chat_stream.py`, `chat_actions.py`, `ai_usage.py`.
+     - Owns `frontend/src/features/chat/`, `frontend/src/features/telemetry/`, `frontend/src/services/api/chat.ts`, `frontend/src/services/api/telemetry.ts`.
+     - Owns `backend/tests/test_rag_module.py`, `backend/tests/test_ollama_provider.py`, `backend/tests/test_eval_cases.py`.
+   - **Owner 2 (Platform, Auth, Workspaces & Tickets):**
+     - Owns `backend/app/services/ticket_service.py`, `document_service.py`.
+     - Owns `backend/app/db/session.py`, `backend/app/db/base.py`, `backend/app/db/seed/`, `backend/app/models/*`, `backend/app/core/deps.py`.
+     - Owns `backend/app/api/v1/endpoints/tickets.py`, `agent.py`, `workspaces.py`, `documents.py`, `auth.py`, `health.py`.
+     - Owns `frontend/src/features/agent/`, `frontend/src/features/auth/`, `frontend/src/features/knowledge/`.
+     - Owns `frontend/src/services/api/tickets.ts`, `workspaces.ts`, `documents.ts`, `auth.ts`.
+     - Owns `backend/tests/test_tickets_module.py`, `test_auth_module.py`, `test_workspace_and_verification.py`.
+   - **Owner 3 (Frontend UX, DevOps & QA):**
+     - Owns `frontend/src/components/*`, `frontend/src/App.tsx`, `frontend/src/main.tsx`, `frontend/src/data.ts`.
+     - Owns `frontend/src/services/mocks/*`, `docker-compose.yml`, `Dockerfile*`, `scripts/*`, `.github/workflows/*`, `docs/*`.
    - **Rule:** Do NOT edit files outside your assigned module without explicit coordination.
 2. **Frozen Shared Files Policy:**
-   - The following shared integration files may ONLY be modified through the **Integration Owner** (or in dedicated integration commits):
+   - The following shared integration files may ONLY be modified through the **Integration Owner** (Lead):
      - `backend/app/api/v1/api.py`, `backend/app/core/config.py`, `backend/app/main.py`
-     - `frontend/src/types.ts`, `frontend/src/services/api.ts`, `frontend/src/App.tsx`
-     - `docs/API_CONTRACT.md`
-3. **Git Branch & Commit Convention:**
+     - `frontend/src/types.ts`, `frontend/src/types/*`
+     - `frontend/src/services/api.ts`, `frontend/src/services/api/client.ts`, `frontend/src/services/api/index.ts`
+     - `docs/API_CONTRACT.md`, `docs/spec/CONTRACTS.md`
+   - To request a change to frozen files, create a request file in `docs/requests/<your_name>.md` using `docs/requests/template.md`.
+3. **Automated Ownership Verification:**
+   - Run `python scripts/check_ownership.py --staged` before committing.
+   - Any attempt to commit cross-module files or frozen shared files on a feature branch will be blocked with exit code 1.
+4. **Git Branch & Commit Convention:**
    - Branch naming: `feat/<owner>-<module>`, `fix/<owner>-<issue>`, `docs/<owner>-<topic>`.
    - Commit messages MUST follow Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
    - NEVER use `git push --force`, `git reset --hard`, or commit `.env` / `*.db` files.
-4. **Mandatory Pre-Commit Verification Gate:**
+5. **Mandatory Pre-Commit Verification Gate:**
    - Every commit MUST pass both checks with 0 errors before committing:
-     - Backend: `$env:GEMINI_API_KEY=""; pytest backend/tests/ -v`
-     - Frontend: `npm run lint --prefix frontend && npm run build --prefix frontend`
+     - Backend: `python -m pytest backend/tests/ -v`
+     - Frontend: `npm run lint --prefix frontend; npm run build --prefix frontend`

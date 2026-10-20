@@ -1,0 +1,87 @@
+# SmartDesk AI - Codeowners & Ownership Boundaries
+# See AGENTS.md Section 6 and docs/ARCHITECTURE.md for collaboration policy.
+
+# Default / Fallback: Integration Owner / Lead
+* @lead-dev
+
+# ==============================================================================
+# OWNER 1: AI, RAG, Structured Output, Guardrails & Telemetry
+# ==============================================================================
+backend/app/services/rag_service.py              @owner1-ai
+backend/app/services/llm_service.py              @owner1-ai
+backend/app/services/embedding_service.py        @owner1-ai
+backend/app/services/fallback_service.py         @owner1-ai
+backend/app/services/verification_service.py     @owner1-ai
+backend/app/services/agent_tools.py              @owner1-ai
+backend/app/services/ai_usage_logger.py          @owner1-ai
+backend/app/core/prompts.py                      @owner1-ai
+backend/app/core/security.py                     @owner1-ai
+backend/app/schemas/ai_structured.py             @owner1-ai
+backend/app/api/v1/endpoints/chat.py             @owner1-ai
+backend/app/api/v1/endpoints/chat_stream.py      @owner1-ai
+backend/app/api/v1/endpoints/chat_actions.py     @owner1-ai
+backend/app/api/v1/endpoints/ai_usage.py         @owner1-ai
+backend/tests/test_rag_module.py                 @owner1-ai
+backend/tests/test_ollama_provider.py            @owner1-ai
+backend/tests/test_eval_cases.py                 @owner1-ai
+backend/data/prompts.json                        @owner1-ai
+backend/data/seed_faq.json                       @owner1-ai
+frontend/src/features/chat/                      @owner1-ai
+frontend/src/features/telemetry/                 @owner1-ai
+frontend/src/services/api/chat.ts                @owner1-ai
+frontend/src/services/api/telemetry.ts           @owner1-ai
+
+# ==============================================================================
+# OWNER 2: Platform, Auth, Database, Workspaces, Tickets & Document Lifecycle
+# ==============================================================================
+backend/app/services/ticket_service.py           @owner2-platform
+backend/app/services/document_service.py         @owner2-platform
+backend/app/db/session.py                        @owner2-platform
+backend/app/db/base.py                           @owner2-platform
+backend/app/db/seed/                             @owner2-platform
+backend/app/models/                              @owner2-platform
+backend/app/core/deps.py                         @owner2-platform
+backend/app/api/v1/endpoints/tickets.py          @owner2-platform
+backend/app/api/v1/endpoints/agent.py            @owner2-platform
+backend/app/api/v1/endpoints/workspaces.py       @owner2-platform
+backend/app/api/v1/endpoints/documents.py        @owner2-platform
+backend/app/api/v1/endpoints/auth.py             @owner2-platform
+backend/app/api/v1/endpoints/health.py           @owner2-platform
+backend/tests/test_tickets_module.py             @owner2-platform
+backend/tests/test_auth_module.py                @owner2-platform
+backend/tests/test_workspace_and_verification.py @owner2-platform
+frontend/src/features/agent/                     @owner2-platform
+frontend/src/features/auth/                      @owner2-platform
+frontend/src/features/knowledge/                 @owner2-platform
+frontend/src/services/api/tickets.ts             @owner2-platform
+frontend/src/services/api/workspaces.ts          @owner2-platform
+frontend/src/services/api/documents.ts           @owner2-platform
+frontend/src/services/api/auth.ts                @owner2-platform
+
+# ==============================================================================
+# OWNER 3: Frontend UX, DevOps & QA
+# ==============================================================================
+frontend/src/components/                         @owner3-frontend-qa
+frontend/src/App.tsx                             @owner3-frontend-qa
+frontend/src/main.tsx                            @owner3-frontend-qa
+frontend/src/data.ts                             @owner3-frontend-qa
+frontend/src/services/mocks/                     @owner3-frontend-qa
+docker-compose.yml                               @owner3-frontend-qa
+Dockerfile*                                      @owner3-frontend-qa
+scripts/                                         @owner3-frontend-qa
+.github/workflows/                               @owner3-frontend-qa
+docs/                                            @owner3-frontend-qa
+
+# ==============================================================================
+# FROZEN SHARED INTEGRATION CONTRACTS (Requires Lead / Integration Commit)
+# ==============================================================================
+backend/app/api/v1/api.py                        @lead-dev
+backend/app/core/config.py                       @lead-dev
+backend/app/main.py                              @lead-dev
+frontend/src/types.ts                            @lead-dev
+frontend/src/types/                              @lead-dev
+frontend/src/services/api.ts                     @lead-dev
+frontend/src/services/api/client.ts              @lead-dev
+frontend/src/services/api/index.ts               @lead-dev
+docs/API_CONTRACT.md                             @lead-dev
+docs/spec/CONTRACTS.md                           @lead-dev
