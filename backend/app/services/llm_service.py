@@ -8,6 +8,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.exceptions import LLMTimeoutException, LLMServiceException
+from app.core.security import redact_pii
 
 logger = logging.getLogger("smartdesk.llm")
 
@@ -190,39 +191,49 @@ class LLMService:
 
     async def _execute_api_call(self, prompt: str, system_prompt: str, temperature: float) -> str:
         """Internal dispatcher executing SDK generation call asynchronously with secondary model fallback."""
+        clean_prompt = redact_pii(prompt)
         if self._sdk_type == "genai":
             # google-genai client
             def _sync_call() -> str:
                 from google.genai import types
+                thinking_cfg = types.ThinkingConfig(thinking_budget=0)
                 cfg = types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     temperature=temperature,
+                    thinking_config=thinking_cfg,
                     automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                 )
                 try:
                     response = self._client.models.generate_content(
                         model=self.model_name,
-                        contents=prompt,
+                        contents=clean_prompt,
                         config=cfg,
                     )
-                    return response.text or ""
+                    res_text = (response.text or "").strip()
+                    if not res_text:
+                        raise LLMServiceException("Empty response returned from LLM provider")
+                    return res_text
                 except Exception as primary_err:
                     err_msg = str(primary_err)
+                    fallback_target = getattr(settings, "LLM_FALLBACK_MODEL", "") or self.fallback_model_name
                     if (
-                        self.fallback_model_name
-                        and self.fallback_model_name != self.model_name
+                        fallback_target
+                        and fallback_target != self.model_name
                         and ("404" in err_msg or "NOT_FOUND" in err_msg)
                     ):
                         logger.warning(
                             f"Primary model '{self.model_name}' unavailable ({err_msg}); "
-                            f"retrying with fallback model '{self.fallback_model_name}'."
+                            f"retrying with fallback model '{fallback_target}'."
                         )
                         response = self._client.models.generate_content(
-                            model=self.fallback_model_name,
-                            contents=prompt,
+                            model=fallback_target,
+                            contents=clean_prompt,
                             config=cfg,
                         )
-                        return response.text or ""
+                        res_text = (response.text or "").strip()
+                        if not res_text:
+                            raise LLMServiceException("Empty response returned from fallback LLM provider")
+                        return res_text
                     raise
 
             return await asyncio.to_thread(_sync_call)

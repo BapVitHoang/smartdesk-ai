@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.db.session import get_db
 from app.models.workspace import Workspace
+from app.core.security import check_prompt_injection
 from app.schemas.workspace import (
     WorkspaceCreate,
     WorkspaceUpdate,
@@ -32,6 +33,20 @@ async def create_workspace(
     db: AsyncSession = Depends(get_db)
 ) -> WorkspaceResponse:
     """Create a new domain workspace."""
+    # Prompt injection guardrail on persona and rules
+    for val, field_name in [
+        (payload.persona_name, "persona_name"),
+        (payload.tone_of_voice, "tone_of_voice"),
+        (payload.business_rules, "business_rules"),
+    ]:
+        if val:
+            is_suspicious, reason = check_prompt_injection(val)
+            if is_suspicious:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"PROMPT_SECURITY_VIOLATION: Trường {field_name} chứa ký tự hoặc mẫu độc hại ({reason})."
+                )
+
     # Check if slug already exists
     existing = await db.execute(select(Workspace).where(Workspace.slug == payload.slug))
     if existing.scalar_one_or_none():
@@ -89,6 +104,13 @@ async def update_workspace(
     update_data = payload.model_dump(exclude_unset=True)
     for field, val in update_data.items():
         if val is not None:
+            if isinstance(val, str) and field in {"persona_name", "tone_of_voice", "business_rules"}:
+                is_suspicious, reason = check_prompt_injection(val)
+                if is_suspicious:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"PROMPT_SECURITY_VIOLATION: Trường {field} chứa ký tự hoặc mẫu độc hại ({reason})."
+                    )
             setattr(ws, field, val)
 
     await db.commit()

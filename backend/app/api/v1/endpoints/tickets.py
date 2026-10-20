@@ -1,7 +1,7 @@
 """Ticket management endpoints (CRUD, triage filtering, and agent customization)."""
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, Path, status
+from fastapi import APIRouter, Depends, Query, Path, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, desc
 import logging
@@ -10,7 +10,7 @@ from app.schemas.ticket import TicketCreate, TicketUpdate, TicketResponse
 from app.models.ticket import Ticket
 from app.services.ticket_service import ticket_service
 from app.core.exceptions import TicketNotFoundException
-from app.core.security import sanitize_input
+from app.core.security import sanitize_input, check_prompt_injection
 from app.db.session import get_db
 
 logger = logging.getLogger("smartdesk.api.tickets")
@@ -33,6 +33,17 @@ async def create_ticket(
     # Sanitize text fields
     ticket_in.customer_name = sanitize_input(ticket_in.customer_name)
     ticket_in.subject = sanitize_input(ticket_in.subject)
+    ticket_in.description = sanitize_input(ticket_in.description)
+
+    # Prompt injection guardrail
+    for text_val, field_name in [(ticket_in.subject, "subject"), (ticket_in.description, "description")]:
+        is_suspicious, reason = check_prompt_injection(text_val)
+        if is_suspicious:
+            logger.warning(f"Prompt injection rejected in ticket {field_name}: {reason}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"PROMPT_SECURITY_VIOLATION: Nội dung trường {field_name} không hợp lệ hoặc chứa mã độc prompt injection ({reason})."
+            )
     ticket_in.description = sanitize_input(ticket_in.description)
 
     created_ticket = await ticket_service.create_ticket(db, ticket_in)
