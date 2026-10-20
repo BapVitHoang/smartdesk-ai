@@ -2,7 +2,7 @@
 
 import io
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 from pathlib import Path
 import pypdf
 from sqlalchemy import select, delete
@@ -12,6 +12,7 @@ from app.models.document import Document
 from app.models.knowledge import KnowledgeChunk
 from app.models.verification import VerificationReport, VerificationItem
 from app.services.embedding_service import embedding_service
+from app.core.config import settings
 
 logger = logging.getLogger("smartdesk.document")
 
@@ -89,8 +90,8 @@ class DocumentService:
     def recursive_character_splitter(
         text: str,
         page_number: int = 1,
-        chunk_size: int = 700,
-        chunk_overlap: int = 100
+        chunk_size: Optional[int] = None,
+        chunk_overlap: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         Hierarchically splits text using recursive delimiters [\\n\\n, \\n, . , , , space].
@@ -98,10 +99,13 @@ class DocumentService:
         if not text:
             return []
 
+        eff_chunk_size = chunk_size if chunk_size is not None else getattr(settings, "CHUNK_SIZE", 700)
+        eff_chunk_overlap = chunk_overlap if chunk_overlap is not None else getattr(settings, "CHUNK_OVERLAP", 100)
+
         separators = ["\n\n", "\n", ". ", ", ", " "]
 
         def _split_text(content: str, seps: List[str]) -> List[str]:
-            if len(content) <= chunk_size or not seps:
+            if len(content) <= eff_chunk_size or not seps:
                 return [content] if content.strip() else []
 
             sep = seps[0]
@@ -113,7 +117,7 @@ class DocumentService:
                 s_strip = s.strip()
                 if not s_strip:
                     continue
-                if len(s_strip) > chunk_size:
+                if len(s_strip) > eff_chunk_size:
                     pieces.extend(_split_text(s_strip, remaining_seps))
                 else:
                     pieces.append(s_strip)
@@ -129,12 +133,12 @@ class DocumentService:
         for piece in raw_pieces:
             if not current_chunk:
                 current_chunk = piece
-            elif len(current_chunk) + len(piece) + 1 <= chunk_size:
+            elif len(current_chunk) + len(piece) + 1 <= eff_chunk_size:
                 current_chunk += " " + piece
             else:
                 chunks.append(current_chunk)
                 # Keep overlap from the end of current_chunk
-                overlap_len = min(len(current_chunk), chunk_overlap)
+                overlap_len = min(len(current_chunk), eff_chunk_overlap)
                 overlap_text = current_chunk[-overlap_len:].strip()
                 current_chunk = (overlap_text + " " + piece).strip()
 
@@ -176,7 +180,7 @@ class DocumentService:
                 continue
             full_text_parts.append(page_text)
             page_chunks = self.recursive_character_splitter(
-                page_text, page_number=page_num, chunk_size=700, chunk_overlap=100
+                page_text, page_number=page_num, chunk_size=settings.CHUNK_SIZE, chunk_overlap=settings.CHUNK_OVERLAP
             )
             for chk in page_chunks:
                 chk["chunk_index"] = chunk_counter

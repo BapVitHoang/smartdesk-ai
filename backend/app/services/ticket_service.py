@@ -10,6 +10,7 @@ from app.models.ticket import Ticket
 from app.schemas.ticket import TicketCreate
 from app.services.llm_service import llm_service
 from app.services.fallback_service import fallback_service
+from app.core.prompts import prompt_registry
 
 logger = logging.getLogger("smartdesk.ticket_service")
 
@@ -126,17 +127,18 @@ class TicketService:
         except Exception as e:
             logger.info(f"LLM draft generation unavailable ({e}). Synthesizing structured template draft.")
 
-        # Deterministic template fallback
+        # Deterministic template fallback in Vietnamese (AGENTS.md & PLAN.md)
+        sla_hours = self.calculate_sla_hours(priority)
         return (
-            f"Dear {customer_name},\n\n"
-            f"Thank you for contacting {ws_name}. We have received your inquiry regarding \"{subject}\" "
-            f"and our support team has categorized it as [{category}] with [{priority}] priority.\n\n"
-            f"Based on our support policies for {category}:\n"
-            f"1. Our team is currently reviewing the details of your request.\n"
-            f"2. In the meantime, if you have any additional error codes, screenshots, or receipts, please reply directly to this thread.\n"
-            f"3. You will receive an update from a dedicated specialist within our {self.calculate_sla_hours(priority)}-hour SLA window.\n\n"
-            f"We appreciate your patience while we investigate this matter for you.\n\n"
-            f"Warm regards,\n"
+            f"Kính gửi {customer_name},\n\n"
+            f"Cảm ơn quý khách đã liên hệ với {ws_name}. Chúng tôi đã tiếp nhận yêu cầu liên quan đến \"{subject}\" "
+            f"và phân loại yêu cầu vào danh mục [{category}] với mức độ ưu tiên [{priority}].\n\n"
+            f"Chính sách hỗ trợ cho danh mục {category}:\n"
+            f"1. Đội ngũ chuyên trách đang tiến hành rà soát chi tiết yêu cầu của quý khách.\n"
+            f"2. Nếu có thêm ảnh chụp màn hình, mã lỗi hoặc chứng từ giao dịch, quý khách vui lòng phản hồi trực tiếp vào phiếu này.\n"
+            f"3. Quý khách sẽ nhận được phản hồi từ chuyên viên trong khung cam kết SLA {sla_hours} giờ.\n\n"
+            f"Rất cảm ơn sự kiên nhẫn của quý khách.\n\n"
+            f"Trân trọng,\n"
             f"{persona_name} - {ws_name}"
         )
 

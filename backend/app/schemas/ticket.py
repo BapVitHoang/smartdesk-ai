@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class TicketPriorityEnum(str, Enum):
@@ -68,6 +68,14 @@ class TicketCreate(BaseModel):
         description="Issue category (Authentication, Billing, Bug Report, Feature Request, General; alias Technical Bug accepted)",
         examples=["Authentication"]
     )
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: str) -> str:
+        """Normalizes input alias 'Technical Bug' to canonical 'Bug Report'."""
+        if isinstance(v, str) and v.strip() == "Technical Bug":
+            return "Bug Report"
+        return v
     priority: TicketPriorityEnum = Field(
         default=TicketPriorityEnum.MEDIUM,
         description="Urgency level: Low, Medium, High, or Urgent",
@@ -107,6 +115,14 @@ class TicketUpdate(BaseModel):
         description="Updated ticket category",
         examples=["Authentication"]
     )
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: Optional[str]) -> Optional[str]:
+        """Normalizes input alias 'Technical Bug' to canonical 'Bug Report'."""
+        if isinstance(v, str) and v.strip() == "Technical Bug":
+            return "Bug Report"
+        return v
     priority: Optional[TicketPriorityEnum] = Field(
         default=None,
         description="Updated priority level",

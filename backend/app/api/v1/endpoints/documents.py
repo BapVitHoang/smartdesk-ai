@@ -67,7 +67,7 @@ async def upload_document(
         logger.error(f"Error processing document upload: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi hệ thống khi xử lý tệp: {str(e)}"
+            detail="Đã xảy ra lỗi hệ thống khi xử lý tệp. Vui lòng kiểm tra định dạng tệp hoặc thử lại sau."
         )
 
 
@@ -175,7 +175,7 @@ async def verify_document_endpoint(
         logger.error(f"Error during verification: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi trong quá trình thẩm định tri thức: {str(e)}"
+            detail="Đã xảy ra lỗi trong quá trình thẩm định tri thức. Vui lòng kiểm tra kết nối AI hoặc thử lại sau."
         )
 
 
@@ -242,5 +242,5 @@ async def publish_document_endpoint(
         logger.error(f"Error publishing document: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi khi xuất bản tài liệu: {str(e)}"
+            detail="Đã xảy ra lỗi hệ thống khi xuất bản tài liệu. Vui lòng thử lại sau."
         )
