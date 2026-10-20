@@ -4,154 +4,21 @@ SmartDesk AI - Ownership & Conflict-Prevention Enforcement Script
 Validates that developers only touch files within their assigned module boundaries.
 
 Usage:
-    python scripts/check_ownership.py [--branch <branch_name>] [--staged] [--owner <owner1|owner2|owner3|lead>]
+    python scripts/check_ownership.py [--branch <branch_name>] [--staged] [--owner <devA|devB|devC|lead>] [--as-integrator] [--verify-consistency]
 """
 
 import sys
 import subprocess
 import argparse
 import fnmatch
-from typing import List, Tuple
+from pathlib import Path
+from typing import List, Tuple, Set
 
-# Module Ownership Mapping
-OWNER_PATTERNS = {
-    "owner1": [
-        "backend/app/services/llm_service.py",
-        "backend/app/services/rag_service.py",
-        "backend/app/services/ticket_copilot_service.py",
-        "backend/app/services/fallback_service.py",
-        "backend/app/services/verification_service.py",
-        "backend/app/services/agent_tools.py",
-        "backend/app/core/prompts.py",
-        "backend/app/schemas/ai_structured.py",
-        "backend/app/schemas/chat.py",
-        "backend/app/schemas/verification.py",
-        "backend/app/schemas/ai_usage.py",
-        "backend/app/api/v1/endpoints/chat.py",
-        "backend/app/api/v1/endpoints/chat_stream.py",
-        "backend/app/api/v1/endpoints/chat_actions.py",
-        "backend/app/api/v1/endpoints/ai_usage.py",
-        "backend/app/api/v1/endpoints/knowledge.py",
-        "backend/data/prompts.json",
-        "backend/data/seed_faq.json",
-        "backend/data/finetune_alpaca.jsonl",
-        "backend/data/sample_documents/*",
-        "backend/data/eval_dataset.json",
-        "backend/scripts/run_eval.py",
-        "backend/scripts/reembed_chunks.py",
-        "backend/scripts/export_finetune_dataset.py",
-        "Modelfile",
-        "backend/tests/test_rag_module.py",
-        "backend/tests/test_ollama_provider.py",
-        "backend/tests/ai/*",
-        "docs/notes/A.md",
-        "docs/notes/A-ai-usage.md",
-        "docs/requests/A.md",
-        "docs/requests/devA.md",
-    ],
-    "owner2": [
-        "backend/app/services/ticket_service.py",
-        "backend/app/services/document_service.py",
-        "backend/app/services/embedding_service.py",
-        "backend/app/services/ai_usage_logger.py",
-        "backend/app/core/deps.py",
-        "backend/app/core/security.py",
-        "backend/app/db/base.py",
-        "backend/app/db/session.py",
-        "backend/app/db/seed/*",
-        "backend/app/models/ai_usage.py",
-        "backend/app/models/document.py",
-        "backend/app/models/knowledge.py",
-        "backend/app/models/ticket.py",
-        "backend/app/models/user.py",
-        "backend/app/models/verification.py",
-        "backend/app/models/workspace.py",
-        "backend/app/schemas/ticket.py",
-        "backend/app/schemas/workspace.py",
-        "backend/app/schemas/document.py",
-        "backend/app/schemas/auth.py",
-        "backend/app/api/v1/endpoints/auth.py",
-        "backend/app/api/v1/endpoints/tickets.py",
-        "backend/app/api/v1/endpoints/agent.py",
-        "backend/app/api/v1/endpoints/workspaces.py",
-        "backend/app/api/v1/endpoints/documents.py",
-        "backend/app/api/v1/endpoints/health.py",
-        "backend/tests/test_tickets_module.py",
-        "backend/tests/test_auth_module.py",
-        "backend/tests/test_workspace_and_verification.py",
-        "backend/tests/platform/*",
-        "docker-compose.yml",
-        "docs/notes/B.md",
-        "docs/notes/B-ai-usage.md",
-        "docs/requests/B.md",
-        "docs/requests/devB.md",
-    ],
-    "owner3": [
-        "frontend/src/*",
-        "frontend/Dockerfile",
-        "frontend/nginx.conf",
-        "frontend/index.html",
-        "frontend/metadata.json",
-        "backend/Dockerfile",
-        "backend/PYTHON_FILES_EXPLANATION.md",
-        "backend/README.md",
-        "backend/tests/test_api.py",
-        "backend/tests/common/*",
-        "README.md",
-        "AI_USAGE.md",
-        "docs/DESIGN.md",
-        "docs/PROPOSAL.md",
-        "docs/TEST_ACCEPTANCE.md",
-        "docs/REPORT.md",
-        "docs/PRESENTATION_AND_DEMO.md",
-        "docs/EVALUATION_REPORT.md",
-        "docs/adr/*",
-        "docs/audit/*",
-        "docs/notes/*",
-        "docs/requests/C.md",
-        "docs/requests/devC.md",
-        "scripts/install.bat",
-        "scripts/start.bat",
-        "scripts/start_all.bat",
-        "scripts/start_backend.bat",
-    ],
-}
+# Import authoritative map
+repo_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(repo_root))
 
-FROZEN_SHARED_FILES = [
-    "backend/app/core/config.py",
-    "backend/app/core/exceptions.py",
-    "backend/requirements.txt",
-    "backend/.env.example",
-    "backend/app/api/v1/api.py",
-    "backend/app/models/__init__.py",
-    "backend/app/schemas/__init__.py",
-    "backend/app/__init__.py",
-    "backend/app/api/__init__.py",
-    "backend/app/api/v1/__init__.py",
-    "backend/app/core/__init__.py",
-    "backend/app/db/__init__.py",
-    "backend/app/services/__init__.py",
-    "backend/tests/__init__.py",
-    "backend/tests/conftest.py",
-    "docs/spec/CONTRACTS.md",
-    "docs/API_CONTRACT.md",
-    "AGENTS.md",
-    ".cursorrules",
-    ".gitattributes",
-    ".gitignore",
-    "pytest.ini",
-    "smartdesk_audit_report.md",
-    "frontend/.env.example",
-    "frontend/package.json",
-    "frontend/package-lock.json",
-    "frontend/tsconfig.json",
-    "frontend/vite.config.ts",
-    "frontend/src/types.ts",
-    "frontend/src/types/index.ts",
-    "frontend/src/services/api.ts",
-    "frontend/src/services/api/index.ts",
-    "frontend/src/services/api/client.ts",
-]
+from scripts.ownership_map import OWNERSHIP_MAP
 
 
 def run_git(args: List[str]) -> str:
@@ -181,11 +48,11 @@ def get_modified_files(staged: bool = False, base_branch: str = "origin/Hoang") 
 
 
 def is_pattern_match(file_path: str, patterns: List[str]) -> bool:
-    norm_file = file_path.replace("\\", "/")
+    norm_file = file_path.replace("\\", "/").lstrip("/")
     for pattern in patterns:
-        norm_pattern = pattern.replace("\\", "/")
-        if norm_pattern.endswith("/*"):
-            prefix = norm_pattern[:-2]
+        norm_pattern = pattern.replace("\\", "/").lstrip("/")
+        if norm_pattern.endswith("/*") or norm_pattern.endswith("/**"):
+            prefix = norm_pattern.rstrip("/*").rstrip("/**")
             if norm_file.startswith(prefix + "/") or norm_file == prefix:
                 return True
         elif fnmatch.fnmatch(norm_file, norm_pattern):
@@ -193,59 +60,135 @@ def is_pattern_match(file_path: str, patterns: List[str]) -> bool:
     return False
 
 
-def check_violations(owner: str, files: List[str]) -> Tuple[List[str], List[str]]:
-    allowed = OWNER_PATTERNS.get(owner, [])
+def check_violations(owner: str, files: List[str], as_integrator: bool = False) -> Tuple[List[str], List[str]]:
+    allowed = list(OWNERSHIP_MAP.get(owner, []))
+    if owner == "devB" and as_integrator:
+        allowed.extend(OWNERSHIP_MAP.get("integrator", []))
+
+    frozen_patterns = OWNERSHIP_MAP.get("integrator", [])
     cross_owner_violations = []
     frozen_contract_violations = []
 
     for f in files:
-        # Check frozen integration contract
-        if is_pattern_match(f, FROZEN_SHARED_FILES):
-            frozen_contract_violations.append(f)
-            continue
+        # Check if it is a frozen integration file
+        is_frozen = is_pattern_match(f, frozen_patterns)
+        is_allowed = is_pattern_match(f, allowed)
 
-        # Check if allowed in owner's lane
-        if not is_pattern_match(f, allowed):
+        if is_frozen and not (owner == "devB" and as_integrator):
+            frozen_contract_violations.append(f)
+        elif not is_allowed:
             cross_owner_violations.append(f)
 
     return cross_owner_violations, frozen_contract_violations
+
+
+def verify_consistency() -> bool:
+    """Verifies that OWNERSHIP_MAP, CODEOWNERS, and WORKSTREAMS table are consistent."""
+    print("=== Checking Ownership & Governance Consistency ===")
+    has_errors = False
+
+    # 1. Check all tracked files are mapped in OWNERSHIP_MAP
+    try:
+        tracked_files = [f.strip().replace("\\", "/") for f in run_git(["ls-files"]).splitlines() if f.strip()]
+    except Exception as e:
+        print(f"[ERROR] Could not list tracked files: {e}")
+        return False
+
+    all_patterns = []
+    for owner, patterns in OWNERSHIP_MAP.items():
+        all_patterns.extend(patterns)
+
+    unmapped = []
+    for f in tracked_files:
+        if not is_pattern_match(f, all_patterns):
+            unmapped.append(f)
+
+    if unmapped:
+        print(f"[FAIL] Found {len(unmapped)} tracked files not covered by OWNERSHIP_MAP:")
+        for f in unmapped[:10]:
+            print(f"  - {f}")
+        has_errors = True
+    else:
+        print(f"[PASS] All {len(tracked_files)} tracked files are mapped to an owner.")
+
+    # 2. Check for overlap between devA, devB, devC (Integrator is separate frozen hat)
+    core_owners = ["devA", "devB", "devC"]
+    overlaps = []
+    for i in range(len(core_owners)):
+        for j in range(i + 1, len(core_owners)):
+            o1, o2 = core_owners[i], core_owners[j]
+            p1, p2 = OWNERSHIP_MAP[o1], OWNERSHIP_MAP[o2]
+            for f in tracked_files:
+                if is_pattern_match(f, p1) and is_pattern_match(f, p2):
+                    overlaps.append((f, o1, o2))
+
+    if overlaps:
+        print(f"[FAIL] Found {len(overlaps)} file ownership overlaps between developers:")
+        for f, o1, o2 in overlaps:
+            print(f"  - {f} (claimed by both {o1} and {o2})")
+        has_errors = True
+    else:
+        print("[PASS] Zero overlaps between devA, devB, and devC.")
+
+    # 3. Check CODEOWNERS exists and matches
+    codeowners_path = repo_root / ".github" / "CODEOWNERS"
+    if not codeowners_path.exists():
+        print("[FAIL] .github/CODEOWNERS does not exist.")
+        has_errors = True
+    else:
+        print("[PASS] .github/CODEOWNERS exists.")
+
+    return not has_errors
 
 
 def main():
     parser = argparse.ArgumentParser(description="Check module ownership boundaries.")
     parser.add_argument("--branch", type=str, default=None, help="Explicit branch name to test.")
     parser.add_argument("--staged", action="store_true", help="Check currently staged files.")
-    parser.add_argument("--owner", type=str, choices=["owner1", "owner2", "owner3", "devA", "devB", "devC", "lead"], default=None)
+    parser.add_argument("--owner", type=str, choices=["owner1", "owner2", "owner3", "devA", "devB", "devC", "lead", "integrator"], default=None)
+    parser.add_argument("--as-integrator", action="store_true", help="Allow devB (Hoang) to modify integrator-owned frozen files.")
+    parser.add_argument("--verify-consistency", action="store_true", help="Verify consistency across governance artifacts.")
     args = parser.parse_args()
+
+    if args.verify_consistency:
+        success = verify_consistency()
+        sys.exit(0 if success else 1)
 
     branch = args.branch or get_current_branch()
     owner = args.owner
 
     # Normalize aliases
-    if owner == "devA":
-        owner = "owner1"
-    elif owner == "devB":
-        owner = "owner2"
-    elif owner == "devC":
-        owner = "owner3"
+    if owner in ["devA", "owner1"]:
+        owner = "devA"
+    elif owner in ["devB", "owner2"]:
+        owner = "devB"
+    elif owner in ["devC", "owner3"]:
+        owner = "devC"
+    elif owner in ["integrator", "lead"]:
+        owner = "integrator"
+
+    # Enforce --as-integrator rule: Only devB can use --as-integrator
+    if args.as_integrator and owner not in ["devB", "integrator"]:
+        print(f"[ERROR] Only devB (Hoang) is authorized to use --as-integrator. {owner} is forbidden.")
+        sys.exit(1)
 
     if not owner:
         branch_lower = branch.lower()
         if "feature/a-" in branch_lower or "deva" in branch_lower or "owner1" in branch_lower:
-            owner = "owner1"
+            owner = "devA"
         elif "feature/b-" in branch_lower or "devb" in branch_lower or "owner2" in branch_lower:
-            owner = "owner2"
+            owner = "devB"
         elif "feature/c-" in branch_lower or "devc" in branch_lower or "owner3" in branch_lower:
-            owner = "owner3"
+            owner = "devC"
         elif branch_lower in ["hoang", "main", "master", "integration"] or "lead" in branch_lower:
-            owner = "lead"
+            owner = "integrator"
         else:
-            print(f"[INFO] Unknown branch role '{branch}'. Assuming lead / integration mode.")
-            owner = "lead"
+            print(f"[INFO] Unknown branch role '{branch}'. Assuming integrator mode.")
+            owner = "integrator"
 
     print(f"=== SmartDesk AI Ownership Check ===")
     print(f"Branch: {branch}")
-    print(f"Role: {owner.upper()}")
+    print(f"Role: {owner.upper()}{' (with Integrator hat)' if args.as_integrator else ''}")
 
     files = get_modified_files(staged=args.staged)
     if not files:
@@ -256,11 +199,11 @@ def main():
     for f in files:
         print(f"  - {f}")
 
-    if owner == "lead":
-        print("[OK] Lead/Integration role has access to all files.")
+    if owner == "integrator":
+        print("[OK] Integrator role has access to all files.")
         sys.exit(0)
 
-    cross_violations, frozen_violations = check_violations(owner, files)
+    cross_violations, frozen_violations = check_violations(owner, files, as_integrator=args.as_integrator)
 
     if cross_violations or frozen_violations:
         print("\n[ERROR] OWNERSHIP BOUNDARY VIOLATION DETECTED!")
@@ -268,8 +211,8 @@ def main():
             print("\n* The following modified files are FROZEN SHARED INTEGRATION CONTRACTS:")
             for f in frozen_violations:
                 print(f"  [FROZEN] {f}")
-            print("  -> Frozen files may only be modified by the Integration Owner.")
-            print("  -> Please file a change request in docs/requests/<your_name>.md.")
+            print("  -> Frozen files may only be modified by the Integrator (Hoang).")
+            print("  -> Please file a change request in docs/requests/dev<A|B|C>.md.")
 
         if cross_violations:
             print("\n* The following modified files belong to ANOTHER MODULE OWNER:")

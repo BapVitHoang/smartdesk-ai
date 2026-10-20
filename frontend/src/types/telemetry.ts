@@ -32,3 +32,19 @@ export interface TokenUsageSummary {
   monthly_budget_usd: number;
   remaining_budget_usd: number;
 }
+
+export interface AIUsageSummaryResponse {
+  total_requests: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  avg_latency_ms: number;
+  fallback_count: number;
+  refused_count: number;
+  recent_logs: AIUsageLogItem[];
+}
+
+export interface ResetCooldownResponse {
+  status: string;
+  message: string;
+  cooldown_active: boolean;
+}

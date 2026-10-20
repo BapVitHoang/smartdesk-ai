@@ -63,3 +63,19 @@ export interface BackendTicketResponse {
   created_at: string;
   updated_at?: string | null;
 }
+
+export interface TicketQueryParams {
+  status?: string;
+  category?: string;
+  priority?: string;
+  workspace_id?: number;
+  sort_by?: 'created_at' | 'priority' | 'status' | 'sla_hours';
+  sort_order?: 'asc' | 'desc';
+  page?: number;
+  page_size?: number;
+}
+
+export interface DeleteEntityResponse {
+  success: boolean;
+  message: string;
+}

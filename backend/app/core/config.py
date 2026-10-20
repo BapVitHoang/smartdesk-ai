@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     GOOGLE_OAUTH_CLIENT_ID: str = ""
     DEMO_LOGIN_ENABLED: bool = True
+    DEV_AUTH_BYPASS: bool = False
 
     # Database Configuration (PostgreSQL 16 with pgvector or SQLite async fallback)
     DATABASE_URL: str = f"sqlite+aiosqlite:///{DEFAULT_SQLITE_PATH}"

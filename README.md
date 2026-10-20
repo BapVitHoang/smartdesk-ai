@@ -141,3 +141,15 @@ pytest backend/tests/ -v
 npm run lint --prefix frontend
 npm run build --prefix frontend
 ```
+
+---
+
+## 6. Thành viên Nhóm & Phân công Module (Team Roster & Ownership — REQ-29)
+
+SmartDesk AI được phát triển bởi **nhóm 3 thành viên** (Dev B kiêm nhiệm vai trò Integrator điều phối kiến trúc và release):
+
+| Họ và Tên | MSSV | GitHub | Vai trò chính | Phân công Module & Quyền sở hữu (REQ-29) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Dương Bắp Vịt Hoàng** (Repo Owner) | `23110020` | [`@BapVitHoang`](https://github.com/BapVitHoang) | **Dev B & Integrator** | Platform, Database, OAuth2/JWT, Ticket CRUD, Docker Compose, Frozen Governance & Release |
+| **[A_FULL_NAME]** | `[A_MSSV]` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | AI Engine, RAG Pipeline, Single-call Structured Output, Tool-using Agent, 24-case Eval Benchmark |
+| **[C_FULL_NAME]** | `[C_MSSV]` | `@[C_USERNAME]` | **Dev C** | Frontend UX, Streaming Bubble, Confirmation UI, Telemetry View, Integration Tests & Capstone Docs |

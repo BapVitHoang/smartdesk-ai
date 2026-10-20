@@ -17,86 +17,116 @@ smartdesk-ai/
 ├── backend/                          # FastAPI (Python 3.11+) Async Backend
 │   ├── app/
 │   │   ├── api/v1/
-│   │   │   ├── api.py                # [SHARED] Central router registry with modular extension hooks
-│   │   │   └── endpoints/            # One router file per domain module
-│   │   │       ├── chat.py           # [Owner 1] POST /api/v1/chat
-│   │   │       ├── documents.py      # [Owner 1] Upload, chunk inspection, 3-stage verification, publish
-│   │   │       ├── knowledge.py      # [Owner 1] FAQ & knowledge retrieval
-│   │   │       ├── tickets.py        # [Owner 2] Ticket CRUD & filtering
-│   │   │       ├── agent.py          # [Owner 2] AI Copilot draft regeneration
-│   │   │       ├── workspaces.py     # [Owner 2] Multi-domain workspace CRUD
-│   │   │       └── health.py         # [Owner 2] Readiness & LLM latency smoke-test
+│   │   │   ├── api.py                # [Integrator] Central router registry
+│   │   │   └── endpoints/            # Domain endpoint routers
+│   │   │       ├── chat.py           # [Dev A] POST /api/v1/chat
+│   │   │       ├── chat_stream.py    # [Dev A] POST /api/v1/chat/stream SSE
+│   │   │       ├── chat_actions.py   # [Dev A] POST /api/v1/chat/confirm-action
+│   │   │       ├── ai_usage.py       # [Dev A] GET /api/v1/agent/ai-usage, reset-cooldown
+│   │   │       ├── knowledge.py      # [Dev A] FAQ & knowledge chunk retrieval
+│   │   │       ├── documents.py      # [Dev B] Upload, chunk inspection, 3-stage verification, publish
+│   │   │       ├── tickets.py        # [Dev B] Ticket CRUD, sorting, pagination, delete
+│   │   │       ├── agent.py          # [Dev B] AI Copilot draft regeneration
+│   │   │       ├── workspaces.py     # [Dev B] Multi-domain workspace CRUD & deletion
+│   │   │       ├── auth.py           # [Dev B] OAuth2 login, JWT token, /me
+│   │   │       └── health.py         # [Dev B] Readiness & LLM latency smoke-test
 │   │   ├── core/
-│   │   │   ├── config.py             # [SHARED] Pydantic Settings (.env loader, SQLite path resolver)
-│   │   │   ├── prompts.py            # [Owner 1] Versioned prompt template loader
-│   │   │   ├── security.py           # [Owner 1] Input sanitizer & Prompt Injection guardrail
-│   │   │   └── exceptions.py         # [SHARED] RFC 7807 structured exception classes & handlers
+│   │   │   ├── config.py             # [Integrator] Pydantic Settings (.env loader, SQLite path resolver)
+│   │   │   ├── exceptions.py         # [Integrator] RFC 7807 structured exception classes & handlers
+│   │   │   ├── prompts.py            # [Dev A] Versioned prompt template loader & hot-reload
+│   │   │   ├── deps.py               # [Dev B] Auth dependencies & get_current_user
+│   │   │   └── security.py           # [Dev B] Input sanitizer, PII redactor & Prompt Injection guardrail
 │   │   ├── db/
-│   │   │   ├── base.py               # [Owner 2] SQLAlchemy 2.0 DeclarativeBase
-│   │   │   └── session.py            # [Owner 2] Dual-engine async session (pgvector / SQLite) & seeding
-│   │   ├── models/                   # [Owner 2] SQLAlchemy 2.0 ORM models
-│   │   ├── schemas/                  # [SHARED] Frozen Pydantic v2 request/response contracts
+│   │   │   ├── base.py               # [Dev B] SQLAlchemy 2.0 DeclarativeBase
+│   │   │   ├── seed/                 # [Dev B] Modular database seeders
+│   │   │   └── session.py            # [Dev B] Dual-engine async session (pgvector / SQLite) & migrations
+│   │   ├── models/                   # [Dev B] SQLAlchemy 2.0 ORM models (models/__init__.py Integrator)
+│   │   ├── schemas/                  # Pydantic v2 schemas (Dev A / Dev B / schemas/__init__.py Integrator)
 │   │   ├── services/
-│   │   │   ├── llm_service.py        # [Owner 1] Gemini 3.5/2.5 Flash Lite + Ollama + 429 Cost-Guard
-│   │   │   ├── embedding_service.py  # [Owner 1] Gemini/Ollama embeddings + Dual-mode cosine search
-│   │   │   ├── rag_service.py        # [Owner 1] Workspace-isolated RAG orchestrator
-│   │   │   ├── fallback_service.py   # [Owner 1] Pure-Python Okapi BM25 deterministic matcher
-│   │   │   ├── verification_service.py # [Owner 1] 3-stage Synthetic QA -> Self-Test -> AI Judge
-│   │   │   ├── agent_tools.py        # [Owner 1] Tool registry & execution hook for Agentic workflows
-│   │   │   ├── ticket_service.py     # [Owner 2] SLA calculation, auto-tagging, AI Copilot draft
-│   │   │   └── document_service.py   # [Owner 2] PDF/TXT/MD text extraction & recursive chunker
-│   │   └── main.py                   # [SHARED] FastAPI ASGI app factory, CORS, timing middleware
+│   │   │   ├── llm_service.py        # [Dev A] Gemini 3.5/2.5 Flash Lite + Ollama + 429 Cost-Guard
+│   │   │   ├── rag_service.py        # [Dev A] Workspace-isolated RAG orchestrator
+│   │   │   ├── ticket_copilot_service.py # [Dev A] AI triage & draft reply structured output
+│   │   │   ├── verification_service.py # [Dev A] 3-stage Synthetic QA -> Self-Test -> AI Judge
+│   │   │   ├── agent_tools.py        # [Dev A] Tool registry & execution hook for Agentic workflows
+│   │   │   ├── ticket_service.py     # [Dev B] Database ticket CRUD, SLA calculation, filtering
+│   │   │   ├── document_service.py   # [Dev B] PDF/TXT/MD text extraction & recursive chunker
+│   │   │   ├── embedding_service.py  # [Dev B] Vector embeddings + PostgreSQL pgvector search
+│   │   │   ├── fallback_service.py   # [Dev B] Pure-Python Okapi BM25 deterministic matcher
+│   │   │   └── ai_usage_logger.py    # [Dev B] Background async AI telemetry logger
+│   │   └── main.py                   # [Integrator] FastAPI ASGI app factory, CORS, timing middleware
 │   ├── data/
-│   │   ├── prompts.json              # [Owner 1] Externalized, versioned system prompt catalog
-│   │   ├── seed_faq.json             # [Owner 1] Curated 12-item FAQ dataset for BM25 fallback
-│   │   └── sample_documents/         # [Owner 1] Domain sample docs (SmileCare, TechStore)
-│   ├── scripts/                      # [Owner 1/2] CLI utilities (reembed_chunks.py, export_finetune_dataset.py)
+│   │   ├── prompts.json              # [Dev A] Externalized, versioned system prompt catalog
+│   │   ├── seed_faq.json             # [Dev A] Curated 12-item FAQ dataset for BM25 fallback
+│   │   ├── eval_dataset.json         # [Dev A] 24-case AI benchmark evaluation dataset
+│   │   └── sample_documents/         # [Dev A] Domain sample docs (SmileCare, TechStore)
+│   ├── scripts/                      # CLI utilities (run_eval.py [Dev A], reembed_chunks.py [Dev B])
 │   └── tests/                        # Per-module automated Pytest suites
-│       ├── test_api.py               # [SHARED] Core baseline integration tests (9 tests)
-│       ├── test_workspace_and_verification.py # [Owner 1/2] Workspaces & verification pipeline (9 tests)
-│       ├── test_ollama_provider.py   # [Owner 1] Dual AI provider unit tests (6 tests)
-│       ├── test_rag_module.py        # [Owner 1] RAG, prompt loader & agent tools module tests
-│       ├── test_tickets_module.py    # [Owner 2] Ticket SLA, categories & triage module tests
-│       └── test_auth_module.py       # [Owner 2] Security guardrails & auth extension module tests
+│       ├── test_rag_module.py        # [Dev A] RAG, prompt loader & agent tools module tests
+│       ├── test_ollama_provider.py   # [Dev A] Dual AI provider unit tests
+│       ├── ai/                       # [Dev A] AI structured output & agent tool tests
+│       ├── test_tickets_module.py    # [Dev B] Ticket SLA, categories & triage module tests
+│       ├── test_auth_module.py       # [Dev B] Security guardrails & auth tests
+│       ├── test_workspace_and_verification.py # [Dev B] Workspaces & verification pipeline
+│       ├── platform/                 # [Dev B] Platform, pgvector & DB migration tests
+│       ├── test_api.py               # [Dev C] Core API integration tests
+│       ├── common/                   # [Dev C] Cross-feature scenario tests
+│       └── conftest.py               # [Integrator] Pytest fixtures & dependency overrides
 ├── frontend/                         # React 19 + Vite 6 + Tailwind CSS v4 SPA
 │   ├── src/
-│   │   ├── components/               # [Owner 3] Core screen components
-│   │   ├── features/                 # [Owner 3] Isolated feature subfolders (auth, telemetry, tools)
+│   │   ├── components/               # [Dev C] Core screen components
+│   │   ├── features/                 # [Dev C] Isolated feature subfolders (auth, telemetry, tools)
 │   │   ├── services/
-│   │   │   └── api.ts                # [SHARED] Central API client with offline fallback
-│   │   ├── data.ts                   # [Owner 3] Local fallback mock dataset
-│   │   ├── types.ts                  # [SHARED] Frozen TypeScript interfaces & domain enums
-│   │   └── App.tsx                   # [SHARED] Root tab & state coordinator
-│   ├── package.json
-│   └── vite.config.ts
+│   │   │   ├── api/                  # [Dev C] Modular API client methods (auth, chat, tickets, etc.)
+│   │   │   ├── mocks/                # [Dev C] Offline mock fixtures
+│   │   │   ├── api.ts                # [Integrator] Central API facade
+│   │   │   └── api/client.ts         # [Integrator] Shared fetch client
+│   │   ├── data.ts                   # [Dev C] Local fallback mock dataset
+│   │   ├── types/                    # [Integrator] Modular TypeScript interfaces
+│   │   ├── types.ts                  # [Integrator] Canonical TypeScript interfaces facade
+│   │   └── App.tsx                   # [Dev C] Root tab & state coordinator
+│   ├── Dockerfile                    # [Integrator] Multi-stage production container Dockerfile
+│   ├── nginx.conf                    # [Integrator] Nginx reverse proxy configuration
+│   ├── package.json                  # [Integrator]
+│   └── vite.config.ts                # [Integrator]
 ├── docs/                             # Governing specifications, ADRs, audit & plan
-│   ├── adr/                          # ADR-001 .. ADR-004
-│   ├── audit/                        # 00-checklist, 01-gap-analysis, 02-brainstorm-notes, 03-working-tree-triage
-│   ├── plan/PLAN.md                  # Phased implementation roadmap
-│   ├── spec/SPEC.md                  # Detailed technical specifications
-│   ├── ARCHITECTURE.md               # This file
-│   ├── API_CONTRACT.md               # Frozen REST API schemas
-│   ├── DESIGN.md                     # UI/UX tokens & 4-state specifications
-│   ├── PROPOSAL.md                   # 12 User Stories & Requirement Traceability Matrix
-│   └── TEST_ACCEPTANCE.md            # Manual & automated acceptance test matrix
-├── scripts/                          # Windows batch launchers (install.bat, start_all.bat, etc.)
-├── AI_USAGE.md                       # AI usage disclosure & failure/fix case studies
-├── AGENTS.md                         # Master rules for AI assistants & developers
-└── docker-compose.yml                # PostgreSQL 16 (pgvector) + Backend container orchestration
+│   ├── adr/                          # [Integrator] ADR-001 .. ADR-004
+│   ├── audit/                        # [Integrator] 00-checklist, 01-gap-analysis, etc.
+│   ├── plan/                         # [Integrator] PLAN.md, WORKSTREAMS.md, GIT_WORKFLOW.md, PROMPTS_FOR_DEVS.md
+│   ├── spec/                         # [Integrator] CONTRACTS.md, SPEC.md
+│   ├── ARCHITECTURE.md               # [Integrator] This file
+│   ├── API_CONTRACT.md               # [Integrator] Frozen REST API schemas
+│   ├── DESIGN.md                     # [Integrator] UI/UX tokens & 4-state specifications
+│   ├── DEV_START_HERE.md             # [Integrator] Mandatory developer onboarding guide
+│   ├── PROPOSAL.md                   # [Dev C] 12 User Stories & Requirement Traceability Matrix
+│   ├── REPORT.md                     # [Dev C] Formal capstone project report
+│   ├── PRESENTATION_AND_DEMO.md      # [Dev C] 15-slide deck & demo playbook
+│   └── TEST_ACCEPTANCE.md            # [Dev C] Acceptance test matrix
+├── scripts/                          # Windows batch launchers & python governance tools
+│   ├── check_ownership.py            # [Integrator] Pre-commit ownership validation tool
+│   ├── gen_codeowners.py             # [Integrator] CODEOWNERS generation script
+│   ├── ownership_map.py              # [Integrator] Single source of truth ownership map
+│   ├── verify_setup.ps1              # [Integrator] Universal 9-gate environment verifier
+│   └── *.bat                         # [Integrator] Batch launchers
+├── AI_USAGE.md                       # [Integrator] AI usage disclosure & failure/fix case studies
+├── AGENTS.md                         # [Integrator] Master rules for AI assistants & developers
+└── docker-compose.yml                # [Dev B] PostgreSQL 16 (pgvector) + Backend + Frontend orchestration
 ```
 
 ---
 
-## 2. Module Ownership Matrix (3-Developer / Workstream Boundaries)
+## 2. Module Ownership Matrix (Team of 3 Members)
 
-To prevent merge conflicts during parallel development, every file in the repository belongs to exactly ONE designated owner:
+To prevent merge conflicts during parallel development, every file in the repository belongs to exactly ONE designated owner. The team consists of **exactly 3 members**:
+- **Dev A (Owner 1):** AI Engine & Evaluation (`@TheOrijinnn`)
+- **Dev B (Owner 2) & Integrator:** Platform, Data & Security + Integrator Hat (`@BapVitHoang`)
+- **Dev C (Owner 3):** Frontend UX, QA & Capstone Documentation (`@[C_USERNAME]`)
 
 | Developer / Role | Owned Backend Modules | Owned Frontend, Infra & Docs | Dedicated Test Suites |
 | :--- | :--- | :--- | :--- |
-| **Dev A (Owner 1: AI Engine Lead)** | `services/llm_service.py`, `rag_service.py`, `fallback_service.py`, `verification_service.py`, `agent_tools.py`, `core/prompts.py`, `endpoints/chat.py`, `chat_stream.py`, `chat_actions.py`, `knowledge.py`, `backend/data/*`, `backend/scripts/*`, `Modelfile` | `docs/notes/A.md`, `docs/notes/A-ai-usage.md`, `docs/requests/A.md` | `backend/tests/test_rag_module.py`, `test_ollama_provider.py`, `backend/tests/ai/*` |
-| **Dev B (Owner 2: Platform & Data Lead)** | `services/ticket_service.py`, `document_service.py`, `embedding_service.py`, `ai_usage_logger.py`, `core/deps.py`, `core/security.py`, `db/base.py`, `session.py`, `seed/*`, `models/*`, `endpoints/tickets.py`, `agent.py`, `workspaces.py`, `documents.py`, `auth.py`, `ai_usage.py`, `health.py` | `docker-compose.yml`, `docs/notes/B.md`, `docs/notes/B-ai-usage.md`, `docs/requests/B.md` | `backend/tests/test_tickets_module.py`, `test_auth_module.py`, `test_workspace_and_verification.py`, `backend/tests/platform/*` |
-| **Dev C (Owner 3: Frontend UX, QA & Docs Lead)** | `backend/Dockerfile`, `backend/PYTHON_FILES_EXPLANATION.md`, `backend/README.md` | `frontend/src/*`, `frontend/Dockerfile`, `frontend/nginx.conf`, `README.md`, `AI_USAGE.md`, `docs/DESIGN.md`, `docs/PROPOSAL.md`, `docs/TEST_ACCEPTANCE.md`, `docs/REPORT.md`, `docs/PRESENTATION_AND_DEMO.md`, `docs/adr/*`, `docs/audit/*`, `docs/notes/*`, `scripts/*.bat` | `backend/tests/test_api.py`, `backend/tests/common/*` |
-| **Integrator / Hoang (Shared Gatekeeper)** | `api/v1/api.py`, `core/config.py`, `core/exceptions.py`, `schemas/*`, `models/__init__.py`, `requirements.txt`, `.env.example`, `conftest.py`, `pytest.ini` | `frontend/package*.json`, `tsconfig.json`, `vite.config.ts`, `types.ts`, `types/index.ts`, `services/api.ts`, `services/api/index.ts`, `services/api/client.ts`, `docs/spec/CONTRACTS.md`, `docs/API_CONTRACT.md`, `AGENTS.md`, `.cursorrules`, `.gitattributes`, `.gitignore`, `.github/**`, `scripts/check_ownership.py`, `scripts/verify_setup.ps1` | All shared test fixtures |
+| **Dev A (Owner 1: AI Engine)** | `services/llm_service.py`, `rag_service.py`, `ticket_copilot_service.py`, `verification_service.py`, `agent_tools.py`, `core/prompts.py`, `endpoints/chat.py`, `chat_stream.py`, `chat_actions.py`, `endpoints/ai_usage.py`, `knowledge.py`, `schemas/ai_structured.py`, `schemas/chat.py`, `schemas/verification.py`, `backend/data/*`, `backend/scripts/run_eval.py`, `export_finetune_dataset.py`, `Modelfile` | `docs/notes/A.md`, `docs/notes/A-ai-usage.md`, `docs/notes/A-eval-report.md`, `docs/requests/devA.md` | `backend/tests/test_rag_module.py`, `test_ollama_provider.py`, `backend/tests/ai/*` |
+| **Dev B (Owner 2: Platform & Security)** | `backend/Dockerfile`, `services/ticket_service.py`, `document_service.py`, `embedding_service.py`, `fallback_service.py`, `ai_usage_logger.py`, `core/deps.py`, `core/security.py`, `db/base.py`, `session.py`, `seed/*`, `models/*`, `schemas/ticket.py`, `workspace.py`, `document.py`, `health.py`, `knowledge.py`, `auth.py`, `endpoints/tickets.py`, `agent.py`, `workspaces.py`, `documents.py`, `auth.py`, `health.py`, `scripts/reembed_chunks.py` | `docker-compose.yml`, `docs/notes/B.md`, `docs/notes/B-ai-usage.md`, `docs/requests/devB.md` | `backend/tests/test_tickets_module.py`, `test_auth_module.py`, `test_workspace_and_verification.py`, `backend/tests/platform/*` |
+| **Dev C (Owner 3: Frontend UX & Docs)** | `backend/PYTHON_FILES_EXPLANATION.md` | `frontend/src/*` (components, features, services/api, services/mocks, data.ts, App.tsx, main.tsx, index.css, metadata.json), `README.md`, `docs/PROPOSAL.md`, `docs/TEST_ACCEPTANCE.md`, `docs/REPORT.md`, `docs/PRESENTATION_AND_DEMO.md`, `docs/notes/C.md`, `docs/notes/C-ai-usage.md`, `docs/requests/devC.md` | `backend/tests/test_api.py`, `backend/tests/common/*` |
+| **Integrator Hat (Hoang / Dev B)** | `api/v1/api.py`, `core/config.py`, `core/exceptions.py`, `schemas/__init__.py`, `services/__init__.py`, `models/__init__.py`, `requirements.txt`, `.env.example`, `conftest.py`, `pytest.ini`, `backend/README.md` | `frontend/Dockerfile`, `frontend/nginx.conf`, `frontend/package*.json`, `tsconfig.json`, `vite.config.ts`, `types.ts`, `types/*`, `services/api.ts`, `services/api/index.ts`, `services/api/client.ts`, `AI_USAGE.md`, `docs/DESIGN.md`, `docs/DEV_START_HERE.md`, `docs/API_CONTRACT.md`, `docs/spec/CONTRACTS.md`, `docs/adr/*`, `docs/audit/*`, `docs/plan/*`, `docs/requests/template.md`, `AGENTS.md`, `.cursorrules`, `.gitattributes`, `.gitignore`, `.github/*`, `scripts/*` | All shared test fixtures |
 
 ### Strict Collaboration Rules
 1. **Do Not Edit Outside Your Module:** An agent or developer assigned to a task for Owner 1 must not modify Owner 2's services or Owner 3's UI components unless explicitly designated as an integration task.

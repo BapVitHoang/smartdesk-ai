@@ -2,14 +2,18 @@
 
 > Required by **REQ-28** and evaluated under **CRIT-06** & **CRIT-09**.  
 > Every AI-assisted code generation session must be recorded below.
+> **Rule:** Record every real AI mistake you find, with the commit hash; never invent one.
 
 ---
 
-## Session 1: SSE Token Streaming in React ChatView
-- **Date:** 2026-10-20
-- **AI Tool Used:** Gemini 3.5 Flash / Claude 3.5 Sonnet
-- **Key Prompt:** "Implement SSE token consumption with fetch and ReadableStream in chat.ts, updating React state token by token with cursor."
-- **Manual Verification & Changes:** Verified that `ReadableStream` reader decodes chunks as UTF-8, strips SSE event prefixes (`data:`), and handles stream termination cleanly.
-- **Bug / Failure Case Study (Mandatory):**
-  - *Observed Issue:* AI helper created an infinite loop by re-triggering `useEffect` on every token chunk append.
-  - *Fix:* Replaced `useEffect` dependency with an imperative async function triggered directly on user submit event.
+## Session Template (Copy for each AI session)
+
+### Session [N]: [Brief Feature or Task Title]
+- **Date:** YYYY-MM-DD
+- **AI Tool Used:** [e.g. Cursor, Claude 3.5 Sonnet, Gemini 3.5 Flash]
+- **Key Prompt:** "[Exact or key prompt given to the AI]"
+- **Manual Verification & Changes:** [What you manually inspected, modified, or tested]
+- **AI Mistakes & Corrections (if encountered):**
+  - *Observed Issue:* [Exact bug, hallucination, or wrong code generated]
+  - *Commit Hash / File:* [Commit hash or file:line reference]
+  - *Fix Applied:* [How you diagnosed and corrected it]

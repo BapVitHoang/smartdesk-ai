@@ -37,6 +37,16 @@ export interface VerificationItem {
   reason?: string;
 }
 
+export interface AgentTraceStep {
+  agent: string;
+  action: string;
+  input_summary?: string;
+  output_summary?: string;
+  latency_ms?: number;
+  status: 'success' | 'failed' | 'skipped';
+  timestamp?: string;
+}
+
 export interface VerificationReport {
   id: number;
   document_id: number;
@@ -45,4 +55,5 @@ export interface VerificationReport {
   status: 'passed' | 'warning' | 'failed';
   created_at: string;
   items: VerificationItem[];
+  agent_trace?: AgentTraceStep[];
 }

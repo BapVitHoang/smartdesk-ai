@@ -22,3 +22,25 @@ export interface LoginCredentials {
   password?: string;
   google_id_token?: string;
 }
+
+export interface OAuth2LoginRequest {
+  provider: 'google' | 'demo';
+  token?: string;
+  email?: string;
+}
+
+export interface TokenRequest {
+  grant_type?: string;
+  username: string;
+  password?: string;
+  scope?: string;
+}
+
+export interface UserProfileResponse {
+  id: number;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  workspace_id?: number;
+  oauth_provider?: string;
+}

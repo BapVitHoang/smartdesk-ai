@@ -44,6 +44,7 @@ Your role is: AI Engine & Evaluation Engineer
 - `backend/tests/test_ollama_provider.py`
 - `docs/notes/A.md`
 - `docs/notes/A-ai-usage.md`
+- `docs/notes/A-eval-report.md`
 - `docs/requests/devA.md`
 
 # FORBIDDEN PATHS (DO NOT TOUCH):
@@ -67,8 +68,9 @@ Your role is: AI Engine & Evaluation Engineer
    - Implement `POST /api/v1/chat/stream` in `chat_stream.py` yielding `metadata`, `token`, and `done` SSE events.
 4. **TASK-15 (24-Case AI Evaluation Benchmark):**
    - Create `backend/data/eval_dataset.json` containing 24 test cases (10 normal, 6 edge, 8 should-refuse across Workspaces 1-3).
-   - Create `backend/scripts/run_eval.py` supporting `--mode=deterministic` (<2s pass rate test) and `--mode=live --delay=4.5`.
-   - Ensure the runner outputs `docs/EVALUATION_REPORT.md` proving pass rate improvement.
+   - Create `backend/scripts/run_eval.py` supporting `--mode=deterministic` (<2s CI mode) and `--mode=live --delay=4.5`.
+   - Output results to `docs/notes/A-eval-report.md`.
+   - Definition of Done: run_eval.py reports REAL results; baseline vs upgraded numbers come from actually running both pipelines; the report states what deterministic mode measures (retrieval, guardrails, schema) and what live mode measures (LLM answers).
 
 # VERIFICATION COMMANDS (ALL MUST PASS):
 ```powershell
@@ -78,7 +80,7 @@ python backend/scripts/run_eval.py --mode deterministic
 ```
 
 # MANDATORY LOGGING:
-Document all prompts, manual code checks, and at least one AI failure case study in `docs/notes/A-ai-usage.md`.
+Document all prompts, manual code checks, and record every real AI mistake you find, with the commit hash (never invent one) in `docs/notes/A-ai-usage.md`.
 ```
 
 ---
@@ -157,7 +159,7 @@ docker compose config
 ```
 
 # MANDATORY LOGGING:
-Document all prompts, manual code checks, and at least one AI failure case study in `docs/notes/B-ai-usage.md`.
+Document all prompts, manual code checks, and record every real AI mistake you find, with the commit hash (never invent one) in `docs/notes/B-ai-usage.md`.
 ```
 
 ---
@@ -176,12 +178,13 @@ Your role is: Frontend UX, Integration QA & Documentation Engineer
    - `docs/plan/WORKSTREAMS.md` (Section 2.3 - Dev C lane & tasks)
    - `docs/spec/CONTRACTS.md` (frozen internal interfaces)
    - `docs/plan/GIT_WORKFLOW.md` (Git rules & rebase protocol)
-2. Run `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` and verify all 8 checks pass.
+2. Run `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` and verify all 9 checks pass.
 3. REFUSAL RULE: You MUST refuse to modify any file outside your strictly assigned paths. If you need a change in a frozen file (e.g., `frontend/src/types.ts`, `frontend/src/services/api/client.ts`), write the proposed diff to `docs/requests/devC.md` and stop. Never edit foreign files directly.
 
 # STRICTLY ASSIGNED PATHS (YOU OWN ONLY THESE FILES):
 - `frontend/src/App.tsx`
 - `frontend/src/main.tsx`
+- `frontend/src/index.css`
 - `frontend/src/data.ts`
 - `frontend/src/components/**` (Header, ChatView, TicketFormView, AgentDashboardView, KnowledgeManagerView, Footer)
 - `frontend/src/features/**` (agent, auth, chat, knowledge, telemetry)
@@ -192,8 +195,8 @@ Your role is: Frontend UX, Integration QA & Documentation Engineer
 - `frontend/src/services/api/auth.ts`
 - `frontend/src/services/api/telemetry.ts`
 - `frontend/src/services/mocks/**`
-- `frontend/Dockerfile`
-- `frontend/nginx.conf`
+- `frontend/metadata.json`
+- `backend/PYTHON_FILES_EXPLANATION.md`
 - `backend/tests/common/**`
 - `backend/tests/test_api.py`
 - `README.md`
@@ -201,13 +204,13 @@ Your role is: Frontend UX, Integration QA & Documentation Engineer
 - `docs/REPORT.md`
 - `docs/PRESENTATION_AND_DEMO.md`
 - `docs/TEST_ACCEPTANCE.md`
-- `docs/EVALUATION_REPORT.md`
 - `docs/notes/C.md`
 - `docs/notes/C-ai-usage.md`
 - `docs/requests/devC.md`
 
 # FORBIDDEN PATHS (DO NOT TOUCH):
 - `backend/app/**` (owned by Dev A, Dev B, and Integrator)
+- `frontend/Dockerfile`, `frontend/nginx.conf` (Integrator-owned frozen files)
 - Frozen shared files: `frontend/src/types.ts`, `frontend/src/types/**`, `frontend/src/services/api.ts`, `frontend/src/services/api/client.ts`, `frontend/package.json`
 
 # TASKS TO IMPLEMENT (IN PRIORITY ORDER):
@@ -223,10 +226,7 @@ Your role is: Frontend UX, Integration QA & Documentation Engineer
 4. **TASK-12 & TASK-13 (Auth Switcher & Ticket Controls in `features/auth/` & `features/agent/`):**
    - Add OAuth2 Demo Switcher in `Header.tsx` allowing 1-click toggle between Customer and Admin.
    - Add sort dropdown (`sort_by`, `sort_order`), pagination buttons, and ticket delete button in `AgentDashboardView.tsx`.
-5. **Frontend Containerization:**
-   - Create `frontend/Dockerfile` (multi-stage build with `nginx:alpine`).
-   - Create `frontend/nginx.conf` with `/api/v1` reverse proxy and `proxy_buffering off` for SSE streaming.
-6. **TASK-16 & TASK-17 (End-to-End Tests & Capstone Documentation):**
+5. **TASK-16 & TASK-17 (End-to-End Tests & Capstone Documentation):**
    - Implement cross-feature integration tests in `backend/tests/common/`.
    - Update `docs/PROPOSAL.md` with 12 User Stories (`US-01..12`) and complete Traceability Matrix.
    - Write formal project report `docs/REPORT.md` (10-20 pages) and `docs/PRESENTATION_AND_DEMO.md` (15 slides, 8-min demo script, 10-min live-change playbook).
@@ -240,5 +240,5 @@ python -m pytest backend/tests/test_api.py backend/tests/common/ -v
 ```
 
 # MANDATORY LOGGING:
-Document all prompts, manual code checks, and at least one AI failure case study in `docs/notes/C-ai-usage.md`.
+Document all prompts, manual code checks, and record every real AI mistake you find, with the commit hash (never invent one) in `docs/notes/C-ai-usage.md`.
 ```

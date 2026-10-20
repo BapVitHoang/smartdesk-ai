@@ -14,9 +14,8 @@ To prevent collisions and enable clean Git commit attribution as required by **R
 | Developer | Role / Workstream | Feature Branch Name | Base Branch |
 | :--- | :--- | :--- | :--- |
 | **Dev A** | AI Engine & Evaluation | `feature/a-ai-engine` | `Hoang` |
-| **Dev B** | Platform, Data & Security | `feature/b-platform` | `Hoang` |
+| **Dev B (Hoang)** | Platform, Data & Security (+ Integrator Hat) | `feature/b-platform` | `Hoang` |
 | **Dev C** | Frontend UX, QA & Docs | `feature/c-frontend-docs` | `Hoang` |
-| **Hoang (Lead)** | Integrator & Governance | `Hoang` / `main` | `origin/Hoang` |
 
 ### 1.1 Branch Creation Commands
 When starting work, each developer runs:
@@ -119,25 +118,35 @@ flowchart LR
 2. **Dev A merges SECOND:** Dev A integrates AI structured outputs (`ticket_copilot_service.py`), agent tools, and streaming endpoints (`/chat/stream`). These backend endpoints are required by Dev C for live UI testing.
 3. **Dev C merges THIRD:** Dev C wires the complete user interface to the live backend endpoints, runs cross-feature end-to-end tests (`backend/tests/common/`), and compiles the final capstone documentation pack (`REPORT.md`, `PRESENTATION_AND_DEMO.md`).
 
+### 4.2 Peer Review & Cross-Approval Protocol
+Every PR requires formal review and approval from at least one other team member before merging into `Hoang`.
+
+- **Default Peer Review Pairs:**
+  - **Dev A's PRs** are reviewed by **Dev B (Hoang)**.
+  - **Dev C's PRs** are reviewed by **Dev A**.
+  - **Dev B's PRs** are reviewed by **Dev C**.
+
+- **Reviewer Mandatory Checklist:**
+  - [ ] **Ownership boundary passes:** Author modified only files within their assigned lane (`python scripts/check_ownership.py`).
+  - [ ] **Automated tests pass:** Unit tests and linter exit cleanly with 0 errors.
+  - [ ] **Contracts preserved:** Shared interfaces in `CONTRACTS.md`, `types.ts`, and `api.ts` are untouched.
+  - [ ] **Understanding verification:** The author can clearly explain the architecture, data flow, and test coverage for the changes.
+
 ---
 
 ## 5. Integrator Test Runner & Rollback Procedures
 
-The Lead Integrator (Hoang) conducts a full verification suite before approving any PR.
+Hoang (wearing the Integrator hat) conducts the universal verification suite before approving any PR.
 
 ### 5.1 Full Integration Run Command
 Upon receiving a PR, the Integrator executes:
 ```powershell
-# 1. Verify file boundaries
-python scripts/check_ownership.py
+# 1. Run universal 9-gate verification suite (including consistency check)
+powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1
 
-# 2. Run all backend tests
-python -m pytest backend/tests/ -v
-
-# 3. Run AI evaluation benchmark
+# 2. Run deterministic AI evaluation benchmark
 python backend/scripts/run_eval.py --mode deterministic
-
-# 4. Verify frontend build
+```
 npm run lint --prefix frontend
 npm run build --prefix frontend
 

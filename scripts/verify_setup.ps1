@@ -7,7 +7,7 @@ Write-Host "  SmartDesk AI - Environment & Toolchain Verification Gate" -Foregro
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 $passedSteps = 0
-$totalSteps = 8
+$totalSteps = 9
 
 function Report-Step($stepNum, $stepName, $success, $detail) {
     if ($success) {
@@ -121,6 +121,19 @@ try {
     }
 } catch {
     $res = Report-Step 8 "Docker Compose Configuration" $false "Docker command not available or daemon offline"
+}
+
+# Step 9: Ownership & Governance Consistency Check
+try {
+    $consOutput = python scripts/check_ownership.py --verify-consistency 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $res = Report-Step 9 "Ownership & Governance Consistency" $true "Zero overlaps, all tracked files mapped in OWNERSHIP_MAP & CODEOWNERS"
+        $passedSteps++
+    } else {
+        $res = Report-Step 9 "Ownership & Governance Consistency" $false "Governance consistency check failed: $consOutput"
+    }
+} catch {
+    $res = Report-Step 9 "Ownership & Governance Consistency" $false $_.Exception.Message
 }
 
 Write-Host "=================================================================" -ForegroundColor Cyan

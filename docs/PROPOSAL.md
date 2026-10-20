@@ -133,3 +133,15 @@ flowchart TD
 - **Endpoint:** `GET /api/v1/health/smoke-test`
 - **Verified Cloud Models:** `gemini-3.5-flash-lite` (primary), `gemini-2.5-flash-lite` (fallback), `gemini-embedding-001` (embeddings) — *replacing retired `gemini-1.5-flash` and `text-embedding-004` which return HTTP 404 on live Google GenAI API*.
 - **Measured Round-Trip Latency:** **`922.74 ms`** (`< 1,500ms` target; `PASS`).
+
+---
+
+## 6. Team Roster & Module Ownership (REQ-29)
+
+SmartDesk AI is developed by a **team of exactly 3 members** (Dev B simultaneously serves as the Integration Owner):
+
+| Member Name | Student ID (MSSV) | GitHub Account | Primary Role | Assigned Module Domain & File Ownership (REQ-29) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Dương Bắp Vịt Hoàng** (Repo Owner) | `23110020` | [`@BapVitHoang`](https://github.com/BapVitHoang) | **Dev B & Integrator** | Platform, Database, OAuth2/JWT, Ticket CRUD, Docker Compose, Frozen Governance & Release |
+| **[A_FULL_NAME]** | `[A_MSSV]` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | AI Engine, RAG Pipeline, Single-call Structured Output, Tool-using Agent, 24-case Eval Benchmark |
+| **[C_FULL_NAME]** | `[C_MSSV]` | `@[C_USERNAME]` | **Dev C** | Frontend UX, Streaming Bubble, Confirmation UI, Telemetry View, Integration Tests & Capstone Docs |

@@ -2,14 +2,18 @@
 
 > Required by **REQ-28** and evaluated under **CRIT-06** & **CRIT-09**.  
 > Every AI-assisted code generation session must be recorded below.
+> **Rule:** Record every real AI mistake you find, with the commit hash; never invent one.
 
 ---
 
-## Session 1: Single-Call Ticket Copilot Structured Output
-- **Date:** 2026-10-20
-- **AI Tool Used:** Gemini 3.5 Flash / Claude 3.5 Sonnet
-- **Key Prompt:** "Implement Pydantic v2 model TicketCopilotStructuredOutput and combine triage + draft reply into one single LLM call."
-- **Manual Verification & Changes:** Checked that sentiment is constrained to `positive | neutral | negative` and priority maps to canonical SLA hours. Verified against `CONTRACTS.md`.
-- **Bug / Failure Case Study (Mandatory):**
-  - *Observed Issue:* Initial AI generation omitted the `ai_draft_reply` field when confidence was below 0.7, causing Pydantic validation error.
-  - *Fix:* Added default fallback draft string generation in Python to ensure valid schema compliance even on low-confidence inputs.
+## Session Template (Copy for each AI session)
+
+### Session [N]: [Brief Feature or Task Title]
+- **Date:** YYYY-MM-DD
+- **AI Tool Used:** [e.g. Cursor, Claude 3.5 Sonnet, Gemini 3.5 Flash]
+- **Key Prompt:** "[Exact or key prompt given to the AI]"
+- **Manual Verification & Changes:** [What you manually inspected, modified, or tested]
+- **AI Mistakes & Corrections (if encountered):**
+  - *Observed Issue:* [Exact bug, hallucination, or wrong code generated]
+  - *Commit Hash / File:* [Commit hash or file:line reference]
+  - *Fix Applied:* [How you diagnosed and corrected it]

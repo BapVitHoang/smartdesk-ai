@@ -26,12 +26,16 @@ SmartDesk AI uses Python 3.11+ asynchronous FastAPI and Node.js 20+ React 19. Co
 ### Step-by-Step Setup
 ```powershell
 # 1. Clone the repository (if not already in workspace)
-git clone https://github.com/hoangduong140604/smartdesk-ai.git
+git clone https://github.com/BapVitHoang/smartdesk-ai.git
 cd smartdesk-ai
 
-# 2. Check out your designated feature branch
-# (Choose: feature/a-ai-engine, feature/b-platform, or feature/c-frontend-docs)
-git checkout -b feature/<your-branch> origin/Hoang
+# 2. Check out your designated feature branch (use your exact branch name):
+# For Dev A (AI Engine):
+git checkout -b feature/a-ai-engine origin/Hoang
+# For Dev B (Platform, Data & Security + Integrator):
+git checkout -b feature/b-platform origin/Hoang
+# For Dev C (Frontend UX, QA & Docs):
+git checkout -b feature/c-frontend-docs origin/Hoang
 
 # 3. Create backend virtual environment and install dependencies
 cd backend
@@ -85,7 +89,7 @@ Whenever you use an AI tool to generate code:
 1. Record the tool name (e.g., Cursor, Claude 3.5 Sonnet).
 2. Record the key prompt used.
 3. Record what you manually checked, changed, or tested.
-4. **Mandatory Case Studies:** You must document at least **one instance** where the AI produced incorrect, buggy, or hallucinated code and explain how you fixed it. (Required to satisfy **REQ-28** and avoid the -10% group penalty under **CRIT-09**).
+4. **Mandatory AI Case Studies:** Record every real AI mistake you find, with the commit hash; never invent one. (Required to satisfy **REQ-28** and avoid the -10% group penalty under **CRIT-09**).
 
 ### 4.3 The CRIT-08 "Understanding Gate" (50% Score Cap Warning!)
 > [!CAUTION]
@@ -104,10 +108,10 @@ Review the pitfalls discovered during our project audit before writing code:
 - **Circuit Breaker False Triggers:** If an external LLM call returns 429, the system enters a 60-second cooldown. Always provide a 1-click cooldown reset in `endpoints/ai_usage.py`.
 - **Hallucinated Refusal Answers:** System prompt must strictly command the model to answer only from provided context, or explicitly say it cannot find the answer and recommend human escalation.
 
-### Dev B (Platform, Data & Security)
+### Dev B (Platform, Data & Security + Integrator)
 - **SQLite vs PostgreSQL `pgvector` Types:** Local development uses SQLite while Docker/production uses PostgreSQL with `pgvector`. Always use `Vector(768).with_variant(JSON(), "sqlite")` in `models/knowledge.py`.
 - **Raw `str(e)` Leaks:** Never return `detail=str(e)` in HTTP 500 responses; this leaks internal stack traces and database paths to clients. Log the exception internally and return a generic error message.
-- **Auth Token Breakage in Existing Tests:** When securing endpoints with `Depends(get_current_user)`, ensure `backend/tests/conftest.py` attaches a valid demo admin JWT so existing unit tests do not break.
+- **Authentication & Dependency Overrides:** The test suite uses dependency overrides in `conftest.py` (`client`, `admin_client`, `user_client`, `unauth_client`). When implementing JWT authentication in `auth.py`, test real token issuance and validation in your own dedicated test files under `backend/tests/test_auth_module.py` or `backend/tests/platform/`.
 
 ### Dev C (Frontend UX, QA & Docs)
 - **`ApiError` Swallowing:** Never swallow HTTP 400 validation errors or 401/403 authorization failures with silent fallbacks. Surface errors clearly to the user.
@@ -116,11 +120,36 @@ Review the pitfalls discovered during our project audit before writing code:
 
 ---
 
-## 6. Daily Communication & Sync Protocol
+## 6. Team Structure & Git Identity
+
+SmartDesk AI is developed by a **team of exactly 3 members** (no separate fourth integrator person):
+- **Hoang (`@BapVitHoang`)**: Dev B (Platform, Data & Security) AND Integrator.
+- **Dev A (`@TheOrijinnn`)**: AI Engine & Evaluation.
+- **Dev C (`@[C_USERNAME]`)**: Frontend UX, QA & Capstone Documentation.
+
+### 6.1 Configuring Local Git Identity (Per-Repository)
+To ensure individual commit traceability for grading (**REQ-29**, **CRIT-06**), set your identity locally in the repository (do NOT use `--global`):
+```powershell
+# From the repository root:
+git config user.name "Your Full Name"
+git config user.email "your_student_email@student.hcmute.edu.vn"
+```
+
+If using **GitHub Desktop**:
+1. Go to **Repository** menu $\to$ **Repository Settings...**
+2. Select **Git Config** tab.
+3. Select **Use local Git config** and fill in your Name and Student Email.
+
+> [!IMPORTANT]
+> **Strict Identity Rule:** Nobody commits another member's work. Every commit in Git history must be authored by the member who wrote and tested that code.
+
+---
+
+## 7. Daily Communication & Sync Protocol
 
 - **Daily Standup Check-in (Async / Chat):** Post a 3-bullet update each morning:
   1. What I completed yesterday.
   2. What I am working on today.
   3. Any blockers or change requests needed from other modules.
-- **Need a Change in Shared Files?** Create an entry in `docs/requests/<your-dev-id>.md`.
+- **Need a Change in Shared Files?** Create an entry in `docs/requests/dev<A|B|C>.md`.
 - **Pre-PR Verification:** Run `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` before submitting any PR.
