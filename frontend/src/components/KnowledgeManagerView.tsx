@@ -44,6 +44,7 @@ import {
   publishDocument,
   getDocumentChunks,
 } from '../services/api';
+import { VerificationTrace } from '../features/knowledge';
 
 interface KnowledgeManagerViewProps {
   currentWorkspaceId: number;
@@ -662,6 +663,9 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
                   <span className="text-xs font-semibold text-slate-700">Điểm tối thiểu &ge; 85%</span>
                 </div>
               </div>
+
+              {/* Multi-Agent Verification Trace (REQ-34) */}
+              <VerificationTrace report={activeReport} />
 
               {/* Items Detail Table */}
               <div className="space-y-3">

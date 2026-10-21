@@ -5,9 +5,19 @@ import { TicketFormView } from './components/TicketFormView';
 import { AgentDashboardView } from './components/AgentDashboardView';
 import { KnowledgeManagerView } from './components/KnowledgeManagerView';
 import { Footer } from './components/Footer';
-import { TabType, UIState, Ticket, ChatMessage, Toast, ToastType, TicketStatus, TicketFormData } from './types';
+import {
+  TabType,
+  UIState,
+  Ticket,
+  ChatMessage,
+  Toast,
+  ToastType,
+  TicketStatus,
+  TicketFormData,
+  User,
+} from './types';
 import { INITIAL_TICKETS, INITIAL_CHAT_MESSAGES } from './data';
-import { registerApiToastHandler, getTickets } from './services/api';
+import { registerApiToastHandler, getTickets, getCurrentUser } from './services/api';
 import { CheckCircle2, AlertCircle, Info, X, Loader2, Inbox } from 'lucide-react';
 
 export default function App() {
@@ -19,6 +29,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
   const [prefillTicketData, setPrefillTicketData] = useState<Partial<TicketFormData> | undefined>(undefined);
   const [toast, setToast] = useState<Toast | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const showToast = (message: string, type: ToastType = 'success') => {
     const newToast: Toast = {
@@ -36,7 +47,14 @@ export default function App() {
     // 1. Register global toast notifier for API fallbacks
     registerApiToastHandler(showToast);
 
-    // 2. Fetch real-time tickets from FastAPI backend for the current workspace
+    // 2. Fetch current logged-in user profile
+    getCurrentUser().then((user) => {
+      if (user) {
+        setCurrentUser(user);
+      }
+    });
+
+    // 3. Fetch real-time tickets from FastAPI backend for the current workspace
     const loadTicketsForWorkspace = async () => {
       try {
         const remoteTickets = await getTickets({ workspace_id: currentWorkspaceId }, showToast);
@@ -55,6 +73,15 @@ export default function App() {
       registerApiToastHandler(null);
     };
   }, [currentWorkspaceId]);
+
+  const handleUserChanged = (newUser: User | null) => {
+    setCurrentUser(newUser);
+    // RBAC: If switching to normal user, immediately navigate away from admin-only tabs
+    if (newUser && newUser.role === 'user' && (activeTab === 'agent' || activeTab === 'knowledge')) {
+      setActiveTab('chat');
+      showToast('Đã chuyển hướng về Chat Bot do vai trò Khách hàng không có quyền truy cập tab Quản trị.', 'info');
+    }
+  };
 
   const handleEscalateToTicket = (prefill?: Partial<TicketFormData>) => {
     setPrefillTicketData(prefill);
@@ -90,9 +117,9 @@ export default function App() {
         return '#e11d48'; // Red-600
       case 'loading':
       case 'warning':
-        return '#d97706'; // Amber-600 (distinct for Loading State)
+        return '#d97706'; // Amber-600
       case 'empty':
-        return '#2563eb'; // Blue-600 (distinct for Empty State)
+        return '#2563eb'; // Blue-600
       case 'info':
         return '#0284c7'; // Sky-600
       case 'success':
@@ -120,7 +147,6 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-slate-100 text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
-      
       {/* Toast Notification Container */}
       {toast && (
         <div
@@ -135,7 +161,7 @@ export default function App() {
           <span>{toast.message}</span>
           <button
             onClick={() => setToast(null)}
-            className="ml-2 hover:opacity-75 focus:outline-none"
+            className="ml-2 hover:opacity-75 focus:outline-none cursor-pointer"
             aria-label="Đóng thông báo"
           >
             <X className="w-4 h-4" />
@@ -151,6 +177,8 @@ export default function App() {
         demoState={demoState}
         setDemoState={setDemoState}
         onToast={showToast}
+        currentUser={currentUser}
+        onUserChanged={handleUserChanged}
       />
 
       {/* Main Screen Viewport */}
@@ -180,7 +208,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'agent' && (
+        {activeTab === 'agent' && currentUser?.role === 'admin' && (
           <AgentDashboardView
             tickets={tickets}
             setTickets={setTickets}
@@ -194,7 +222,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'knowledge' && (
+        {activeTab === 'knowledge' && currentUser?.role === 'admin' && (
           <KnowledgeManagerView
             currentWorkspaceId={currentWorkspaceId}
             setCurrentWorkspaceId={setCurrentWorkspaceId}

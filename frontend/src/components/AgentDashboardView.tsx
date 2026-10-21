@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Inbox, Activity } from 'lucide-react';
 import { Ticket, UIState, TicketStatus, ToastType } from '../types';
-import { getTickets, updateTicketStatus, regenerateAiDraft } from '../services/api';
-import { TicketToolbar, TicketList, TicketDetail } from '../features/agent';
+import { getTickets, updateTicketStatus, regenerateAiDraft, deleteTicket } from '../services/api';
+import { TicketToolbar, TicketList, TicketDetail, TicketSortField } from '../features/agent';
 import { TelemetryPanel } from '../features/telemetry';
 
 interface AgentDashboardViewProps {
   tickets: Ticket[];
   setTickets?: React.Dispatch<React.SetStateAction<Ticket[]>>;
   selectedTicket: Ticket | null;
-  setSelectedTicket: (ticket: Ticket) => void;
+  setSelectedTicket: (ticket: Ticket | null) => void;
   demoState: UIState;
   setDemoState: (state: UIState) => void;
   onUpdateTicketStatus: (ticketId: string, newStatus: TicketStatus, draftReply?: string) => void;
@@ -32,6 +32,10 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
   const [filterType, setFilterType] = useState<'all' | 'open' | 'urgent'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<TicketSortField>('created_at');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 8;
+
   const [agentReplyText, setAgentReplyText] = useState(selectedTicket?.draftReply || '');
   const [agentSending, setAgentSending] = useState(false);
   const [isRegeneratingDraft, setIsRegeneratingDraft] = useState(false);
@@ -42,6 +46,11 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
       setAgentReplyText(selectedTicket.draftReply);
     }
   }, [selectedTicket]);
+
+  // Reset pagination to first page whenever filters or sorting changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterType, selectedCategory, searchTerm, sortBy]);
 
   // Combined real-time filtering: Status + Category + Search term
   const filteredTickets = tickets.filter((t) => {
@@ -68,6 +77,28 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
     return true;
   });
 
+  // Sorting logic based on selected sortBy
+  const sortedTickets = [...filteredTickets].sort((a, b) => {
+    if (sortBy === 'priority') {
+      const priorityWeights: Record<string, number> = { Urgent: 4, High: 3, Medium: 2, Low: 1 };
+      return (priorityWeights[b.priority] || 0) - (priorityWeights[a.priority] || 0);
+    }
+    if (sortBy === 'status') {
+      return a.status.localeCompare(b.status);
+    }
+    if (sortBy === 'sla_hours') {
+      return (a.estimated_response_hours || 0) - (b.estimated_response_hours || 0);
+    }
+    // Default created_at descending
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return timeB - timeA;
+  });
+
+  // Client-side pagination
+  const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize));
+  const paginatedTickets = sortedTickets.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const handleRefreshTickets = async () => {
     setIsRefreshing(true);
     try {
@@ -77,7 +108,8 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
         priority?: string;
         search?: string;
         workspace_id?: number;
-      } = {};
+        sort_by?: string;
+      } = { sort_by: sortBy };
       if (filterType === 'open') filters.status = 'open';
       if (filterType === 'urgent') filters.priority = 'Urgent';
       if (selectedCategory !== 'all') filters.category = selectedCategory;
@@ -96,6 +128,22 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
       onToast('Không thể làm mới danh sách ticket.', 'warning');
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleDeleteTicket = async (ticketId: string) => {
+    try {
+      await deleteTicket(ticketId, onToast);
+      if (setTickets) {
+        setTickets((prev) => prev.filter((t) => t.id !== ticketId && t.ticket_code !== `#${ticketId}`));
+      }
+      onToast(`Đã xóa phiếu hỗ trợ #${ticketId} thành công!`, 'success');
+      if (selectedTicket && (selectedTicket.id === ticketId || selectedTicket.ticket_code === `#${ticketId}`)) {
+        const remaining = tickets.filter((t) => t.id !== ticketId && t.ticket_code !== `#${ticketId}`);
+        setSelectedTicket(remaining.length > 0 ? remaining[0] : null);
+      }
+    } catch (err: any) {
+      onToast(err?.detail || err?.message || `Không thể xóa ticket #${ticketId}.`, 'error');
     }
   };
 
@@ -193,7 +241,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
         </div>
       ) : (
         <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
-          {/* CỘT TRÁI: DANH SÁCH TICKET HOẶC TRẠNG THÁI SKELETON / EMPTY / ERROR */}
+          {/* CỘT TRÁI: DANH SÁCH TICKET HOẶC TRẠNG THÁI SKELETON / EMPTY / ERROR (Responsive: h-1/2 md:h-full) */}
           <div className="w-full md:w-5/12 lg:w-4/12 border-r border-slate-200 bg-white flex flex-col h-1/2 md:h-full overflow-hidden shrink-0">
             <TicketToolbar
               searchTerm={searchTerm}
@@ -202,6 +250,8 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
               setSelectedCategory={setSelectedCategory}
               filterType={filterType}
               setFilterType={setFilterType}
+              sortBy={sortBy}
+              setSortBy={setSortBy}
               ticketCount={filteredTickets.length}
               demoState={demoState}
               isRefreshing={isRefreshing}
@@ -209,7 +259,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
             />
 
             <TicketList
-              tickets={filteredTickets}
+              tickets={paginatedTickets}
               selectedTicket={selectedTicket}
               onSelectTicket={setSelectedTicket}
               demoState={demoState}
@@ -218,9 +268,34 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
                 await handleRefreshTickets();
               }}
             />
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="p-2.5 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
+                <span>
+                  Trang <strong>{currentPage}</strong> / {totalPages} ({sortedTickets.length} tickets)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-medium transition-colors"
+                  >
+                    Trang trước
+                  </button>
+                  <button
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-medium transition-colors"
+                  >
+                    Trang sau
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* CỘT PHẢI: CHI TIẾT TICKET & AI SUGGESTED DRAFT REPLY */}
+          {/* CỘT PHẢI: CHI TIẾT TICKET, XÓA TICKET & AI SUGGESTED DRAFT REPLY */}
           <div className="flex-1 bg-slate-50/50 flex flex-col h-full overflow-y-auto custom-scrollbar p-4 sm:p-6">
             <TicketDetail
               selectedTicket={selectedTicket}
@@ -232,6 +307,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
               onRegenerateDraft={handleRegenerateDraft}
               onStatusChange={handleStatusChange}
               onSendReply={handleSendAgentReply}
+              onDeleteTicket={handleDeleteTicket}
               onResetOriginalDraft={() => {
                 if (selectedTicket) {
                   setAgentReplyText(selectedTicket.draftReply);

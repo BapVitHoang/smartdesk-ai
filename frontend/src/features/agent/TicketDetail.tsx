@@ -5,7 +5,8 @@ import {
   ShieldCheck, 
   Send, 
   Loader2, 
-  Inbox 
+  Inbox,
+  Trash2,
 } from 'lucide-react';
 import { Ticket, TicketStatus, UIState } from '../../types';
 
@@ -20,6 +21,7 @@ interface TicketDetailProps {
   onStatusChange: (status: TicketStatus) => void;
   onSendReply: () => void;
   onResetOriginalDraft: () => void;
+  onDeleteTicket?: (ticketId: string) => void;
 }
 
 export const TicketDetail: React.FC<TicketDetailProps> = ({
@@ -33,6 +35,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
   onStatusChange,
   onSendReply,
   onResetOriginalDraft,
+  onDeleteTicket,
 }) => {
   if (!selectedTicket || demoState === 'empty') {
     return (
@@ -68,8 +71,25 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
             </span>
           </div>
 
-          <div className="text-xs text-slate-500">
-            Thời gian gửi: <span className="font-medium text-slate-700">{selectedTicket.date}</span>
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-slate-500">
+              Thời gian gửi: <span className="font-medium text-slate-700">{selectedTicket.date}</span>
+            </div>
+            {onDeleteTicket && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Bạn có chắc chắn muốn xóa ticket #${selectedTicket.id}? Thao tác này không thể hoàn tác.`)) {
+                    onDeleteTicket(selectedTicket.id);
+                  }
+                }}
+                title="Xóa phiếu hỗ trợ này (Admin)"
+                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 text-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Xóa</span>
+              </button>
+            )}
           </div>
         </div>
 

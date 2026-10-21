@@ -1,6 +1,8 @@
 import React from 'react';
-import { Search, X, Filter, RefreshCw } from 'lucide-react';
+import { Search, X, Filter, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { UIState } from '../../types';
+
+export type TicketSortField = 'created_at' | 'priority' | 'status' | 'sla_hours';
 
 interface TicketToolbarProps {
   searchTerm: string;
@@ -9,6 +11,8 @@ interface TicketToolbarProps {
   setSelectedCategory: (cat: string) => void;
   filterType: 'all' | 'open' | 'urgent';
   setFilterType: (ft: 'all' | 'open' | 'urgent') => void;
+  sortBy?: TicketSortField;
+  setSortBy?: (sort: TicketSortField) => void;
   ticketCount: number;
   demoState: UIState;
   isRefreshing: boolean;
@@ -22,6 +26,8 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
   setSelectedCategory,
   filterType,
   setFilterType,
+  sortBy = 'created_at',
+  setSortBy,
   ticketCount,
   demoState,
   isRefreshing,
@@ -40,7 +46,7 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
             onClick={onRefresh}
             disabled={isRefreshing}
             title="Làm mới hàng đợi từ máy chủ"
-            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 bg-white transition-all shadow-xs"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 bg-white transition-all shadow-xs cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-600' : ''}`} />
           </button>
@@ -50,7 +56,7 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
         </div>
       </div>
 
-      {/* Search and Category Filter */}
+      {/* Search, Category Filter & Sorting Dropdown */}
       <div className="p-3 bg-white border-b border-slate-200 space-y-2 shrink-0">
         <div className="relative flex items-center">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
@@ -75,20 +81,37 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
-          <select
-            id="agent-ticket-category-select"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full text-xs py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 font-medium cursor-pointer transition-colors"
-          >
-            <option value="all">Tất cả danh mục (All Categories)</option>
-            <option value="Authentication">Authentication (Đăng nhập, 2FA)</option>
-            <option value="Billing">Billing (Thanh toán, Hoàn tiền)</option>
-            <option value="Bug Report">Bug Report (Lỗi kỹ thuật, Timeout)</option>
-            <option value="Feature Request">Feature Request (Đề xuất tính năng)</option>
-          </select>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-center gap-1.5">
+            <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-0.5" />
+            <select
+              id="agent-ticket-category-select"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full text-[11px] py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 font-medium cursor-pointer transition-colors"
+            >
+              <option value="all">Tất cả danh mục</option>
+              <option value="Authentication">Authentication</option>
+              <option value="Billing">Billing</option>
+              <option value="Bug Report">Bug Report</option>
+              <option value="Feature Request">Feature Request</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-0.5" />
+            <select
+              id="agent-ticket-sort-select"
+              value={sortBy}
+              onChange={(e) => setSortBy && setSortBy(e.target.value as TicketSortField)}
+              className="w-full text-[11px] py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 font-medium cursor-pointer transition-colors"
+            >
+              <option value="created_at">Mới nhất (Date)</option>
+              <option value="priority">Mức ưu tiên (Priority)</option>
+              <option value="status">Trạng thái (Status)</option>
+              <option value="sla_hours">Cam kết SLA (SLA Hours)</option>
+            </select>
+          </div>
         </div>
       </div>
 

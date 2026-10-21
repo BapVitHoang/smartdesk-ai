@@ -18,6 +18,7 @@ import {
   ToastNotifier,
   notifyFallback,
   fetchWithTimeout,
+  getAuthHeaders,
 } from './client';
 
 // Status Mapping Helpers
@@ -190,6 +191,8 @@ export async function getTickets(
     search?: string;
     skip?: number;
     limit?: number;
+    sort_by?: string;
+    sort_order?: string;
   },
   onToast?: ToastNotifier
 ): Promise<Ticket[]> {
@@ -204,9 +207,12 @@ export async function getTickets(
     if (filters?.search) params.append('search', filters.search);
     if (filters?.skip !== undefined) params.append('skip', String(filters.skip));
     if (filters?.limit !== undefined) params.append('limit', String(filters.limit));
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_order) params.append('sort_order', filters.sort_order);
 
     const url = `${API_BASE_URL}/tickets${params.toString() ? `?${params.toString()}` : ''}`;
-    const res = await fetchWithTimeout(url, { method: 'GET' }, 4000);
+    const headers = getAuthHeaders();
+    const res = await fetchWithTimeout(url, { method: 'GET', headers }, 4000);
 
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
@@ -229,6 +235,51 @@ export async function getTickets(
       'warning'
     );
     return localFallbackTickets;
+  }
+}
+
+/**
+ * Delete Support Ticket (Admin only)
+ * Endpoint: DELETE /api/v1/tickets/{id}
+ */
+export async function deleteTicket(
+  ticketId: string | number,
+  onToast?: ToastNotifier
+): Promise<boolean> {
+  const toastFn = onToast || notifyFallback;
+  const cleanId = String(ticketId).replace(/^#/, '');
+
+  try {
+    const headers = getAuthHeaders();
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/tickets/${encodeURIComponent(cleanId)}`,
+      {
+        method: 'DELETE',
+        headers,
+      },
+      5000
+    );
+
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw new ApiError(res.status, 'Chỉ Quản trị viên (Admin) mới có quyền xóa ticket.');
+      }
+      throw new ApiError(res.status, `Lỗi khi xóa ticket: HTTP ${res.status}`);
+    }
+
+    localFallbackTickets = localFallbackTickets.filter(
+      (t) => t.id !== cleanId && t.ticket_code !== `#${cleanId}`
+    );
+    return true;
+  } catch (err: any) {
+    if (err instanceof ApiError && (err.statusCode === 401 || err.statusCode === 403)) {
+      throw err;
+    }
+    localFallbackTickets = localFallbackTickets.filter(
+      (t) => t.id !== cleanId && t.ticket_code !== `#${cleanId}`
+    );
+    toastFn('Máy chủ ngoại tuyến, đã xóa ticket khỏi danh sách tạm thời.', 'info');
+    return true;
   }
 }
 

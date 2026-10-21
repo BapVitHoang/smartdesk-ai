@@ -44,7 +44,30 @@
 
 ---
 
+### Task C3: OAuth2 Role Switcher, Ticket Sorting/Pagination/Delete & Multi-Agent Verification Trace (`TASK-12`, `TASK-13`, `TASK-08` UI / `REQ-09`, `REQ-17`, `REQ-30`, `REQ-31`, `REQ-34`)
+1. **Authentication & RBAC Navigation (`LoginSwitcher.tsx`, `Header.tsx`, `App.tsx`):**
+   - Upgraded `LoginSwitcher.tsx` with a 1-click toggle button to quickly switch between `admin@smartdesk.ai` (Admin) and `an.nguyen@company.vn` (User).
+   - In `Header.tsx`, locked/hid Tab 3 (*Agent Triage Dashboard*) and Tab 4 (*Quản lý Tri thức*) when role is `user` to visually communicate RBAC permissions.
+   - In `App.tsx`, added role guard: switching to `user` role automatically navigates back to Tab 1 (*Customer AI Chatbot*).
+2. **Ticket Sorting, Pagination & Deletion (`TicketToolbar.tsx`, `TicketDetail.tsx`, `AgentDashboardView.tsx`):**
+   - Enhanced `TicketToolbar.tsx` with sorting dropdown (`created_at` Mới nhất, `priority` Mức ưu tiên, `status` Trạng thái, `sla_hours` Cam kết SLA).
+   - Added client/server-side pagination (`currentPage`, `totalPages`, previous/next controls) in `AgentDashboardView.tsx`.
+   - Added Ticket Delete capability (`DELETE /api/v1/tickets/{id}`) with confirmation prompt and live state updates in `TicketDetail.tsx` and `services/api/tickets.ts`.
+   - Maintained mobile flexbox responsiveness (`h-1/2 md:h-full`) to guarantee full visibility on screens < 768px.
+3. **Multi-Agent Verification Trace (`VerificationTrace.tsx`, `KnowledgeManagerView.tsx`):**
+   - Enhanced `VerificationTrace.tsx` to visualize the 3-agent verification workflow:
+     - **Fact Checker Agent**: checks factual consistency with ground-truth chunks.
+     - **Completeness Auditor Agent**: verifies complete coverage of instructions & caveats.
+     - **Tone & Policy Checker Agent**: verifies professional customer support tone & policy adherence.
+   - Embedded `<VerificationTrace report={activeReport} />` directly into the Active Knowledge Verification report modal of `KnowledgeManagerView.tsx`.
+4. **Verification & Build:**
+   - Passed TypeScript typecheck (`npm run lint` -> `tsc --noEmit`).
+   - Passed production build (`npm run build` -> `vite build`).
+
+---
+
 ## 2. Decision Log
 - Date: 2026-10-20 — Switched mobile split-pane flexbox from `h-full` to `h-1/2 md:h-full` in `AgentDashboardView.tsx` to fix mobile scrolling.
 - Date: 2026-10-21 — Integrated SSE token streaming and Two-Phase Agent Confirmation Card in `ChatView.tsx`.
 - Date: 2026-10-21 — Embedded AI Telemetry & Cost-Guard Cooldown reset panel in `AgentDashboardView.tsx`.
+- Date: 2026-10-21 — Implemented 1-click RBAC switcher, ticket sorting, pagination, delete, and 3-agent verification trace.
