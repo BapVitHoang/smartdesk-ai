@@ -7,8 +7,10 @@ import logging
 
 from app.schemas.ticket import TicketResponse
 from app.models.ticket import Ticket
+from app.models.user import User
 from app.services.ticket_service import ticket_service
 from app.core.exceptions import TicketNotFoundException
+from app.core.deps import require_role
 from app.db.session import get_db
 
 logger = logging.getLogger("smartdesk.api.agent")
@@ -25,9 +27,10 @@ router = APIRouter()
 )
 async def generate_draft_reply(
     ticket_id: str = Path(..., description="Ticket integer ID or formatted code"),
+    admin_user: User = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db)
 ) -> TicketResponse:
-    """Regenerates AI draft reply for a given ticket."""
+    """Regenerates AI draft reply for a given ticket (restricted to admin/agent role)."""
     query = select(Ticket)
     if ticket_id.isdigit():
         query = query.where(Ticket.id == int(ticket_id))

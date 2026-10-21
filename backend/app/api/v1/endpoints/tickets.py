@@ -8,9 +8,11 @@ import logging
 
 from app.schemas.ticket import TicketCreate, TicketUpdate, TicketResponse
 from app.models.ticket import Ticket
+from app.models.user import User
 from app.services.ticket_service import ticket_service
 from app.core.exceptions import TicketNotFoundException
 from app.core.security import sanitize_input, check_prompt_injection
+from app.core.deps import get_current_user, require_role
 from app.db.session import get_db
 
 logger = logging.getLogger("smartdesk.api.tickets")
@@ -55,7 +57,7 @@ async def create_ticket(
     response_model=List[TicketResponse],
     status_code=status.HTTP_200_OK,
     summary="List and Filter Support Tickets",
-    description="Query tickets with optional filtering by status, category, priority, and text search for Agent Dashboard."
+    description="Query tickets with optional filtering by status, category, priority, and text search for Agent Dashboard. Enforces RBAC tenant data isolation."
 )
 async def list_tickets(
     workspace_id: Optional[int] = Query(None, description="Filter by workspace ID"),
@@ -65,10 +67,15 @@ async def list_tickets(
     search: Optional[str] = Query(None, description="Search term in subject, description, customer name, or ticket code"),
     skip: int = Query(0, ge=0, description="Offset for pagination"),
     limit: int = Query(20, ge=1, le=100, description="Limit results"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> List[TicketResponse]:
-    """Retrieve filtered ticket list sorted by newest first."""
+    """Retrieve filtered ticket list. Regular users only see their own tickets."""
     query = select(Ticket)
+
+    # RBAC Data Isolation: Regular users only see tickets created under their email
+    if current_user.role != "admin":
+        query = query.where(Ticket.customer_email == current_user.email)
 
     if workspace_id:
         query = query.where(Ticket.workspace_id == workspace_id)
@@ -102,13 +109,14 @@ async def list_tickets(
     response_model=TicketResponse,
     status_code=status.HTTP_200_OK,
     summary="Get Ticket Details",
-    description="Fetch a ticket by integer ID or formatted code (#TICK-XXXX)."
+    description="Fetch a ticket by integer ID or formatted code (#TICK-XXXX). Enforces RBAC ownership."
 )
 async def get_ticket(
     ticket_id: str = Path(..., description="Ticket integer ID or formatted code"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> TicketResponse:
-    """Retrieve ticket details."""
+    """Retrieve ticket details with customer ownership validation."""
     query = select(Ticket)
     if ticket_id.isdigit():
         query = query.where(Ticket.id == int(ticket_id))
@@ -122,6 +130,13 @@ async def get_ticket(
     if not ticket:
         raise TicketNotFoundException(ticket_id)
 
+    # RBAC Data Isolation: Regular users cannot inspect other customers' tickets
+    if current_user.role != "admin" and ticket.customer_email != current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Quyền truy cập bị từ chối. Bạn chỉ có thể xem phiếu hỗ trợ của chính mình."
+        )
+
     return TicketResponse.model_validate(ticket)
 
 
@@ -130,14 +145,15 @@ async def get_ticket(
     response_model=TicketResponse,
     status_code=status.HTTP_200_OK,
     summary="Update Ticket or Edit AI Draft",
-    description="Update status (in_progress, resolved) or customize the pre-drafted response."
+    description="Update status (in_progress, resolved) or customize the pre-drafted response (restricted to admin)."
 )
 async def update_ticket(
     ticket_id: str = Path(..., description="Ticket integer ID or formatted code"),
     ticket_update: TicketUpdate = ...,
+    admin_user: User = Depends(require_role("admin")),
     db: AsyncSession = Depends(get_db)
 ) -> TicketResponse:
-    """Update ticket properties and draft reply."""
+    """Update ticket properties and draft reply (restricted to admin/agent role)."""
     query = select(Ticket)
     if ticket_id.isdigit():
         query = query.where(Ticket.id == int(ticket_id))
@@ -165,3 +181,33 @@ async def update_ticket(
     await db.refresh(ticket)
 
     return TicketResponse.model_validate(ticket)
+
+
+@router.delete(
+    "/{ticket_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete Support Ticket",
+    description="Deletes a support ticket by integer ID or formatted code (restricted to admin role)."
+)
+async def delete_ticket(
+    ticket_id: str = Path(..., description="Ticket integer ID or formatted code"),
+    admin_user: User = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)
+) -> None:
+    """Deletes a ticket from database (admin only)."""
+    query = select(Ticket)
+    if ticket_id.isdigit():
+        query = query.where(Ticket.id == int(ticket_id))
+    else:
+        formatted_code = ticket_id if ticket_id.startswith("#") else f"#{ticket_id}"
+        query = query.where(or_(Ticket.ticket_code == ticket_id, Ticket.ticket_code == formatted_code))
+
+    result = await db.execute(query)
+    ticket = result.scalars().first()
+
+    if not ticket:
+        raise TicketNotFoundException(ticket_id)
+
+    await db.delete(ticket)
+    await db.commit()
+    return None
