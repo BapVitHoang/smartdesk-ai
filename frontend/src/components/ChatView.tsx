@@ -14,6 +14,7 @@ import {
   Loader2,
   ShieldCheck,
   Building2,
+  CheckCircle2,
 } from 'lucide-react';
 import { 
   ChatMessage, 
@@ -28,7 +29,13 @@ import {
   DemoState
 } from '../types';
 import { getRagResponse } from '../data';
-import { sendChatMessage, getKnowledgeArticle, getWorkspaces } from '../services/api';
+import { 
+  sendChatMessage, 
+  streamChatMessage, 
+  confirmChatAction, 
+  getKnowledgeArticle, 
+  getWorkspaces 
+} from '../services/api';
 
 interface ChatViewProps {
   chatMessages: ChatMessage[];
@@ -54,6 +61,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Modal State for viewing full FAQ / Knowledge Article
@@ -215,6 +223,38 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
   };
 
+  const handleConfirmAction = async (msgId: string, actionId: string, confirmed: boolean) => {
+    setActionLoadingId(actionId);
+    try {
+      const outcome = await confirmChatAction(actionId, confirmed, onToast);
+      setChatMessages((prev) =>
+        prev.map((m) => {
+          if (m.id === msgId && m.pending_action) {
+            const ticketText = outcome.ticket_id ? ` (Mã: #${outcome.ticket_id})` : '';
+            return {
+              ...m,
+              pending_action: {
+                ...m.pending_action,
+                requires_confirmation: false,
+              },
+              text: `${m.text}\n\n**${confirmed ? '✅ Đã xác nhận:' : '❌ Đã hủy thao tác:'}** ${outcome.result_message || outcome.message}${ticketText}`,
+            };
+          }
+          return m;
+        })
+      );
+      if (confirmed) {
+        onToast(outcome.result_message || `Đã thực thi thành công thao tác ${outcome.ticket_id ? `(#${outcome.ticket_id})` : ''}`, 'success');
+      } else {
+        onToast('Đã hủy thao tác theo yêu cầu.', 'info');
+      }
+    } catch (err: any) {
+      onToast(err?.detail || 'Lỗi khi xử lý thao tác xác nhận.', 'error');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || isBotTyping) return;
@@ -227,39 +267,68 @@ export const ChatView: React.FC<ChatViewProps> = ({
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setChatMessages((prev) => [...prev, userMsg]);
+    const botMsgId = `bot-${Date.now()}`;
+    const initialBotReply: ChatMessage = {
+      id: botMsgId,
+      sender: 'bot',
+      text: '',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      feedbackGiven: null,
+    };
+
+    setChatMessages((prev) => [...prev, userMsg, initialBotReply]);
     setChatInput('');
     setIsBotTyping(true);
 
     try {
-      const ragAnswer = await sendChatMessage(userText, undefined, currentWorkspaceId, onToast);
-      const botReply: ChatMessage = {
-        id: `bot-${Date.now()}`,
-        sender: 'bot',
-        text: ragAnswer.response,
-        bulletPoints: ragAnswer.bulletPoints,
-        citations: ragAnswer.citations,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        feedbackGiven: null,
-        latency_ms: ragAnswer.latency_ms,
-        confidence: ragAnswer.confidence,
-        is_fallback: ragAnswer.is_fallback,
-        escalation_recommended: ragAnswer.escalation_recommended,
-      };
-      setChatMessages((prev) => [...prev, botReply]);
+      const ragAnswer = await streamChatMessage(
+        userText,
+        (chunk) => {
+          setChatMessages((prev) =>
+            prev.map((m) => (m.id === botMsgId ? { ...m, text: m.text + chunk } : m))
+          );
+        },
+        undefined,
+        currentWorkspaceId,
+        onToast
+      );
+
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === botMsgId
+            ? {
+                ...m,
+                text: ragAnswer.response || m.text,
+                bulletPoints: ragAnswer.bulletPoints,
+                citations: ragAnswer.citations,
+                latency_ms: ragAnswer.latency_ms,
+                confidence: ragAnswer.confidence,
+                is_fallback: ragAnswer.is_fallback,
+                fallback_reason: ragAnswer.fallback_reason,
+                escalation_recommended: ragAnswer.escalation_recommended,
+                pending_action: ragAnswer.pending_action,
+                tools_called: ragAnswer.tools_called,
+              }
+            : m
+        )
+      );
     } catch (err) {
       const fallbackAns = getRagResponse(userText);
-      const botReply: ChatMessage = {
-        id: `bot-${Date.now()}`,
-        sender: 'bot',
-        text: fallbackAns.text,
-        bulletPoints: fallbackAns.bulletPoints,
-        citations: fallbackAns.citations,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        feedbackGiven: null,
-        is_fallback: true,
-      };
-      setChatMessages((prev) => [...prev, botReply]);
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === botMsgId
+            ? {
+                ...m,
+                text: fallbackAns.text,
+                bulletPoints: fallbackAns.bulletPoints,
+                citations: fallbackAns.citations,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                feedbackGiven: null,
+                is_fallback: true,
+              }
+            : m
+        )
+      );
     } finally {
       setIsBotTyping(false);
     }
@@ -366,7 +435,79 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   </div>
                 )}
 
-                <div className="leading-relaxed font-normal">{msg.text}</div>
+                {msg.tools_called && msg.tools_called.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                    {msg.tools_called.map((tool, tIdx) => (
+                      <span
+                        key={tIdx}
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 text-[11px] font-semibold"
+                      >
+                        <Sparkles className="w-3 h-3 text-violet-500 shrink-0" />
+                        <span>Công cụ AI: {tool}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="leading-relaxed font-normal whitespace-pre-wrap">
+                  {msg.text}
+                  {isBotTyping && idx === chatMessages.length - 1 && msg.sender === 'bot' && (
+                    <span className="inline-block w-1.5 h-4 ml-1 bg-indigo-600 animate-pulse align-middle" />
+                  )}
+                </div>
+
+                {msg.pending_action && msg.pending_action.requires_confirmation && (
+                  <div className="p-3.5 my-2.5 rounded-xl bg-slate-50 border border-indigo-200/90 shadow-2xs space-y-2.5">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700">
+                        <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span>Yêu cầu xác nhận thao tác (Agent Tool Action)</span>
+                      </div>
+                      <span className="text-[10px] bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        {msg.pending_action.action_type === 'create_escalation_ticket' ? 'Tạo phiếu hỗ trợ' : 'Cập nhật phiếu'}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                      {msg.pending_action.summary}
+                    </p>
+
+                    {msg.pending_action.parameters && Object.keys(msg.pending_action.parameters).length > 0 && (
+                      <div className="text-[11px] text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200 space-y-1 font-mono">
+                        {Object.entries(msg.pending_action.parameters).map(([k, v]) => (
+                          <div key={k} className="flex items-start gap-1.5 truncate">
+                            <span className="font-semibold text-slate-500">{k}:</span>
+                            <span className="text-slate-800 truncate">{String(v)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={actionLoadingId === msg.pending_action.action_id}
+                        onClick={() => handleConfirmAction(msg.id!, msg.pending_action!.action_id, true)}
+                        className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {actionLoadingId === msg.pending_action.action_id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
+                        <span>Xác nhận thực thi</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actionLoadingId === msg.pending_action.action_id}
+                        onClick={() => handleConfirmAction(msg.id!, msg.pending_action!.action_id, false)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        Hủy bỏ
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {msg.bulletPoints && msg.bulletPoints.length > 0 && (
                   <ul className="space-y-1.5 my-2 pl-4 list-disc text-slate-700 text-xs sm:text-sm">
@@ -473,7 +614,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           ))}
 
-          {isBotTyping && (
+          {isBotTyping && !chatMessages[chatMessages.length - 1]?.text && (
             <div className="flex gap-3 max-w-md">
               <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
                 AI
