@@ -1,6 +1,6 @@
-"""Chat and RAG Request/Response schemas."""
+"""Chat, RAG, and Agent Tool Confirmation Request/Response schemas."""
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -12,6 +12,17 @@ class CitationBadge(BaseModel):
     source_url: str = Field(..., description="Link or anchor to the referenced knowledge section", examples=["/docs/auth/account-recovery"])
     page: Optional[int] = Field(default=None, description="Page number if applicable", examples=[2])
     snippet: Optional[str] = Field(default=None, description="Referenced text snippet", examples=["Bảo hành 12 tháng..."])
+
+
+class PendingActionSchema(BaseModel):
+    """Two-phase user confirmation payload for mutating agent tool actions (Capability B - REQ-14)."""
+
+    action_id: str = Field(..., description="Unique server-side pending action identifier", examples=["act-9812"])
+    action_type: str = Field(..., description="Name of the mutating tool to execute", examples=["create_escalation_ticket"])
+    summary: str = Field(..., description="Human-readable Vietnamese summary of the action")
+    parameters: Dict[str, Any] = Field(default_factory=dict, description="Structured tool parameters awaiting confirmation")
+    requires_confirmation: bool = Field(default=True, description="Always True for mutating actions")
+    expires_at: Optional[str] = Field(default=None, description="ISO timestamp when the pending action expires")
 
 
 class ChatRequest(BaseModel):
@@ -37,7 +48,7 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    """Standardized response for customer-facing AI assistant."""
+    """Standardized response for customer-facing AI assistant with RAG citations and Agent Tools."""
 
     response: str = Field(..., description="Grounded AI or fallback answer generated for the user")
     citations: List[CitationBadge] = Field(
@@ -57,4 +68,12 @@ class ChatResponse(BaseModel):
     escalation_recommended: Optional[bool] = Field(
         default=False,
         description="True if confidence was low or circuit breaker tripped, recommending ticket creation"
+    )
+    tools_called: List[str] = Field(
+        default_factory=list,
+        description="List of agent tool names invoked during request processing"
+    )
+    pending_action: Optional[PendingActionSchema] = Field(
+        default=None,
+        description="Pending mutating tool action requiring explicit user confirmation before execution"
     )
