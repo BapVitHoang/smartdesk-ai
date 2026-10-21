@@ -1,9 +1,9 @@
 """Ticket management endpoints (CRUD, triage filtering, and agent customization)."""
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, Path, status, HTTPException
+from fastapi import APIRouter, Depends, Query, Path, Response, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, desc
+from sqlalchemy import select, or_, desc, asc, func
 import logging
 
 from app.schemas.ticket import TicketCreate, TicketUpdate, TicketResponse
@@ -57,47 +57,73 @@ async def create_ticket(
     response_model=List[TicketResponse],
     status_code=status.HTTP_200_OK,
     summary="List and Filter Support Tickets",
-    description="Query tickets with optional filtering by status, category, priority, and text search for Agent Dashboard. Enforces RBAC tenant data isolation."
+    description="Query tickets with optional filtering, server-side sorting, pagination, and total count header. Enforces RBAC tenant data isolation."
 )
 async def list_tickets(
+    response: Response,
     workspace_id: Optional[int] = Query(None, description="Filter by workspace ID"),
     status: Optional[str] = Query(None, description="Filter by status (e.g. open, in_progress, resolved)"),
     category: Optional[str] = Query(None, description="Filter by category"),
     priority: Optional[str] = Query(None, description="Filter by priority (Low, Medium, High, Urgent)"),
     search: Optional[str] = Query(None, description="Search term in subject, description, customer name, or ticket code"),
+    sort_by: str = Query("created_at", description="Sort field: created_at | priority | status | sla_hours"),
+    sort_order: str = Query("desc", description="Sort direction: asc | desc"),
     skip: int = Query(0, ge=0, description="Offset for pagination"),
     limit: int = Query(20, ge=1, le=100, description="Limit results"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> List[TicketResponse]:
-    """Retrieve filtered ticket list. Regular users only see their own tickets."""
+    """Retrieve filtered and sorted ticket list with X-Total-Count header."""
     query = select(Ticket)
+    count_query = select(func.count(Ticket.id))
 
     # RBAC Data Isolation: Regular users only see tickets created under their email
     if current_user.role != "admin":
         query = query.where(Ticket.customer_email == current_user.email)
+        count_query = count_query.where(Ticket.customer_email == current_user.email)
 
     if workspace_id:
         query = query.where(Ticket.workspace_id == workspace_id)
+        count_query = count_query.where(Ticket.workspace_id == workspace_id)
     if status:
         query = query.where(Ticket.status == status.lower())
+        count_query = count_query.where(Ticket.status == status.lower())
     if category:
         query = query.where(Ticket.category == category)
+        count_query = count_query.where(Ticket.category == category)
     if priority:
         query = query.where(Ticket.priority == priority)
+        count_query = count_query.where(Ticket.priority == priority)
     if search:
         search_pattern = f"%{search}%"
-        query = query.where(
-            or_(
-                Ticket.ticket_code.ilike(search_pattern),
-                Ticket.subject.ilike(search_pattern),
-                Ticket.description.ilike(search_pattern),
-                Ticket.customer_name.ilike(search_pattern),
-                Ticket.customer_email.ilike(search_pattern)
-            )
+        search_filter = or_(
+            Ticket.ticket_code.ilike(search_pattern),
+            Ticket.subject.ilike(search_pattern),
+            Ticket.description.ilike(search_pattern),
+            Ticket.customer_name.ilike(search_pattern),
+            Ticket.customer_email.ilike(search_pattern)
         )
+        query = query.where(search_filter)
+        count_query = count_query.where(search_filter)
 
-    query = query.order_by(desc(Ticket.created_at)).offset(skip).limit(limit)
+    # 1. Total matching count for pagination header (REQ-30)
+    total_count = (await db.execute(count_query)).scalar() or 0
+    response.headers["X-Total-Count"] = str(total_count)
+
+    # 2. Server-side sorting
+    sort_col = Ticket.created_at
+    if sort_by == "priority":
+        sort_col = Ticket.priority
+    elif sort_by == "status":
+        sort_col = Ticket.status
+    elif sort_by in {"sla_hours", "sla_due_date"}:
+        sort_col = Ticket.estimated_response_hours
+    elif sort_by == "created_at":
+        sort_col = Ticket.created_at
+
+    order_fn = asc if sort_order.lower() == "asc" else desc
+    query = query.order_by(order_fn(sort_col)).offset(skip).limit(limit)
+
     result = await db.execute(query)
     tickets = result.scalars().all()
 

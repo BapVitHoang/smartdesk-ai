@@ -23,8 +23,21 @@
 4. **Automated Test Coverage:**
    - Extended `backend/tests/test_auth_module.py` with 6 dedicated test cases covering login, token resolution, 401 unauthorized handling, and RBAC data isolation. All 49 test cases pass (100%).
 
+### Task B2: Server-Side Sorting, Pagination Count Header, Delete API & Copilot Integration (`TASK-13` / `REQ-15`, `REQ-30`, `REQ-31`)
+1. **Single-Call Copilot Integration (`backend/app/services/ticket_service.py`):**
+   - Connected `ticket_copilot_service.generate_ticket_triage_and_draft()` in `create_ticket()` and `generate_draft_reply()` to obtain structured classification, tag extraction, and localized Vietnamese draft replies.
+2. **Server-Side Sorting & Pagination Header (`backend/app/api/v1/endpoints/tickets.py`):**
+   - Added `sort_by` (`created_at`, `priority`, `status`, `sla_hours`) and `sort_order` (`asc`, `desc`) query parameters to `GET /api/v1/tickets`.
+   - Added count calculation matching current user and filter criteria, returning total records via `X-Total-Count` response header.
+3. **Delete Endpoints (`tickets.py` & `workspaces.py`):**
+   - `DELETE /api/v1/tickets/{ticket_id}`: Admin-only deletion returning `HTTP 204 No Content`.
+   - `DELETE /api/v1/workspaces/{id}`: Admin-only deletion returning `HTTP 204 No Content`. Explicitly guards default workspace (ID=1) with `HTTP 400 Bad Request`.
+4. **Automated Test Coverage:**
+   - Extended `backend/tests/test_tickets_module.py` with 3 test cases for sorting, `X-Total-Count` header, workspace deletion rules, and copilot triage integration. All 52 tests pass (100%).
+
 ---
 
 ## 2. Decision Log
 - Date: 2026-10-20 — Configured dual-dialect `Vector(768).with_variant(JSON(), "sqlite")` in `models/knowledge.py` to ensure local tests pass without PostgreSQL.
 - Date: 2026-10-21 — Implemented HS256 JWT token generation and role-based data isolation on ticket endpoints (`admin` vs `user`), ensuring customers cannot access cross-tenant or other users' support tickets.
+- Date: 2026-10-21 — Added `X-Total-Count` header and server-side sorting to `GET /api/v1/tickets`, hooked up `ticket_copilot_service` into ticket creation, and guarded workspace deletion (`id=1` blocked).

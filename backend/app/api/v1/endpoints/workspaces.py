@@ -8,7 +8,9 @@ from sqlalchemy import select
 
 from app.db.session import get_db
 from app.models.workspace import Workspace
+from app.models.user import User
 from app.core.security import check_prompt_injection
+from app.core.deps import require_role
 from app.schemas.workspace import (
     WorkspaceCreate,
     WorkspaceUpdate,
@@ -117,3 +119,36 @@ async def update_workspace(
     await db.refresh(ws)
     logger.info(f"Updated workspace ID={ws.id}")
     return WorkspaceResponse.model_validate(ws)
+
+
+@router.delete(
+    "/{id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete workspace",
+    description="Deletes a workspace by ID (restricted to admin). Default workspace ID 1 cannot be deleted."
+)
+async def delete_workspace(
+    id: int,
+    admin_user: User = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db)
+) -> None:
+    """Deletes a workspace by ID. Blocks deletion of default workspace (ID=1)."""
+    if id == 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể xóa Workspace mặc định (ID 1)."
+        )
+
+    result = await db.execute(select(Workspace).where(Workspace.id == id))
+    ws = result.scalar_one_or_none()
+    if not ws:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy Workspace với ID {id}."
+        )
+
+    await db.delete(ws)
+    await db.commit()
+    logger.info(f"Deleted workspace ID={id} slug={ws.slug}")
+    return None
+

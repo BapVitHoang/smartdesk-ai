@@ -8,9 +8,7 @@ from sqlalchemy import select
 
 from app.models.ticket import Ticket
 from app.schemas.ticket import TicketCreate
-from app.services.llm_service import llm_service
-from app.services.fallback_service import fallback_service
-from app.core.prompts import prompt_registry
+from app.services.ticket_copilot_service import ticket_copilot_service
 
 logger = logging.getLogger("smartdesk.ticket_service")
 
@@ -67,68 +65,28 @@ class TicketService:
         db: Optional[AsyncSession] = None
     ) -> str:
         """
-        Generates a professional, empathetic draft resolution using LLM or structured template fallback
-        aligned with workspace persona and business rules.
+        Generates a professional, empathetic draft resolution using TicketCopilotService single-call
+        structured output aligned with workspace persona and business rules.
         """
-        from app.models.workspace import Workspace
-
-        ws_name = "SmartDesk Cloud Support"
-        persona_name = "SmartDesk Support Specialist"
-        tone_of_voice = "Chuyên nghiệp, ngắn gọn, thân thiện và chính xác về mặt kỹ thuật."
-        business_rules = ""
-
-        if db and workspace_id:
-            try:
-                ws_res = await db.execute(select(Workspace).where(Workspace.id == workspace_id))
-                ws = ws_res.scalar_one_or_none()
-                if ws:
-                    ws_name = ws.name
-                    persona_name = ws.persona_name
-                    tone_of_voice = ws.tone_of_voice
-                    business_rules = ws.business_rules
-            except Exception as e:
-                logger.warning(f"Failed to query workspace {workspace_id} for draft: {e}")
-
-        # Search relevant FAQ for grounding the draft within the tenant's workspace
-        matched = fallback_service.match_faq(
-            f"{subject} {description}",
-            workspace_id=workspace_id,
-            workspace_name=ws_name
-        )
-        faq_context = matched.get("response", "") if matched.get("confidence", 0) >= 0.50 else ""
-
-        draft_prompt = (
-            f"You are {persona_name} representing '{ws_name}'.\n"
-            f"Tone of voice: {tone_of_voice}.\n"
-            f"Business Rules:\n{business_rules}\n\n"
-            f"Draft a polite, professional, and empathetic email reply to the customer.\n\n"
-            f"Customer Details:\n"
-            f"- Name: {customer_name}\n"
-            f"- Issue Category: {category}\n"
-            f"- Priority: {priority}\n"
-            f"- Subject: {subject}\n"
-            f"- Description: {description}\n\n"
-            f"Knowledge Base Reference:\n{faq_context}\n\n"
-            f"Writing Guidelines:\n"
-            f"1. Greet the customer warmly by their full name.\n"
-            f"2. Acknowledge and summarize their specific concern with empathy.\n"
-            f"3. Provide clear step-by-step resolution instructions or explain the next investigative steps.\n"
-            f"4. State that their ticket is actively being handled by {ws_name}.\n"
-            f"5. Conclude with a warm closing from '{persona_name}' / '{ws_name}'."
-        )
-
         try:
-            draft_text, _ = await llm_service.generate_response(
-                prompt=draft_prompt,
-                temperature=0.3
+            copilot_output = await ticket_copilot_service.generate_ticket_triage_and_draft(
+                subject=subject,
+                description=description,
+                workspace_id=workspace_id or 1,
+                session=db,
+                customer_name=customer_name,
+                category_hint=category,
+                priority_hint=priority,
             )
-            if draft_text and len(draft_text.strip()) > 30:
-                return draft_text.strip()
-        except Exception as e:
-            logger.info(f"LLM draft generation unavailable ({e}). Synthesizing structured template draft.")
+            if copilot_output and copilot_output.ai_draft_reply and len(copilot_output.ai_draft_reply.strip()) > 30:
+                return copilot_output.ai_draft_reply.strip()
+        except Exception as exc:
+            logger.warning(f"TicketCopilot draft generation encountered error: {exc}")
 
         # Deterministic template fallback in Vietnamese (AGENTS.md & PLAN.md)
         sla_hours = self.calculate_sla_hours(priority)
+        ws_name = "SmartDesk Cloud Support"
+        persona_name = "SmartDesk Support Specialist"
         return (
             f"Kính gửi {customer_name},\n\n"
             f"Cảm ơn quý khách đã liên hệ với {ws_name}. Chúng tôi đã tiếp nhận yêu cầu liên quan đến \"{subject}\" "
@@ -144,7 +102,8 @@ class TicketService:
 
     async def create_ticket(self, db: AsyncSession, ticket_in: TicketCreate) -> Ticket:
         """
-        Creates a new ticket, assigns #TICK-XXXX code, auto-tags, and pre-populates AI draft.
+        Creates a new ticket, assigns #TICK-XXXX code, auto-tags, and pre-populates AI draft
+        using single-call ticket copilot structured output (REQ-15).
         """
         # Determine next sequence number by finding max existing code to avoid collision with seed data
         result = await db.execute(select(Ticket.ticket_code))
@@ -168,24 +127,49 @@ class TicketService:
         # Calculate SLA response hours
         sla_hours = self.calculate_sla_hours(ticket_in.priority.value)
 
-        # Generate AI tags
-        ai_tags = self.extract_ai_tags(
-            category=ticket_in.category,
-            priority=ticket_in.priority.value,
-            subject=ticket_in.subject,
-            description=ticket_in.description
-        )
-
-        # Generate pre-populated AI draft reply
-        ai_draft = await self.generate_draft_reply(
-            customer_name=ticket_in.customer_name,
-            category=ticket_in.category,
-            priority=ticket_in.priority.value,
-            subject=ticket_in.subject,
-            description=ticket_in.description,
-            workspace_id=ws_id,
-            db=db
-        )
+        # 1. Single-call copilot structured triage and localized draft generation
+        try:
+            copilot_output = await ticket_copilot_service.generate_ticket_triage_and_draft(
+                subject=ticket_in.subject,
+                description=ticket_in.description,
+                workspace_id=ws_id,
+                session=db,
+                customer_name=ticket_in.customer_name,
+                category_hint=ticket_in.category,
+                priority_hint=ticket_in.priority.value,
+            )
+            ai_tags = copilot_output.ai_tags if copilot_output and copilot_output.ai_tags else self.extract_ai_tags(
+                category=ticket_in.category,
+                priority=ticket_in.priority.value,
+                subject=ticket_in.subject,
+                description=ticket_in.description
+            )
+            ai_draft = copilot_output.ai_draft_reply if copilot_output and copilot_output.ai_draft_reply else await self.generate_draft_reply(
+                customer_name=ticket_in.customer_name,
+                category=ticket_in.category,
+                priority=ticket_in.priority.value,
+                subject=ticket_in.subject,
+                description=ticket_in.description,
+                workspace_id=ws_id,
+                db=db
+            )
+        except Exception as e:
+            logger.warning(f"Error in ticket copilot triage, falling back to rule-based tags and draft: {e}")
+            ai_tags = self.extract_ai_tags(
+                category=ticket_in.category,
+                priority=ticket_in.priority.value,
+                subject=ticket_in.subject,
+                description=ticket_in.description
+            )
+            ai_draft = await self.generate_draft_reply(
+                customer_name=ticket_in.customer_name,
+                category=ticket_in.category,
+                priority=ticket_in.priority.value,
+                subject=ticket_in.subject,
+                description=ticket_in.description,
+                workspace_id=ws_id,
+                db=db
+            )
 
         db_ticket = Ticket(
             workspace_id=ticket_in.workspace_id or 1,
