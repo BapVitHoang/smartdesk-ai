@@ -103,6 +103,9 @@ async def init_db() -> None:
     # 1. Synchronize schema, falling back to SQLite if PostgreSQL fails
     try:
         async with engine.begin() as conn:
+            if "postgresql" in engine.url.drivername:
+                from sqlalchemy import text
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             await conn.run_sync(Base.metadata.create_all)
             if "sqlite" in engine.url.drivername:
                 await conn.run_sync(_migrate_sqlite_columns)

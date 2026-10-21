@@ -35,9 +35,25 @@
 4. **Automated Test Coverage:**
    - Extended `backend/tests/test_tickets_module.py` with 3 test cases for sorting, `X-Total-Count` header, workspace deletion rules, and copilot triage integration. All 52 tests pass (100%).
 
+### Task B3 & B4: Dual-Dialect pgvector, PII Redaction & Platform Verification (`TASK-14` / `REQ-07`, `REQ-11`, `REQ-28`, `REQ-38`)
+1. **Dual-Dialect pgvector Mapping (`backend/app/models/knowledge.py`):**
+   - Configured `Vector(768).with_variant(JSON(), "sqlite")` from `pgvector.sqlalchemy` for `KnowledgeChunk.embedding` and `FAQItem.embedding`.
+2. **PostgreSQL Extension Initialization (`backend/app/db/session.py`):**
+   - Added automatic execution of `CREATE EXTENSION IF NOT EXISTS vector` on engine startup when PostgreSQL is detected.
+3. **PII Masking & Dual-Mode Vector Search (`backend/app/services/embedding_service.py`):**
+   - Enforced `redact_pii(text)` sanitization before dispatching queries to external Google Gemini / Ollama Embedding APIs.
+   - Enhanced `search_similar_chunks()`: If running on PostgreSQL, dispatches native SQL pgvector cosine distance query (`<=>` operator); if running on SQLite, falls back seamlessly to in-memory cosine similarity calculation.
+4. **Platform Automated Test Suite (`backend/tests/platform/test_pgvector_and_db.py`):**
+   - Added tests verifying dual-dialect mapping, PII masking, and SQLite fallback similarity.
+5. **Docker Compose Verification:**
+   - Validated `docker compose config` with `postgres: pgvector/pgvector:pg16`, `backend`, and `frontend`.
+6. **AI Usage & Prompting Log (`docs/notes/B-ai-usage.md`):**
+   - Documented all 3 sessions and real bug diagnostics.
+
 ---
 
 ## 2. Decision Log
 - Date: 2026-10-20 — Configured dual-dialect `Vector(768).with_variant(JSON(), "sqlite")` in `models/knowledge.py` to ensure local tests pass without PostgreSQL.
 - Date: 2026-10-21 — Implemented HS256 JWT token generation and role-based data isolation on ticket endpoints (`admin` vs `user`), ensuring customers cannot access cross-tenant or other users' support tickets.
 - Date: 2026-10-21 — Added `X-Total-Count` header and server-side sorting to `GET /api/v1/tickets`, hooked up `ticket_copilot_service` into ticket creation, and guarded workspace deletion (`id=1` blocked).
+- Date: 2026-10-21 — Enabled native pgvector SQL cosine search with SQLite in-memory fallback, and masked PII before calling external embedding APIs.

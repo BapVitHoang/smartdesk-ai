@@ -8,10 +8,11 @@ import random
 import time
 from typing import Any, Dict, List, Optional
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.security import redact_pii
 from app.models.knowledge import KnowledgeChunk
 from app.models.document import Document
 
@@ -97,21 +98,25 @@ class EmbeddingService:
     async def get_text_embedding(self, text: str) -> List[float]:
         """
         Calculates vector embedding with Cost-Guard circuit breaker (Gemini) or local Ollama.
+        Masks PII information before dispatching to external APIs (REQ-11).
         Falls back automatically to pseudo-embeddings on failure.
         """
+        # Redact PII before dispatching to external LLM embedding APIs
+        safe_text = redact_pii(text)
+
         if self.provider == "ollama":
-            return await self._call_ollama_embedding(text)
+            return await self._call_ollama_embedding(safe_text)
 
         if self.is_rate_limited():
             logger.debug("[Cost-Guard] Embedding rate-limit cooldown active. Using pseudo-embedding.")
-            return self.generate_pseudo_embedding(text)
+            return self.generate_pseudo_embedding(safe_text)
 
         if not self._client or not self.api_key or self.api_key == "YOUR_GEMINI_API_KEY_HERE":
-            return self.generate_pseudo_embedding(text)
+            return self.generate_pseudo_embedding(safe_text)
 
         try:
             return await asyncio.wait_for(
-                self._call_gemini_embedding(text),
+                self._call_gemini_embedding(safe_text),
                 timeout=min(2.0, settings.LLM_TIMEOUT_SECONDS)
             )
         except Exception as exc:
@@ -230,14 +235,61 @@ class EmbeddingService:
         only_published: bool = True
     ) -> List[Dict[str, Any]]:
         """
-        Performs dual-mode cosine similarity search over published knowledge chunks.
+        Performs dual-mode cosine similarity search over published knowledge chunks:
+        1. PostgreSQL: Uses native pgvector <=> operator in SQL.
+        2. SQLite / Local: Uses Python cosine similarity with fallback pseudo-embeddings.
         """
         if not session:
             return []
 
         query_vector = await self.get_text_embedding(query)
 
-        # Query chunks for this workspace
+        # Detect dialect to determine if PostgreSQL pgvector can be used
+        is_postgres = False
+        try:
+            bind = session.get_bind()
+            if bind and "postgresql" in bind.dialect.name:
+                is_postgres = True
+        except Exception:
+            pass
+
+        # 1. Native PostgreSQL pgvector search
+        if is_postgres:
+            try:
+                stmt = (
+                    select(
+                        KnowledgeChunk,
+                        (1 - KnowledgeChunk.embedding.cosine_distance(query_vector)).label("score"),
+                        Document.status.label("doc_status")
+                    )
+                    .outerjoin(Document, KnowledgeChunk.document_id == Document.id)
+                    .where(KnowledgeChunk.workspace_id == workspace_id)
+                )
+                if only_published:
+                    stmt = stmt.where(or_(KnowledgeChunk.document_id.is_(None), Document.status == "published"))
+
+                stmt = stmt.order_by(KnowledgeChunk.embedding.cosine_distance(query_vector)).limit(top_k)
+                result = await session.execute(stmt)
+                rows = result.all()
+                scored_chunks: List[Dict[str, Any]] = []
+                for chunk, score, doc_status in rows:
+                    scored_chunks.append({
+                        "id": chunk.id,
+                        "chunk_id": chunk.chunk_id,
+                        "document_id": chunk.document_id,
+                        "workspace_id": chunk.workspace_id,
+                        "page_number": chunk.page_number,
+                        "chunk_index": chunk.chunk_index,
+                        "title": chunk.title,
+                        "content": chunk.content,
+                        "source_url": chunk.source_url,
+                        "score": round(float(score) if score is not None else 0.0, 4)
+                    })
+                return scored_chunks
+            except Exception as pg_err:
+                logger.warning(f"PostgreSQL pgvector native search failed ({pg_err}). Falling back to memory cosine.")
+
+        # 2. SQLite / In-memory Fallback Search
         stmt = (
             select(KnowledgeChunk, Document.status.label("doc_status"))
             .outerjoin(Document, KnowledgeChunk.document_id == Document.id)
@@ -246,7 +298,7 @@ class EmbeddingService:
         result = await session.execute(stmt)
         rows = result.all()
 
-        scored_chunks: List[Dict[str, Any]] = []
+        scored_chunks = []
         for chunk, doc_status in rows:
             # If only_published is True, filter out pending/unverified document chunks
             if only_published and chunk.document_id is not None:
