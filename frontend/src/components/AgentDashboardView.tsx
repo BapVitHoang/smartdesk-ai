@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Inbox, Activity } from 'lucide-react';
 import { Ticket, UIState, TicketStatus, ToastType } from '../types';
 import { getTickets, updateTicketStatus, regenerateAiDraft } from '../services/api';
 import { TicketToolbar, TicketList, TicketDetail } from '../features/agent';
+import { TelemetryPanel } from '../features/telemetry';
 
 interface AgentDashboardViewProps {
   tickets: Ticket[];
@@ -26,6 +28,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
   onToast,
   currentWorkspaceId,
 }) => {
+  const [dashboardView, setDashboardView] = useState<'tickets' | 'telemetry'>('tickets');
   const [filterType, setFilterType] = useState<'all' | 'open' | 'urgent'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -142,54 +145,103 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
   };
 
   return (
-    <div id="screen-agent-dashboard" className="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
-      {/* CỘT TRÁI: DANH SÁCH TICKET HOẶC TRẠNG THÁI SKELETON / EMPTY / ERROR */}
-      <div className="w-full md:w-5/12 lg:w-4/12 border-r border-slate-200 bg-white flex flex-col h-1/2 md:h-full overflow-hidden shrink-0">
-        <TicketToolbar
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-          filterType={filterType}
-          setFilterType={setFilterType}
-          ticketCount={filteredTickets.length}
-          demoState={demoState}
-          isRefreshing={isRefreshing}
-          onRefresh={handleRefreshTickets}
-        />
+    <div id="screen-agent-dashboard" className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
+      {/* Thanh điều hướng chế độ xem: Hàng đợi Ticket vs Giám sát AI Telemetry */}
+      <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setDashboardView('tickets')}
+            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+              dashboardView === 'tickets'
+                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
+            }`}
+          >
+            <Inbox className="w-3.5 h-3.5" />
+            <span>Hàng đợi Ticket</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                dashboardView === 'tickets' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {filteredTickets.length}
+            </span>
+          </button>
 
-        <TicketList
-          tickets={filteredTickets}
-          selectedTicket={selectedTicket}
-          onSelectTicket={setSelectedTicket}
-          demoState={demoState}
-          onRetry={async () => {
-            setDemoState('success');
-            await handleRefreshTickets();
-          }}
-        />
+          <button
+            onClick={() => setDashboardView('telemetry')}
+            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+              dashboardView === 'telemetry'
+                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Giám sát AI &amp; Chi phí (Telemetry)</span>
+            <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold">
+              Cost-Guard
+            </span>
+          </button>
+        </div>
       </div>
 
-      {/* CỘT PHẢI: CHI TIẾT TICKET & AI SUGGESTED DRAFT REPLY */}
-      <div className="flex-1 bg-slate-50/50 flex flex-col h-full overflow-y-auto custom-scrollbar p-4 sm:p-6">
-        <TicketDetail
-          selectedTicket={selectedTicket}
-          demoState={demoState}
-          agentReplyText={agentReplyText}
-          setAgentReplyText={setAgentReplyText}
-          isRegeneratingDraft={isRegeneratingDraft}
-          agentSending={agentSending}
-          onRegenerateDraft={handleRegenerateDraft}
-          onStatusChange={handleStatusChange}
-          onSendReply={handleSendAgentReply}
-          onResetOriginalDraft={() => {
-            if (selectedTicket) {
-              setAgentReplyText(selectedTicket.draftReply);
-              onToast('Đã khôi phục câu trả lời mẫu từ AI');
-            }
-          }}
-        />
-      </div>
+      {dashboardView === 'telemetry' ? (
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 bg-slate-50/50">
+          <div className="max-w-6xl mx-auto">
+            <TelemetryPanel onToast={onToast} />
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
+          {/* CỘT TRÁI: DANH SÁCH TICKET HOẶC TRẠNG THÁI SKELETON / EMPTY / ERROR */}
+          <div className="w-full md:w-5/12 lg:w-4/12 border-r border-slate-200 bg-white flex flex-col h-1/2 md:h-full overflow-hidden shrink-0">
+            <TicketToolbar
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
+              filterType={filterType}
+              setFilterType={setFilterType}
+              ticketCount={filteredTickets.length}
+              demoState={demoState}
+              isRefreshing={isRefreshing}
+              onRefresh={handleRefreshTickets}
+            />
+
+            <TicketList
+              tickets={filteredTickets}
+              selectedTicket={selectedTicket}
+              onSelectTicket={setSelectedTicket}
+              demoState={demoState}
+              onRetry={async () => {
+                setDemoState('success');
+                await handleRefreshTickets();
+              }}
+            />
+          </div>
+
+          {/* CỘT PHẢI: CHI TIẾT TICKET & AI SUGGESTED DRAFT REPLY */}
+          <div className="flex-1 bg-slate-50/50 flex flex-col h-full overflow-y-auto custom-scrollbar p-4 sm:p-6">
+            <TicketDetail
+              selectedTicket={selectedTicket}
+              demoState={demoState}
+              agentReplyText={agentReplyText}
+              setAgentReplyText={setAgentReplyText}
+              isRegeneratingDraft={isRegeneratingDraft}
+              agentSending={agentSending}
+              onRegenerateDraft={handleRegenerateDraft}
+              onStatusChange={handleStatusChange}
+              onSendReply={handleSendAgentReply}
+              onResetOriginalDraft={() => {
+                if (selectedTicket) {
+                  setAgentReplyText(selectedTicket.draftReply);
+                  onToast('Đã khôi phục câu trả lời mẫu từ AI');
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
