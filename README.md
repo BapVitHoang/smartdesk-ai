@@ -151,5 +151,25 @@ SmartDesk AI được phát triển bởi **nhóm 3 thành viên** (Dev B kiêm 
 | Họ và Tên | MSSV | GitHub | Vai trò chính | Phân công Module & Quyền sở hữu (REQ-29) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Dương Bắp Vịt Hoàng** (Repo Owner) | `23110020` | [`@BapVitHoang`](https://github.com/BapVitHoang) | **Dev B & Integrator** | Platform, Database, OAuth2/JWT, Ticket CRUD, Docker Compose, Frozen Governance & Release |
-| **[A_FULL_NAME]** | `[A_MSSV]` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | AI Engine, RAG Pipeline, Single-call Structured Output, Tool-using Agent, 24-case Eval Benchmark |
-| **[C_FULL_NAME]** | `[C_MSSV]` | `@[C_USERNAME]` | **Dev C** | Frontend UX, Streaming Bubble, Confirmation UI, Telemetry View, Integration Tests & Capstone Docs |
+| **Nguyễn Nhật Huy** | `23110029` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | AI Engine, RAG Pipeline, Single-call Structured Output, Tool-using Agent, 24-case Eval Benchmark |
+| **Trần Quốc Khánh** | `23110034` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend UX, Streaming Bubble, Confirmation UI, Telemetry View, Integration Tests & Capstone Docs |
+
+---
+
+## 7. Tài khoản Kiểm thử (Test Accounts)
+
+Hệ thống tích hợp sẵn cơ chế đăng nhập một chạm (1-click Demo Switcher) trên thanh điều hướng Header:
+
+| Email | Vai trò (Role) | Quyền hạn truy cập | Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `admin@smartdesk.ai` | `admin` | **Toàn quyền:** Chat RAG, Form ticket, Bảng điều khiển Agent Copilot, Quản lý Tri thức & Báo cáo Telemetry. | Đăng nhập 1-click qua nút "Demo Admin" |
+| `an.nguyen@company.vn` | `user` | **Giới hạn Khách hàng:** Hỏi đáp Chatbot, Gửi ticket, xem ticket cá nhân (Khóa/ẩn 2 tab quản trị Agent & Tri thức). | Đăng nhập 1-click qua nút "Demo User" |
+
+---
+
+## 8. Chính sách Quyền riêng tư Dữ liệu AI (Data Privacy & PII Masking Policy)
+
+- **Mặt nạ dữ liệu cá nhân (`redact_pii`):** Toàn bộ địa chỉ email, số điện thoại Việt Nam và số Căn cước công dân/CMND trong tin nhắn của người dùng đều được tự động ẩn danh hóa thành `[REDACTED_EMAIL]`, `[REDACTED_PHONE]`, `[REDACTED_ID]` trước khi truyền tải đến Google Gemini API hoặc các mô hình nhúng (Embedding).
+- **Hàng rào an toàn Prompt Injection (`check_prompt_injection`):** Mọi truy vấn độc hại bằng tiếng Anh hoặc tiếng Việt tìm cách thay đổi chỉ thị hệ thống bị chặn ngay tại tầng API Gateway với mã HTTP 400 (`PROMPT_SECURITY_VIOLATION`), không tốn token và không đưa dữ liệu nguy hại vào bộ nhớ đệm.
+- **Không lưu trữ bí mật:** Token JWT HS256 có thời hạn và khóa phiên làm việc nghiêm ngặt, dữ liệu khách hàng được cô lập theo `customer_email`.
+

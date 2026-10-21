@@ -123,8 +123,8 @@ flowchart TD
 | **US-08** (Document Ingestion) | `POST /api/v1/workspaces/{id}/documents/upload` | `KnowledgeManagerView.tsx`, `api.ts::uploadDocument` | `test_workspace_and_verification.py::test_document_upload_and_chunking` | **Implemented & Verified** |
 | **US-09** (Active AI Verification) | `POST /api/v1/documents/{id}/verify`, `/publish` | `KnowledgeManagerView.tsx` (Verification Studio Modal) | `test_workspace_and_verification.py::test_document_verification_pipeline` | **Implemented & Verified** |
 | **US-10** (Dual Provider & 429 Guard) | `llm_service.py`, `embedding_service.py` | `Header.tsx`, `api.ts` (Free Tier Cooldown Toast) | `test_ollama_provider.py` (6 tests), `test_cost_guard_circuit_breaker_on_429` | **Implemented & Verified** |
-| **US-11** (Auth, OAuth2 & RBAC) | `/api/v1/auth/*` (Extension point in `api.py`) | `frontend/src/features/` | `test_auth_module.py` (`TODO: Phase B TASK-B01..B03`) | **Planned (`PLAN.md`)** |
-| **US-12** (SSE, Tools & Telemetry) | `/api/v1/chat/stream`, `agent_tools.py`, `/admin/metrics` | `frontend/src/features/`, `ChatView.tsx` | `test_rag_module.py` (`TODO: Phase B/C TASK-B04..C04`) | **Planned (`PLAN.md`)** |
+| **US-11** (Auth, OAuth2 & RBAC) | `POST /api/v1/auth/demo-login`, `GET /auth/me` | `LoginSwitcher.tsx`, `Header.tsx`, `App.tsx` | `test_auth_module.py` (10 tests passed) | **Implemented & Verified** |
+| **US-12** (SSE, Tools & Telemetry) | `POST /api/v1/chat/stream`, `POST /chat/confirm-action`, `GET /agent/ai-usage` | `ChatView.tsx`, `TelemetryPanel.tsx` | `test_rag_module.py`, `run_eval.py` (24 cases) | **Implemented & Verified** |
 
 ---
 
@@ -143,5 +143,5 @@ SmartDesk AI is developed by a **team of exactly 3 members** (Dev B simultaneous
 | Member Name | Student ID (MSSV) | GitHub Account | Primary Role | Assigned Module Domain & File Ownership (REQ-29) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Dương Bắp Vịt Hoàng** (Repo Owner) | `23110020` | [`@BapVitHoang`](https://github.com/BapVitHoang) | **Dev B & Integrator** | Platform, Database, OAuth2/JWT, Ticket CRUD, Docker Compose, Frozen Governance & Release |
-| **[A_FULL_NAME]** | `[A_MSSV]` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | AI Engine, RAG Pipeline, Single-call Structured Output, Tool-using Agent, 24-case Eval Benchmark |
-| **[C_FULL_NAME]** | `[C_MSSV]` | `@[C_USERNAME]` | **Dev C** | Frontend UX, Streaming Bubble, Confirmation UI, Telemetry View, Integration Tests & Capstone Docs |
+| **Nguyễn Nhật Huy** | `23110029` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | AI Engine, RAG Pipeline, Single-call Structured Output, Tool-using Agent, 24-case Eval Benchmark |
+| **Trần Quốc Khánh** | `23110034` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend UX, Streaming Bubble, Confirmation UI, Telemetry View, Integration Tests & Capstone Docs |

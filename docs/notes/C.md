@@ -66,8 +66,33 @@
 
 ---
 
+### Task C4: Capstone Final Documentation, Presentation & Playbook (`TASK-16`, `TASK-17` / `REQ-24..29`, `REQ-37`, `REQ-39..42`)
+1. **Comprehensive Project Report (`docs/REPORT.md`):**
+   - Authored formal 7-chapter project report (~15 pages) aligned with course specifications:
+     - Chương 1: Giới thiệu bài toán, đối tượng người dùng & phạm vi hệ thống.
+     - Chương 2: 12 User Stories (`US-01..US-12`) & Bảng Requirement Traceability Matrix đầy đủ.
+     - Chương 3: Kiến trúc hệ thống (Sơ đồ Mermaid thực tế) & 4 Architecture Decision Records (`ADR-001..004`).
+     - Chương 4: Thiết kế AI chuyên sâu (Dual Provider Gemini 3.5 Flash Lite & Ollama Qwen2.5, Quản lý Prompt `prompts.json`, 4 Agent Tools có xác nhận, Pydantic Structured Output, 3-Agent Verification Studio).
+     - Chương 5: Bảo mật, Hàng rào chắn (Guardrails EN/VI), Quyền riêng tư (PII Redaction `redact_pii`) & Cơ chế dự phòng BM25 Circuit Breaker.
+     - Chương 6: Kết quả thực nghiệm bộ 24 Test Cases (Baseline 33.3% -> Upgraded 100.0%), phân tích chi phí Token & độ trễ.
+     - Chương 7: Hạn chế hiện tại & Hướng phát triển.
+2. **Slide Outline, 8-min Demo Script & Live Change Playbook (`docs/PRESENTATION_AND_DEMO.md`):**
+   - 15 Slides structured outline for project defense.
+   - 8-minute minute-by-minute live demo script (RAG grounded answers, 2-phase confirmation card, live Vietnamese prompt injection blocking, agent copilot triage, active verification studio, telemetry cooldown reset).
+   - 10-minute Live Change Playbook with 4 concrete instructor modification scenarios (`prompts.json` rule addition, `config.py` chunk size update, `TicketCopilotStructuredOutput` schema extension, `agent_tools.py` new tool creation).
+3. **Repository Readme & Proposal Updates (`README.md`, `docs/PROPOSAL.md`):**
+   - Added Test Accounts table (`admin@smartdesk.ai` and `an.nguyen@company.vn`).
+   - Added Data Privacy & PII Masking Policy section in `README.md`.
+   - Updated team member roster with Full Names, Student IDs (MSSV), and GitHub accounts in `docs/PROPOSAL.md`.
+4. **Verification:**
+   - 55/55 backend pytest test cases passed.
+   - Frontend `npm run lint` and `npm run build` passed cleanly.
+
+---
+
 ## 2. Decision Log
 - Date: 2026-10-20 — Switched mobile split-pane flexbox from `h-full` to `h-1/2 md:h-full` in `AgentDashboardView.tsx` to fix mobile scrolling.
 - Date: 2026-10-21 — Integrated SSE token streaming and Two-Phase Agent Confirmation Card in `ChatView.tsx`.
 - Date: 2026-10-21 — Embedded AI Telemetry & Cost-Guard Cooldown reset panel in `AgentDashboardView.tsx`.
 - Date: 2026-10-21 — Implemented 1-click RBAC switcher, ticket sorting, pagination, delete, and 3-agent verification trace.
+- Date: 2026-10-21 — Created comprehensive Capstone documentation suite (`REPORT.md`, `PRESENTATION_AND_DEMO.md`, `C-ai-usage.md`).
