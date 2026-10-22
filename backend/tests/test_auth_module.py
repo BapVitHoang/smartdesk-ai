@@ -125,7 +125,7 @@ async def test_oauth2_password_grant_token(unauth_client: AsyncClient) -> None:
     """Verify POST /api/v1/auth/token supports OAuth2 Password Grant for test accounts."""
     res = await unauth_client.post(
         "/api/v1/auth/token",
-        json={"username": "an.nguyen@company.vn", "password": "anypassword"}
+        json={"username": "an.nguyen@company.vn", "password": settings.DEMO_USER_PASSWORD}
     )
     assert res.status_code == 200
     data = res.json()

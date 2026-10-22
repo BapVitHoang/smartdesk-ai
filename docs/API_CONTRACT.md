@@ -442,11 +442,22 @@ Safely delete a document with cascade cleanup of all associated chunks, verifica
 ### `POST /api/v1/auth/oauth2/login`
 Authenticate via Google OAuth2 ID Token or 1-click Demo accounts (`admin@smartdesk.ai` or `an.nguyen@company.vn`).
 
+#### Security & Verification Rules:
+- **`provider: "google"`**: Requires valid Google ID token credential in `credential`. The backend cryptographically verifies token signature with Google public keys (`google-auth`), checks audience against `GOOGLE_OAUTH_CLIENT_ID`, checks issuer (`accounts.google.com`), checks expiry, and ensures `email_verified=true`. If `GOOGLE_OAUTH_CLIENT_ID` is not configured, returns `HTTP 501 Not Implemented`. Newly created Google users are assigned `role: "user"`; elevated to `"admin"` only if their email is listed in `ADMIN_EMAILS`.
+- **`provider: "demo"`**: Available only when `DEMO_LOGIN_ENABLED=true` (default in dev, strictly false in shared/production deployments). Restricted to seeded accounts (`admin@smartdesk.ai`, `an.nguyen@company.vn`). Returns `HTTP 403 Forbidden` if demo login is disabled or if an unauthorized email is supplied. Never mints new accounts.
+
 #### Request Body
 ```json
 {
   "provider": "demo",
   "email": "admin@smartdesk.ai"
+}
+```
+or with Google Credential:
+```json
+{
+  "provider": "google",
+  "credential": "<Google_ID_Token_JWT>"
 }
 ```
 
@@ -455,27 +466,28 @@ Authenticate via Google OAuth2 ID Token or 1-click Demo accounts (`admin@smartde
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "bearer",
-  "expires_in": 86400,
-  "user": {
-    "id": 1,
-    "email": "admin@smartdesk.ai",
-    "full_name": "Quản trị viên SmartDesk",
-    "role": "admin",
-    "is_active": true
-  }
+  "role": "admin",
+  "email": "admin@smartdesk.ai",
+  "full_name": "Quản trị viên SmartDesk"
 }
 ```
 
 ---
 
 ### `POST /api/v1/auth/token`
-Standard OAuth2 password grant endpoint for automated API clients.
+Standard OAuth2 password grant endpoint for automated API clients and customer credentials.
+
+#### Security & Verification Rules:
+- Verifies password against stored salted scrypt hash using constant-time comparison (`hmac.compare_digest`).
+- Constant-time dummy verification runs even for unknown emails to eliminate user enumeration via timing attacks.
+- Returns identical generic `HTTP 401 Unauthorized` (`"Tài khoản hoặc mật khẩu không chính xác."`) for wrong password, unknown user, or inactive account (`is_active=False`).
+- Sliding-window in-memory throttle enforces rate limiting: returns `HTTP 429 Too Many Requests` after repeated failed attempts.
 
 #### Request Body (`application/x-www-form-urlencoded` or JSON)
 ```json
 {
   "username": "an.nguyen@company.vn",
-  "password": "demopassword"
+  "password": "User@SmartDesk2026"
 }
 ```
 

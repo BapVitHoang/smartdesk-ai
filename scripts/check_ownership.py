@@ -12,7 +12,7 @@ import subprocess
 import argparse
 import fnmatch
 from pathlib import Path
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Optional
 
 # Import authoritative map
 repo_root = Path(__file__).resolve().parent.parent
@@ -33,12 +33,19 @@ def get_current_branch() -> str:
         return "unknown"
 
 
-def get_modified_files(staged: bool = False, base_branch: str = "origin/Hoang") -> List[str]:
+def get_modified_files(staged: bool = False, base_branch: Optional[str] = None) -> List[str]:
     try:
         if staged:
             out = run_git(["diff", "--cached", "--name-only"])
-        else:
+        elif base_branch:
             out = run_git(["diff", "--name-only", base_branch])
+        else:
+            out = run_git(["diff", "--name-only", "HEAD"])
+            if not out:
+                try:
+                    out = run_git(["diff", "--name-only", "origin/Hoang"])
+                except Exception:
+                    out = run_git(["diff", "--name-only", "HEAD~1"])
         if not out:
             return []
         return [f.strip().replace("\\", "/") for f in out.splitlines() if f.strip()]
@@ -144,6 +151,7 @@ def verify_consistency() -> bool:
 def main():
     parser = argparse.ArgumentParser(description="Check module ownership boundaries.")
     parser.add_argument("--branch", type=str, default=None, help="Explicit branch name to test.")
+    parser.add_argument("--base", type=str, default=None, help="Base branch or commit to diff against.")
     parser.add_argument("--staged", action="store_true", help="Check currently staged files.")
     parser.add_argument("--owner", type=str, choices=["owner1", "owner2", "owner3", "devA", "devB", "devC", "lead", "integrator"], default=None)
     parser.add_argument("--as-integrator", action="store_true", help="Allow devB (Hoang) to modify integrator-owned frozen files.")
@@ -190,7 +198,7 @@ def main():
     print(f"Branch: {branch}")
     print(f"Role: {owner.upper()}{' (with Integrator hat)' if args.as_integrator else ''}")
 
-    files = get_modified_files(staged=args.staged)
+    files = get_modified_files(staged=args.staged, base_branch=args.base)
     if not files:
         print("[OK] No modified files detected. Clean working tree.")
         sys.exit(0)

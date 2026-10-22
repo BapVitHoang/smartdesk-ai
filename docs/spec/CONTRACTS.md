@@ -14,18 +14,20 @@
 
 ```python
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_bearer)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+    db: AsyncSession = Depends(get_db)
 ) -> User:
     """
-    Extracts Bearer JWT, validates HS256 signature, and resolves active User record.
-    DEFAULT BEHAVIOR: Returns HTTP 401 Unauthorized if no valid Bearer token is provided.
+    Extracts Bearer JWT, validates HS256 signature, validates `exp` and `sub` claims,
+    and resolves the active User entity from the database.
     
-    DEVELOPMENT BYPASS: Allowed ONLY when settings.DEV_AUTH_BYPASS is True (default False;
-    must NEVER be enabled in docker-compose.yml or production demo).
-    
-    NOTE: The current stub fallback returning admin is temporary for early scaffolding
-    and must be removed by Dev B during TASK-12. Tests use dependency_overrides fixtures
-    in conftest.py to stay green.
+    STRICT SECURITY CONTRACT:
+    - Returns HTTP 401 Unauthorized if no valid Bearer token is provided.
+    - Rejects expired tokens, tokens with invalid signatures, and tokens with wrong algorithms.
+    - Role is always queried from the persisted User record in the database, never trusted from JWT claims alone.
+    - Inactive accounts (is_active=False) are rejected with HTTP 401.
+    - Zero unauthenticated fallback: No DEV_AUTH_BYPASS or dummy admin returns exist in production code.
+    - Tests use explicit dependency_overrides in conftest.py or real signed JWTs.
     """
 
 def require_role(required_role: str) -> Callable:

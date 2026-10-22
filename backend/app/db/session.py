@@ -97,8 +97,22 @@ async def init_db() -> None:
                     sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN chunk_index INTEGER DEFAULT 0")
                 if "page_number" not in kc_cols:
                     sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN page_number INTEGER DEFAULT 1")
+
+            user_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()]
+            if user_cols:
+                if "password_hash" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)")
+                if "is_active" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1")
         except Exception as mig_err:
             logger.warning(f"SQLite auto-migration notice: {mig_err}")
+
+    def _migrate_postgres_columns(sync_conn):
+        try:
+            sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
+            sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE")
+        except Exception as mig_err:
+            logger.warning(f"PostgreSQL auto-migration notice: {mig_err}")
 
     # 1. Synchronize schema, falling back to SQLite if PostgreSQL fails
     try:
@@ -109,6 +123,8 @@ async def init_db() -> None:
             await conn.run_sync(Base.metadata.create_all)
             if "sqlite" in engine.url.drivername:
                 await conn.run_sync(_migrate_sqlite_columns)
+            elif "postgresql" in engine.url.drivername:
+                await conn.run_sync(_migrate_postgres_columns)
         logger.info(f"Database schema synchronized successfully on {engine.url.drivername}.")
     except Exception as e:
         logger.warning(

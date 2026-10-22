@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.security import validate_auth_configuration
 from app.core.exceptions import (
     SmartDeskException,
     smartdesk_exception_handler,
@@ -29,6 +30,7 @@ logger = logging.getLogger("smartdesk.main")
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager to handle startup and shutdown events."""
     logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}...")
+    validate_auth_configuration()
     # Initialize database tables and seed knowledge
     await init_db()
     logger.info("Application startup sequence completed.")

@@ -53,8 +53,30 @@ Every piece of AI-assisted code or configuration was subjected to a 4-gate verif
   1. Implemented a stateful **Cost-Guard Circuit Breaker** (`cooldown_until = time.time() + 60.0`) in `llm_service.py` and `embedding_service.py` that immediately stops external API calls for 60 seconds upon any HTTP 429 and switches to deterministic 768-dim SHA-256 unit pseudo-vectors and local BM25 fallback.
   2. Parallelized `run_rag_self_test` with `asyncio.gather()` and added `AI_PROVIDER=ollama` (`qwen2.5:3b` + `nomic-embed-text`) for unlimited local execution.
 
+### Case Study 4: AI-Generated Authentication Accepted Any Password & Decoded Google Credential Without Signature Verification
+- **What the AI Assistant Generated:** Initial AI-assisted code in `backend/app/api/v1/endpoints/auth.py` decoded incoming Google OAuth2 ID tokens via unverified claims extraction `jwt.decode(payload.credential, options={"verify_signature": False})`. In addition, in `login_for_access_token` (`/api/v1/auth/token`), the implementation accepted any submitted password string without comparing it against `user.password_hash`.
+- **Why It Failed (Evidence):**
+  1. Any user could forge an arbitrary JWT claiming to be `admin@smartdesk.ai` and gain immediate full administrative access because the signature was never verified against Google's public keys.
+  2. In the password login route, supplying a valid username/email with `password: "anypassword"` or `password: "wrong"` immediately issued a signed HS256 access token without evaluating password credentials, completely defeating access control.
+- **How We Diagnosed & Fixed It (Commit `eef0af8` by Dev B):**
+  1. Implemented `verify_google_credential(credential)` in `backend/app/core/security.py` using Google's public JWKS certificates (`accounts.google.com`) to strictly verify signature, audience (`GOOGLE_OAUTH_CLIENT_ID`), issuer, expiry, and email verification flags.
+  2. Added salted scrypt password hashing and `verify_password_async(plain_password, password_hash)` with constant-time dummy verification for unknown emails to prevent timing-based user enumeration.
+  3. Added an in-memory login rate limiter (`login_throttle`) locking accounts/IPs after 10 failed attempts with HTTP 429 (`Retry-After: 60`).
+  4. Added dedicated automated security test suite `backend/tests/platform/test_auth_security.py` (8 test cases) covering wrong passwords, token forgery, and rate-limiting.
+
+### Case Study 5: Gemini Live Generation Call Returned HTTP 400 Due to Unsupported Parameters in GenerateContentConfig
+- **What the AI Assistant Generated:** AI configured `GenerateContentConfig` in `backend/app/services/llm_service.py` with parameters like `thinking_budget` and `automatic_function_calling` across all model invocations without inspecting parameter compatibility with `gemini-3.5-flash-lite`.
+- **Why It Failed (Evidence):** When making live API calls to Google Gemini via the `google-genai` SDK, the server returned `400 Bad Request` (`INVALID_ARGUMENT: unsupported parameter`), causing live generation and SSE streaming to fail and immediately trip the fallback mechanism.
+- **How We Diagnosed & Fixed It (Commit `192fecc` & `afbb08d` by Dev A):**
+  1. Refactored `_execute_api_call` and `stream_chat` in `llm_service.py` to construct `GenerateContentConfig` kwargs conditionally (`cfg_kwargs`), isolating `thinking_config = types.ThinkingConfig(thinking_budget=0)` and disabling automatic function calling only on supported configurations.
+  2. Added exception handling and fallback model routing (`gemini-2.5-flash-lite`) when live calls fail.
+  3. Verified live streaming and structured generation with automated test suite in `backend/tests/ai/test_dev_a_suite.py`.
+
 ---
 
-## 4. Planned AI Engineering Extensions (`TODO` for Phase B–D Execution)
-- [ ] `TODO (Phase B - TASK-B04)`: Log AI Usage Diary entries for SSE Token Streaming (`/api/v1/chat/stream`) and Agent Tool Calling (`agent_tools.py`).
-- [ ] `TODO (Phase C - TASK-C02)`: Attach before-vs-after benchmark table from `backend/scripts/run_eval.py` (24-case evaluation dataset across Default, SmileCare, and TechStore workspaces).
+## 4. Benchmark & Evaluation Summary (Verified in Phase C)
+- Attached 24-case evaluation benchmark from `backend/scripts/run_eval.py`:
+  - Normal cases (10): **10/10 Passed (100%)**
+  - Edge cases (6): **6/6 Passed (100%)**
+  - Should-Refuse cases (8): **8/8 Passed (100%)**
+  - Overall Benchmark: **24/24 Passed (100.0%)** (improved from baseline 33.3%).

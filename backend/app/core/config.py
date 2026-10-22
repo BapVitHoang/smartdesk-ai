@@ -10,6 +10,8 @@ from pathlib import Path
 BACKEND_DIR: Path = Path(__file__).resolve().parent.parent.parent
 PROJECT_ROOT: Path = BACKEND_DIR.parent
 DEFAULT_SQLITE_PATH: str = (BACKEND_DIR / "smartdesk.db").as_posix()
+# Placeholder JWT secret. Startup refuses to run with it unless DEMO_LOGIN_ENABLED is true (local demo only).
+DEFAULT_JWT_SECRET_KEY: str = "smartdesk-secret-key-change-in-production-2026"
 
 
 class Settings(BaseSettings):
@@ -52,12 +54,20 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 100
 
     # Authentication & RBAC (Hybrid OAuth2 + Demo Login)
-    JWT_SECRET_KEY: str = "smartdesk-secret-key-change-in-production-2026"
+    JWT_SECRET_KEY: str = DEFAULT_JWT_SECRET_KEY
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     GOOGLE_OAUTH_CLIENT_ID: str = ""
+    # Comma-separated (or JSON list) of emails allowed to hold the admin role when signing in via Google.
+    ADMIN_EMAILS: Union[List[str], str] = []
+    # One-click demo login for the seeded demo accounts only (LOCAL DEMO ONLY; disable in production).
     DEMO_LOGIN_ENABLED: bool = True
-    DEV_AUTH_BYPASS: bool = False
+    # Demo-only default passwords for the seeded accounts. Override via environment for any shared deployment.
+    DEMO_ADMIN_PASSWORD: str = "Admin@SmartDesk2026"
+    DEMO_USER_PASSWORD: str = "User@SmartDesk2026"
+    # In-memory login throttle (failed attempts per key within the window).
+    LOGIN_MAX_FAILED_ATTEMPTS: int = 10
+    LOGIN_THROTTLE_WINDOW_SECONDS: int = 60
 
     # Database Configuration (PostgreSQL 16 with pgvector or SQLite async fallback)
     DATABASE_URL: str = f"sqlite+aiosqlite:///{DEFAULT_SQLITE_PATH}"
@@ -116,6 +126,26 @@ class Settings(BaseSettings):
         elif isinstance(v, list):
             return v
         return ["*"]
+
+    @field_validator("ADMIN_EMAILS", mode="before")
+    @classmethod
+    def assemble_admin_emails(cls, v: Union[str, List[str]]) -> List[str]:
+        """Parse ADMIN_EMAILS from a comma-separated string or JSON list into normalized lowercase emails."""
+        items: List[str]
+        if isinstance(v, str):
+            v_stripped = v.strip()
+            if v_stripped.startswith("[") and v_stripped.endswith("]"):
+                try:
+                    items = [str(i) for i in json.loads(v_stripped)]
+                except Exception:
+                    items = []
+            else:
+                items = v_stripped.split(",")
+        elif isinstance(v, list):
+            items = [str(i) for i in v]
+        else:
+            items = []
+        return [i.strip().lower() for i in items if i and i.strip()]
 
     @property
     def resolved_seed_faq_path(self) -> Path:

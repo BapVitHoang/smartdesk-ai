@@ -1,7 +1,19 @@
-"""Security utilities: input sanitization, prompt injection defense, and PII masking."""
+"""Security utilities: input sanitization, prompt injection defense, PII masking, and authentication primitives."""
 
+import asyncio
+import base64
+import hashlib
+import hmac
+import logging
+import os
 import re
-from typing import Tuple
+import time
+from collections import defaultdict, deque
+from typing import Any, Deque, Dict, Optional, Tuple
+
+from app.core.config import DEFAULT_JWT_SECRET_KEY, settings
+
+logger = logging.getLogger("smartdesk.security")
 
 # Common prompt injection signatures and malicious jailbreak patterns (English and Vietnamese)
 PROMPT_INJECTION_PATTERNS = [
@@ -99,3 +111,179 @@ def redact_pii(text: str) -> str:
     )
 
     return redacted
+
+
+# ---------------------------------------------------------------------------
+# Authentication primitives (REQ-06, REQ-09, REQ-36)
+# ---------------------------------------------------------------------------
+
+# scrypt parameters (OWASP-recommended minimum: N=2^15 for interactive; 2^14 keeps demo logins fast).
+_SCRYPT_N: int = 2**14
+_SCRYPT_R: int = 8
+_SCRYPT_P: int = 1
+_SCRYPT_DKLEN: int = 32
+_SCRYPT_MAXMEM: int = 64 * 1024 * 1024
+
+
+def hash_password(password: str) -> str:
+    """Hashes a password with a random 16-byte salt using hashlib.scrypt. Format: scrypt$N$r$p$salt$hash."""
+    salt = os.urandom(16)
+    digest = hashlib.scrypt(
+        password.encode("utf-8"),
+        salt=salt,
+        n=_SCRYPT_N,
+        r=_SCRYPT_R,
+        p=_SCRYPT_P,
+        dklen=_SCRYPT_DKLEN,
+        maxmem=_SCRYPT_MAXMEM,
+    )
+    return "scrypt${}${}${}${}${}".format(
+        _SCRYPT_N,
+        _SCRYPT_R,
+        _SCRYPT_P,
+        base64.b64encode(salt).decode("ascii"),
+        base64.b64encode(digest).decode("ascii"),
+    )
+
+
+def verify_password(password: str, stored_hash: Optional[str]) -> bool:
+    """Constant-time password verification against a stored scrypt hash. Returns False for malformed hashes."""
+    if not stored_hash:
+        return False
+    try:
+        scheme, n_s, r_s, p_s, salt_b64, hash_b64 = stored_hash.split("$")
+        if scheme != "scrypt":
+            return False
+        salt = base64.b64decode(salt_b64)
+        expected = base64.b64decode(hash_b64)
+        candidate = hashlib.scrypt(
+            password.encode("utf-8"),
+            salt=salt,
+            n=int(n_s),
+            r=int(r_s),
+            p=int(p_s),
+            dklen=len(expected),
+            maxmem=_SCRYPT_MAXMEM,
+        )
+    except (ValueError, TypeError):
+        return False
+    return hmac.compare_digest(candidate, expected)
+
+
+# Verified against when the account does not exist, so response time does not reveal valid emails.
+_DUMMY_PASSWORD_HASH: str = hash_password(base64.b64encode(os.urandom(12)).decode("ascii"))
+
+
+async def verify_password_async(password: str, stored_hash: Optional[str]) -> bool:
+    """Runs scrypt verification in a worker thread. A dummy hash is checked when no hash exists (timing parity)."""
+    return await asyncio.to_thread(verify_password, password, stored_hash or _DUMMY_PASSWORD_HASH) and bool(stored_hash)
+
+
+class LoginThrottle:
+    """Simple in-memory sliding-window throttle for failed login attempts (per email and per client IP)."""
+
+    def __init__(self) -> None:
+        self._failures: Dict[str, Deque[float]] = defaultdict(deque)
+
+    def _prune(self, key: str, now: float) -> Deque[float]:
+        window = float(settings.LOGIN_THROTTLE_WINDOW_SECONDS)
+        bucket = self._failures[key]
+        while bucket and now - bucket[0] > window:
+            bucket.popleft()
+        if not bucket:
+            self._failures.pop(key, None)
+            return deque()
+        return bucket
+
+    def is_blocked(self, *keys: str) -> bool:
+        """Returns True if any key has reached the maximum number of failed attempts within the window."""
+        now = time.monotonic()
+        limit = settings.LOGIN_MAX_FAILED_ATTEMPTS
+        return any(len(self._prune(k, now)) >= limit for k in keys if k)
+
+    def record_failure(self, *keys: str) -> None:
+        """Records one failed attempt for every non-empty key."""
+        now = time.monotonic()
+        for k in keys:
+            if k:
+                self._prune(k, now)
+                self._failures[k].append(now)
+
+    def reset(self, *keys: str) -> None:
+        """Clears failures for the given keys (called after a successful login)."""
+        for k in keys:
+            self._failures.pop(k, None)
+
+    def clear_all(self) -> None:
+        """Clears every recorded failure (used by tests)."""
+        self._failures.clear()
+
+
+login_throttle = LoginThrottle()
+
+
+class GoogleAuthError(Exception):
+    """Raised when a Google ID token cannot be verified. `status_code` maps to the HTTP response."""
+
+    def __init__(self, message: str, status_code: int = 401) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+_GOOGLE_ISSUERS = ("accounts.google.com", "https://accounts.google.com")
+
+
+def _verify_google_token_sync(credential: str, client_id: str) -> Dict[str, Any]:
+    """Blocking verification: signature (Google certs), audience, issuer and expiry via google-auth."""
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
+
+    return google_id_token.verify_oauth2_token(credential, google_requests.Request(), audience=client_id)
+
+
+async def verify_google_credential(credential: str) -> Dict[str, Any]:
+    """
+    Verifies a Google ID token and returns its claims.
+    Raises GoogleAuthError(501) when GOOGLE_OAUTH_CLIENT_ID is not configured (never accepts unverified tokens),
+    and GoogleAuthError(401) for any invalid token (garbled, unsigned, wrong audience, expired, unverified email).
+    """
+    client_id = settings.GOOGLE_OAUTH_CLIENT_ID.strip()
+    if not client_id:
+        raise GoogleAuthError("Google sign-in is not configured on this server.", status_code=501)
+    if not credential or len(credential) > 4096:
+        raise GoogleAuthError("Invalid Google credential.")
+
+    try:
+        claims = await asyncio.to_thread(_verify_google_token_sync, credential, client_id)
+    except Exception as exc:  # google-auth raises ValueError / GoogleAuthError / transport errors
+        logger.warning("Google ID token rejected: %s", type(exc).__name__)
+        raise GoogleAuthError("Invalid Google credential.") from exc
+
+    if claims.get("iss") not in _GOOGLE_ISSUERS:
+        raise GoogleAuthError("Invalid Google credential.")
+    if claims.get("aud") != client_id:
+        raise GoogleAuthError("Invalid Google credential.")
+    if claims.get("email_verified") is not True:
+        raise GoogleAuthError("Google account email is not verified.")
+    if not claims.get("email"):
+        raise GoogleAuthError("Invalid Google credential.")
+    return claims
+
+
+def validate_auth_configuration() -> None:
+    """
+    Startup guard: refuse to run with the placeholder JWT secret unless DEMO_LOGIN_ENABLED is true
+    (local demo only). Raises RuntimeError so the application never serves tokens signed with a public secret.
+    """
+    if settings.JWT_SECRET_KEY == DEFAULT_JWT_SECRET_KEY and not settings.DEMO_LOGIN_ENABLED:
+        raise RuntimeError(
+            "JWT_SECRET_KEY is still the default placeholder while DEMO_LOGIN_ENABLED is false. "
+            "Set a strong JWT_SECRET_KEY (>= 32 random characters) before starting the server."
+        )
+    if settings.JWT_SECRET_KEY == DEFAULT_JWT_SECRET_KEY:
+        logger.error(
+            "SECURITY WARNING: using the default JWT_SECRET_KEY. Acceptable for local demo only; "
+            "set JWT_SECRET_KEY and DEMO_LOGIN_ENABLED=false for any shared deployment."
+        )
+    if len(settings.JWT_SECRET_KEY) < 32:
+        logger.error("SECURITY WARNING: JWT_SECRET_KEY is shorter than 32 characters.")

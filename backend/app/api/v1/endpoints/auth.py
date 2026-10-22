@@ -1,8 +1,8 @@
-"""Authentication & RBAC endpoints (Hybrid Google OAuth2 & Demo Login - REQ-09, REQ-36)."""
+"""Authentication & RBAC endpoints (Google OAuth2 ID token, demo login, password grant - REQ-06, REQ-09, REQ-36)."""
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional, Tuple
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,11 +10,17 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.deps import get_current_user
+from app.core.security import (
+    GoogleAuthError,
+    login_throttle,
+    verify_google_credential,
+    verify_password_async,
+)
+from app.db.seed.seed_users import DEMO_ACCOUNT_EMAILS
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
     OAuth2LoginRequest,
-    OAuth2PasswordRequest,
     TokenResponse,
     UserProfileResponse,
 )
@@ -23,9 +29,13 @@ logger = logging.getLogger("smartdesk.api.auth")
 
 router = APIRouter()
 
+# One generic message for wrong password, unknown email and inactive account (no account enumeration).
+INVALID_CREDENTIALS_MESSAGE = "Tài khoản hoặc mật khẩu không chính xác."
+THROTTLED_MESSAGE = "Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau ít phút."
+
 
 def create_access_token(user: User) -> str:
-    """Creates a real HS256 signed JWT access token for the given user."""
+    """Creates a signed JWT access token (algorithm from settings) that always carries an `exp` claim."""
     now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     token_payload = {
@@ -40,68 +50,10 @@ def create_access_token(user: User) -> str:
     return jwt.encode(token_payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-@router.post(
-    "/oauth2/login",
-    response_model=TokenResponse,
-    status_code=status.HTTP_200_OK,
-    summary="OAuth2 & Demo Login",
-    description="Authenticates via Google OAuth2 ID Token or seeded Demo Accounts, issuing an HS256 JWT access token."
-)
-async def oauth2_login(
-    payload: OAuth2LoginRequest,
-    db: AsyncSession = Depends(get_db)
-) -> TokenResponse:
-    """Authenticates user via Google OAuth2 or demo login and issues a signed HS256 JWT token."""
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    provider: str = payload.provider or "google"
-
-    # 1. Parse Google OAuth2 ID Token credential if provided
-    if payload.credential:
-        try:
-            # Unverified claim extraction for dev/demo or external verification
-            claims = jwt.decode(payload.credential, options={"verify_signature": False})
-            email = claims.get("email")
-            full_name = claims.get("name")
-            provider = "google"
-        except Exception as exc:
-            logger.warning(f"Failed to parse OAuth credential: {exc}")
-
-    # 2. Fallback to direct email payload
-    if not email:
-        email = payload.email
-
-    if not email:
-        # Default to admin demo account
-        email = "admin@smartdesk.ai"
-
-    email_clean = str(email).strip().lower()
-
-    # 3. Look up user in seeded database
-    result = await db.execute(select(User).where(User.email == email_clean))
-    user = result.scalars().first()
-
-    # 4. If user not in DB, dynamically create according to demo/seeded rules
-    if not user:
-        role = "admin" if "admin" in email_clean else "user"
-        if not full_name:
-            full_name = "Quản trị viên SmartDesk" if role == "admin" else "Nguyễn Văn An"
-        user = User(
-            email=email_clean,
-            full_name=full_name,
-            role=role,
-            oauth_provider=provider,
-            workspace_id=1,
-        )
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-
-    # 5. Generate signed HS256 JWT access token
-    access_token = create_access_token(user)
-
+def _token_response(user: User) -> TokenResponse:
+    """Builds the standard token response for an authenticated user."""
     return TokenResponse(
-        access_token=access_token,
+        access_token=create_access_token(user),
         token_type="bearer",
         role=user.role,
         email=user.email,
@@ -109,16 +61,155 @@ async def oauth2_login(
     )
 
 
+def _invalid_credentials() -> HTTPException:
+    """Uniform HTTP 401 used for every failed password login."""
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=INVALID_CREDENTIALS_MESSAGE,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def _throttled() -> HTTPException:
+    """HTTP 429 returned when too many failed attempts were recorded for the email or client IP."""
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail=THROTTLED_MESSAGE,
+        headers={"Retry-After": str(settings.LOGIN_THROTTLE_WINDOW_SECONDS)},
+    )
+
+
+def _throttle_keys(request: Request, email: str) -> Tuple[str, str]:
+    """Returns the (email, client IP) throttle keys for a login attempt."""
+    client_ip = request.client.host if request.client else "unknown"
+    return f"email:{email}", f"ip:{client_ip}"
+
+
+@router.post(
+    "/oauth2/login",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="OAuth2 (Google) & Demo Login",
+    description=(
+        "provider='google': verifies the Google ID token signature, audience, issuer, expiry and email_verified "
+        "(501 if GOOGLE_OAUTH_CLIENT_ID is not configured). "
+        "provider='demo': one-click login for the seeded demo accounts only; 403 unless DEMO_LOGIN_ENABLED is true. "
+        "Issues an HS256 JWT access token."
+    ),
+)
+async def oauth2_login(
+    payload: OAuth2LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Authenticates via a verified Google ID token or the seeded demo accounts and issues a signed JWT."""
+    provider = (payload.provider or "google").strip().lower()
+
+    if provider == "demo":
+        return await _demo_login(payload, db)
+    if provider == "google":
+        return await _google_login(payload, request, db)
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Nhà cung cấp đăng nhập không được hỗ trợ.",
+    )
+
+
+async def _demo_login(payload: OAuth2LoginRequest, db: AsyncSession) -> TokenResponse:
+    """One-click demo login. Never creates users; only works for seeded demo accounts when enabled."""
+    if not settings.DEMO_LOGIN_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Đăng nhập demo đã bị tắt trên máy chủ này.",
+        )
+
+    email = str(payload.email).strip().lower() if payload.email else ""
+    forbidden = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Đăng nhập demo chỉ khả dụng cho các tài khoản demo có sẵn.",
+    )
+    if email not in DEMO_ACCOUNT_EMAILS:
+        raise forbidden
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalars().first()
+    if user is None or not user.is_active or user.oauth_provider != "demo":
+        raise forbidden
+    return _token_response(user)
+
+
+async def _google_login(payload: OAuth2LoginRequest, request: Request, db: AsyncSession) -> TokenResponse:
+    """Verified Google sign-in. New users get role 'user'; admin only via the ADMIN_EMAILS allowlist."""
+    if not payload.credential:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Thiếu Google credential (ID token).",
+        )
+
+    _, ip_key = _throttle_keys(request, "")
+    if login_throttle.is_blocked(ip_key):
+        raise _throttled()
+
+    try:
+        claims: Dict[str, Any] = await verify_google_credential(payload.credential)
+    except GoogleAuthError as exc:
+        if exc.status_code != status.HTTP_501_NOT_IMPLEMENTED:
+            login_throttle.record_failure(ip_key)
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=(
+                "Đăng nhập Google chưa được cấu hình trên máy chủ."
+                if exc.status_code == status.HTTP_501_NOT_IMPLEMENTED
+                else "Google credential không hợp lệ."
+            ),
+        )
+
+    email = str(claims["email"]).strip().lower()
+    is_allowlisted_admin = email in settings.ADMIN_EMAILS
+
+    result = await db.execute(select(User).where(User.email == email))
+    user: Optional[User] = result.scalars().first()
+
+    if user is None:
+        full_name = str(claims.get("name") or email.split("@")[0])[:150]
+        user = User(
+            email=email,
+            full_name=full_name,
+            role="admin" if is_allowlisted_admin else "user",
+            oauth_provider="google",
+            workspace_id=1,
+            is_active=True,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    else:
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Google credential không hợp lệ.",
+            )
+        if is_allowlisted_admin and user.role != "admin":
+            user.role = "admin"
+            await db.commit()
+            await db.refresh(user)
+
+    return _token_response(user)
+
+
 @router.post(
     "/token",
     response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
     summary="OAuth2 Password Grant Login",
-    description="Supports standard OAuth2 Password Grant login (username, password) for test accounts."
+    description=(
+        "Standard OAuth2 password grant (username=email, password). Returns the same generic 401 for a wrong "
+        "password, unknown email or inactive account; 429 after repeated failures."
+    ),
 )
 async def login_for_access_token(
     request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     """Handles OAuth2 Password Grant login (accepts JSON or x-www-form-urlencoded)."""
     username: str = ""
@@ -128,55 +219,38 @@ async def login_for_access_token(
     if "application/x-www-form-urlencoded" in content_type:
         form_data = await request.form()
         username = str(form_data.get("username", "")).strip()
-        password = str(form_data.get("password", "")).strip()
+        password = str(form_data.get("password", ""))
     else:
         try:
             body = await request.json()
             username = str(body.get("username", "")).strip()
-            password = str(body.get("password", "")).strip()
+            password = str(body.get("password", ""))
         except Exception:
             pass
 
     if not username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tên người dùng (username/email) không được để trống."
+            detail="Tên người dùng (username/email) không được để trống.",
         )
 
     clean_email = username.lower()
+    email_key, ip_key = _throttle_keys(request, clean_email)
+    if login_throttle.is_blocked(email_key, ip_key):
+        raise _throttled()
+
     res = await db.execute(select(User).where(User.email == clean_email))
     user = res.scalars().first()
 
-    if not user:
-        # Check if demo login is allowed for test accounts
-        if settings.DEMO_LOGIN_ENABLED and ("admin" in clean_email or "an.nguyen" in clean_email):
-            role = "admin" if "admin" in clean_email else "user"
-            full_name = "Quản trị viên SmartDesk" if role == "admin" else "Nguyễn Văn An"
-            user = User(
-                email=clean_email,
-                full_name=full_name,
-                role=role,
-                oauth_provider="demo",
-                workspace_id=1,
-            )
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Tài khoản hoặc mật khẩu không chính xác.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+    # Always run the (constant-time) hash check so unknown emails take as long as wrong passwords.
+    password_ok = await verify_password_async(password, user.password_hash if user else None)
+    if not user or not user.is_active or not password_ok:
+        login_throttle.record_failure(email_key, ip_key)
+        logger.warning("Failed password login attempt from %s", ip_key)
+        raise _invalid_credentials()
 
-    token = create_access_token(user)
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        role=user.role,
-        email=user.email,
-        full_name=user.full_name,
-    )
+    login_throttle.reset(email_key)
+    return _token_response(user)
 
 
 @router.get(
@@ -184,7 +258,7 @@ async def login_for_access_token(
     response_model=UserProfileResponse,
     status_code=status.HTTP_200_OK,
     summary="Get Current User Profile",
-    description="Returns the profile and role of the currently authenticated user."
+    description="Returns the profile and role of the currently authenticated user.",
 )
 async def get_me(current_user: User = Depends(get_current_user)) -> UserProfileResponse:
     """Returns profile information of the currently authenticated user."""
