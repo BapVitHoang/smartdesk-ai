@@ -27,6 +27,8 @@
 # /frontend/src/services/mocks/*              @[C_USERNAME]
 # TODO: Set GitHub handle for devC
 # /backend/tests/common/*                     @[C_USERNAME]
+# TODO: Set GitHub handle for devC
+# /docs/evidence/*                            @[C_USERNAME]
 /.agents/*                                    @BapVitHoang  # integrator
 /.github/*                                    @BapVitHoang  # integrator
 /docs/adr/*                                   @BapVitHoang  # integrator
@@ -136,6 +138,14 @@
 # /docs/TEST_ACCEPTANCE.md                    @[C_USERNAME]
 # TODO: Set GitHub handle for devC
 # /docs/REPORT.md                             @[C_USERNAME]
+# TODO: Set GitHub handle for devC
+# /docs/REPORT.pdf                            @[C_USERNAME]
+# TODO: Set GitHub handle for devC
+# /docs/SLIDES.pdf                            @[C_USERNAME]
+# TODO: Set GitHub handle for devC
+# /docs/SLIDES.pptx                           @[C_USERNAME]
+# TODO: Set GitHub handle for devC
+# /docs/DEMO_VIDEO_CHECKLIST.md               @[C_USERNAME]
 # TODO: Set GitHub handle for devC
 # /docs/PRESENTATION_AND_DEMO.md              @[C_USERNAME]
 # TODO: Set GitHub handle for devC
