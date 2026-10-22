@@ -26,12 +26,16 @@ pytest backend/tests/ -v
 | `test_list_and_filter_tickets` | `GET /api/v1/tickets` | Dashboard ticket filtering | Status 200, list matches category/priority |
 | `test_update_ticket_and_customize_draft`| `PATCH /api/v1/tickets/{id}` | Support agent edits draft reply | Status 200, draft reply and status updated |
 | `test_agent_copilot_regenerate_draft` | `POST /api/v1/agent/tickets/{id}/generate-draft` | AI Copilot draft regeneration | Status 200, new personalized draft synthesized |
-| `test_workspaces_crud` | `GET/POST /api/v1/workspaces` | Multi-domain workspace listing and creation | Status 200/201, tenant isolation and persona configuration |
+| `test_create_and_list_workspaces` | `GET/POST /api/v1/workspaces` | Multi-domain workspace listing and creation | Status 200/201, tenant isolation and persona configuration |
 | `test_document_upload_and_chunking` | `POST /workspaces/{id}/documents/upload` | File ingestion (.txt, .md, .pdf), chunking & embedding | Status 201, chunks stored, document status `pending` |
 | `test_document_verification_pipeline` | `POST /documents/{id}/verify` | Active AI verification: Synthetic QA $\to$ Self-Test $\to$ AI Judge | Status 200, faithfulness score, detailed verification report |
 | `test_document_publish_and_rag_isolation` | `POST /documents/{id}/publish` | Publishing verified doc & isolated RAG retrieval | Status 200, chunk status `published`, RAG search scoped to workspace |
-| `test_circuit_breaker_free_tier` | Internal / Service | Free Tier Rate Limit Circuit Breaker (HTTP 429) | 60s cooldown lock, deterministic unit pseudo-vector fallback |
+| `test_cost_guard_circuit_breaker_on_429` | Internal / Service | Free Tier Rate Limit Circuit Breaker (HTTP 429) | 60s cooldown lock, deterministic unit pseudo-vector fallback |
 | `test_ollama_provider_*` | `llm_service` / `embedding_service` | Dual-mode Ollama (`qwen2.5:3b` & `nomic-embed-text`) | Local LLM generation, 768-dim embedding, fallback resilience |
+| `test_customer_flow_login_list_create_chat_confirm` | E2E Cross-Feature Flow | Login $\to$ list tickets $\to$ form creation $\to$ chat escalation $\to$ confirm | Status 200/201, real JWT token, ticket `#TICK-XXXX` visible in agent queue |
+| `test_cancelled_confirmation_does_not_create_ticket`| E2E Action Cancel | Two-phase pending action cancellation in chat | Status 200, `executed: false`, ticket count unchanged |
+| `test_customer_cannot_use_agent_only_routes_after_login`| RBAC Data & Route Guard | Customer attempted access to admin telemetry / delete | Status 403 Forbidden |
+| `test_auth_security_*` | Auth Security Module | Google token signature verification, scrypt password hashing & 429 throttle | Status 401 on forged/wrong password, status 429 after 10 attempts |
 
 ---
 
@@ -150,3 +154,31 @@ pytest backend/tests/ -v
   - Embeddings fallback smoothly to deterministic hash-based 768-dim unit vectors; chat falls back to local BM25 knowledge search.
   - Frontend receives response with `is_fallback: true` and displays friendly notification: *"Hệ thống AI đang tạm nghỉ để tối ưu hạn mức (Free Tier Cooldown). Đang chuyển sang chế độ đối soát tri thức cục bộ."*
   - Zero crashes, zero unhandled 500 errors.
+
+---
+
+## 3. Visual & Responsive UI Acceptance Matrix (REQ-31, REQ-33, REQ-34)
+
+To guarantee compliance with responsive viewport requirements (`REQ-34`), search/filter/sort/pagination (`REQ-31`), and admin telemetry observability (`REQ-33`), the application was verified across both **Desktop (`1440x900`)** and **Mobile (`375x812` - iPhone standard)** viewports using automated headless Edge / Playwright sessions.
+
+### 3.1 Visual Verification Results & Evidence Artifacts
+
+| Feature / UI View | Viewport | Verified Interactive Element | Evidence Artifact Path | Result |
+| :--- | :---: | :--- | :--- | :---: |
+| **Customer AI Chat** | `1440x900` | Real-time SSE streaming bubble, quick prompt pills, clickable citation badges | [`docs/evidence/chat-desktop-1440x900.png`](./evidence/chat-desktop-1440x900.png) | **PASS** |
+| **Two-Phase Action Card** | `1440x900` | Two-phase pending mutating tool card (`create_escalation_ticket`) with [Xác nhận thực thi] and [Hủy bỏ] buttons | [`docs/evidence/chat-tool-confirmation-card.png`](./evidence/chat-tool-confirmation-card.png) | **PASS** |
+| **Customer AI Chat (Mobile)** | `375x812` | Touch-friendly chat message stream, responsive bottom input bar, full mobile visibility | [`docs/evidence/chat-mobile-375x812.png`](./evidence/chat-mobile-375x812.png) | **PASS** |
+| **Ticket Submission Form** | `1440x900` | Multi-field validation, category selector, SLA response hours live estimation card | [`docs/evidence/ticket-form-desktop.png`](./evidence/ticket-form-desktop.png) | **PASS** |
+| **Ticket Submission Form (Mobile)** | `375x812` | Full-width mobile input controls, sticky navigation hamburger menu toggle | [`docs/evidence/ticket-form-mobile.png`](./evidence/ticket-form-mobile.png) | **PASS** |
+| **Agent Triage Dashboard** | `1440x900` | Sorting dropdown (`created_at`, `priority`, `status`, `sla_hours`), pagination controls, AI draft reply inspection | [`docs/evidence/agent-dashboard-desktop-1440x900.png`](./evidence/agent-dashboard-desktop-1440x900.png) | **PASS** |
+| **Ticket Delete Action** | `1440x900` | Confirmation modal before permanent deletion (`DELETE /api/v1/tickets/{id}` with admin guard) | [`docs/evidence/agent-ticket-delete-confirm.png`](./evidence/agent-ticket-delete-confirm.png) | **PASS** |
+| **Agent Dashboard (Mobile)** | `375x812` | Split-pane flexbox fix (`h-1/2 md:h-full`): ticket queue and ticket detail both scrollable independently | [`docs/evidence/agent-dashboard-mobile-375x812.png`](./evidence/agent-dashboard-mobile-375x812.png) | **PASS** |
+| **Admin AI Telemetry Panel** | `1440x900` | 4 KPI cards (Total AI Calls, Cost USD, Avg Latency, Fallback/Refused), Cost-Guard Circuit Breaker banner, 1-click [Mở Khóa Cooldown 429] button, recent request audit logs | [`docs/evidence/telemetry-panel-desktop.png`](./evidence/telemetry-panel-desktop.png) | **PASS** |
+| **Admin Telemetry (Mobile)** | `375x812` | Vertically stacked KPI metric cards, scrollable telemetry log table on mobile screen | [`docs/evidence/telemetry-panel-mobile.png`](./evidence/telemetry-panel-mobile.png) | **PASS** |
+| **Knowledge Manager Studio** | `1440x900` | Multi-domain tenant workspace switcher (Default, SmileCare, TechStore), document upload area, chunk viewer | [`docs/evidence/knowledge-manager-desktop.png`](./evidence/knowledge-manager-desktop.png) | **PASS** |
+| **Active Verification Studio Modal** | `1440x900` | 3-Agent Hand-off Trace (`SyntheticQAExamAgent` $\to$ `SandboxRAGAgent` $\to$ `FaithfulnessJudgeAgent`), Faithfulness Score, audit questions | [`docs/evidence/knowledge-verification-trace-modal.png`](./evidence/knowledge-verification-trace-modal.png) | **PASS** |
+| **RBAC Role-Based Access Barrier** | `1440x900` | 1-Click Role Switcher toggling to `an.nguyen@company.vn`: Tab 3 (Agent Dashboard) & Tab 4 (Knowledge) locked with Lock icon and 'Admin' badge | [`docs/evidence/rbac-user-mode-locked.png`](./evidence/rbac-user-mode-locked.png) | **PASS** |
+
+### 3.2 Error Toast & Fallback Localization Policy
+- **Vietnamese Language Standard:** All customer-facing and agent-facing toast alerts, error banners, and modal prompts are strictly rendered in Vietnamese (e.g., *"Đã chuyển sang vai trò QUẢN TRỊ VIÊN (Admin)"*, *"Lỗi xác thực: Vui lòng đăng nhập lại"*, *"Hệ thống AI đang tạm nghỉ để tối ưu hạn mức (Free Tier Cooldown)"*).
+- **Zero Fake Success Policy:** When backend API calls return HTTP 4xx or 5xx (e.g. `PROMPT_SECURITY_VIOLATION`, `401 Unauthorized`, `403 Forbidden`), the frontend NEVER fabricates a fake successful result in local state; instead, an error toast is surfaced with the exact server message.
