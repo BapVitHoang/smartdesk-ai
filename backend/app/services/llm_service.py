@@ -15,6 +15,28 @@ from app.core.security import redact_pii
 
 logger = logging.getLogger("smartdesk.llm")
 
+
+def scrub_sensitive(text: str, api_key: Optional[str] = None) -> str:
+    """Removes API keys and sensitive credentials from error messages and logs."""
+    if not text:
+        return ""
+    scrubbed = str(text)
+    if api_key and len(api_key) > 6:
+        scrubbed = scrubbed.replace(api_key, "[REDACTED_API_KEY]")
+    # Mask common Google API key pattern AIzaSy...
+    scrubbed = re.sub(r"AIzaSy[A-Za-z0-9_\-]{33}", "[REDACTED_API_KEY]", scrubbed)
+    return scrubbed
+
+
+class LLMConfigException(LLMServiceException):
+    """Raised when an external API call fails with HTTP 400/401/403/404 client or configuration error."""
+
+    def __init__(self, message: str, status_code: int = 400, details: Optional[Any] = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.details = details
+        self.telemetry_status = "config_error"
+
 SYSTEM_INSTRUCTION = (
     "You are the SmartDesk AI Customer Support Assistant. "
     "Your objective is to provide precise, professional, and empathetic assistance to customers. "
@@ -134,6 +156,61 @@ class LLMService:
         """Returns the active model identifier for telemetry."""
         return self.ollama_model if self.provider == "ollama" else self.model_name
 
+    def _sanitize_contents(self, contents: Any) -> Any:
+        """
+        Sanitizes request contents for Gemini 3.5 constraints:
+        1. Role 'system' inside contents is rejected (must be in system_instruction).
+        2. Trailing 'model' turns are rejected (request cannot end with a model turn).
+        """
+        if not isinstance(contents, list):
+            return contents
+
+        filtered = [
+            turn for turn in contents
+            if not (isinstance(turn, dict) and str(turn.get("role", "")).lower() == "system")
+        ]
+
+        while filtered and isinstance(filtered[-1], dict) and str(filtered[-1].get("role", "")).lower() == "model":
+            filtered.pop()
+
+        return filtered
+
+    def _parse_and_classify_error(self, exc: Exception) -> Tuple[int, str]:
+        """
+        Extracts HTTP status code and clean error string from exception.
+        Returns:
+            Tuple[int, str]: (status_code, error_message)
+        """
+        err_str = str(exc)
+        code = getattr(exc, "code", getattr(exc, "status_code", None))
+        status_name = str(getattr(exc, "status", "")).upper()
+
+        if code is not None:
+            try:
+                code_int = int(code)
+                return code_int, err_str
+            except (ValueError, TypeError):
+                pass
+
+        if "400" in err_str or "INVALID_ARGUMENT" in err_str or "INVALID_ARGUMENT" in status_name:
+            return 400, err_str
+        if "401" in err_str or "UNAUTHENTICATED" in err_str or "UNAUTHENTICATED" in status_name:
+            return 401, err_str
+        if "403" in err_str or "PERMISSION_DENIED" in err_str or "PERMISSION_DENIED" in status_name:
+            return 403, err_str
+        if "404" in err_str or "NOT_FOUND" in err_str or "NOT_FOUND" in status_name:
+            return 404, err_str
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+            return 429, err_str
+        if "503" in err_str or "UNAVAILABLE" in err_str:
+            return 503, err_str
+        if "504" in err_str or "DEADLINE_EXCEEDED" in err_str:
+            return 504, err_str
+        if "500" in err_str or "INTERNAL" in err_str:
+            return 500, err_str
+
+        return 500, err_str
+
     async def generate_response(
         self,
         prompt: str,
@@ -160,41 +237,91 @@ class LLMService:
         effective_system_prompt = system_prompt or SYSTEM_INSTRUCTION
         effective_timeout = self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
 
-        try:
-            if self.provider == "ollama":
-                response_text = await asyncio.wait_for(
-                    self._execute_ollama_call(prompt, effective_system_prompt, temperature),
-                    timeout=effective_timeout
-                )
-            else:
-                if not self._client:
-                    self._init_client()
-                if not self._client or not self.api_key or self.api_key == "YOUR_GEMINI_API_KEY_HERE":
-                    raise LLMServiceException("Gemini API key is not configured or client failed to initialize.")
-                response_text = await asyncio.wait_for(
-                    self._execute_api_call(prompt, effective_system_prompt, temperature),
-                    timeout=effective_timeout
-                )
+        max_retries = 1
+        attempt = 0
 
-            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            return response_text, elapsed_ms
+        while attempt <= max_retries:
+            try:
+                if self.provider == "ollama":
+                    response_text = await asyncio.wait_for(
+                        self._execute_ollama_call(prompt, effective_system_prompt, temperature),
+                        timeout=effective_timeout
+                    )
+                else:
+                    if not self._client:
+                        self._init_client()
+                    if not self._client or not self.api_key or self.api_key == "YOUR_GEMINI_API_KEY_HERE":
+                        raise LLMServiceException("Gemini API key is not configured or client failed to initialize.")
+                    response_text = await asyncio.wait_for(
+                        self._execute_api_call(prompt, effective_system_prompt, temperature),
+                        timeout=effective_timeout
+                    )
 
-        except asyncio.TimeoutError:
-            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            logger.warning(f"LLM API call timed out after {elapsed_ms}ms (Threshold: {effective_timeout}s)")
-            raise LLMTimeoutException(f"LLM call timed out after {elapsed_ms}ms")
-        except (LLMServiceException, LLMTimeoutException):
-            raise
-        except Exception as e:
-            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            err_str = str(e)
-            if "429" in err_str or "ResourceExhausted" in err_str or "quota" in err_str.lower():
-                cooldown_secs = float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
-                self.cooldown_until = time.time() + cooldown_secs
-                logger.warning(f"[Cost-Guard] Rate limit 429 kích hoạt. Khóa gọi AI trong {int(cooldown_secs)} giây.")
-                raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
-            logger.error(f"LLM API execution error after {elapsed_ms}ms: {str(e)}", exc_info=True)
-            raise LLMServiceException(f"LLM execution failed: {str(e)}")
+                elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                return response_text, elapsed_ms
+
+            except asyncio.TimeoutError:
+                elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                logger.warning(f"LLM API call timed out after {elapsed_ms}ms (Threshold: {effective_timeout}s, attempt {attempt + 1})")
+                if attempt < max_retries:
+                    attempt += 1
+                    await asyncio.sleep(1.0)
+                    continue
+                raise LLMTimeoutException(f"LLM call timed out after {elapsed_ms}ms")
+
+            except (LLMConfigException, LLMServiceException, LLMTimeoutException):
+                raise
+
+            except Exception as e:
+                elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                status_code, err_msg = self._parse_and_classify_error(e)
+                clean_err_msg = scrub_sensitive(err_msg, self.api_key)
+
+                # HTTP 400, 401, 403, 404: Client / Configuration errors
+                # NEVER retry, NEVER set cooldown, log once at ERROR level
+                if status_code in (400, 401, 403, 404):
+                    logger.error(
+                        f"[LLM Config Error] External API rejected request with HTTP {status_code} after {elapsed_ms}ms: {clean_err_msg}"
+                    )
+                    raise LLMConfigException(clean_err_msg, status_code=status_code)
+
+                # HTTP 429 / Quota / Rate limit
+                elif status_code == 429:
+                    retry_after = getattr(e, "retry_after", None)
+                    if retry_after is not None:
+                        try:
+                            retry_after = float(retry_after)
+                        except (ValueError, TypeError):
+                            retry_after = None
+
+                    if attempt < max_retries and retry_after is not None and retry_after <= 5.0:
+                        logger.info(f"[Cost-Guard] Honoring Retry-After ({retry_after}s) before retrying...")
+                        attempt += 1
+                        await asyncio.sleep(retry_after)
+                        continue
+
+                    cooldown_secs = float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
+                    self.cooldown_until = time.time() + cooldown_secs
+                    logger.warning(
+                        f"[Cost-Guard] Rate limit 429 kích hoạt. Khóa gọi AI trong {int(cooldown_secs)} giây: {clean_err_msg}"
+                    )
+                    raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
+
+                # HTTP 5xx: Upstream server error -> limited retry (1 bounded retry), then fallback
+                elif status_code in (500, 502, 503, 504):
+                    if attempt < max_retries:
+                        logger.warning(
+                            f"[LLM Upstream Error] HTTP {status_code} on attempt {attempt + 1}: {clean_err_msg}. Retrying in 1.0s..."
+                        )
+                        attempt += 1
+                        await asyncio.sleep(1.0)
+                        continue
+                    logger.error(f"[LLM Upstream Error] HTTP {status_code} after {attempt + 1} attempts: {clean_err_msg}")
+                    raise LLMServiceException(f"LLM upstream error {status_code}: {clean_err_msg}")
+
+                # Other unexpected exceptions
+                logger.error(f"LLM API execution error after {elapsed_ms}ms: {clean_err_msg}", exc_info=True)
+                raise LLMServiceException(f"LLM execution failed: {clean_err_msg}")
 
     async def _execute_ollama_call(
         self,
@@ -254,7 +381,8 @@ class LLMService:
         if self._sdk_type == "genai":
             def _sync_call() -> Tuple[str, int, int]:
                 from google.genai import types
-                thinking_cfg = types.ThinkingConfig(thinking_budget=0)
+                thinking_level_val = getattr(settings, "GEMINI_THINKING_LEVEL", "MINIMAL") or "MINIMAL"
+                thinking_cfg = types.ThinkingConfig(thinking_level=thinking_level_val)
                 cfg_kwargs: Dict[str, Any] = {
                     "system_instruction": system_prompt,
                     "temperature": temperature,
@@ -266,10 +394,11 @@ class LLMService:
                     cfg_kwargs["response_schema"] = response_schema
 
                 cfg = types.GenerateContentConfig(**cfg_kwargs)
+                sanitized_contents = self._sanitize_contents(clean_prompt)
                 try:
                     response = self._client.models.generate_content(
                         model=self.model_name,
-                        contents=clean_prompt,
+                        contents=sanitized_contents,
                         config=cfg,
                     )
                 except Exception as primary_err:
@@ -286,7 +415,7 @@ class LLMService:
                         )
                         response = self._client.models.generate_content(
                             model=fallback_target,
-                            contents=clean_prompt,
+                            contents=sanitized_contents,
                             config=cfg,
                         )
                     else:
@@ -308,8 +437,9 @@ class LLMService:
         elif self._sdk_type == "generativeai":
             def _sync_call() -> str:
                 generation_config = {"temperature": temperature}
+                sanitized_contents = self._sanitize_contents(clean_prompt)
                 response = self._client.generate_content(
-                    clean_prompt,
+                    sanitized_contents,
                     generation_config=generation_config
                 )
                 return (response.text or "").strip()
@@ -359,39 +489,75 @@ class LLMService:
             raise LLMServiceException(f"AI provider '{self.provider}' is not configured.")
 
         effective_timeout = self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
+        max_retries = 1
+        attempt = 0
 
-        try:
-            if self.provider == "ollama":
-                raw_text = await asyncio.wait_for(
-                    self._execute_ollama_call(prompt, structured_instruction, temperature, json_mode=True),
-                    timeout=effective_timeout,
-                )
-            else:
-                if not self._client:
-                    self._init_client()
-                if not self._client:
-                    raise LLMServiceException("Gemini client not initialized.")
-                raw_text = await asyncio.wait_for(
-                    self._execute_api_call(
-                        prompt,
-                        structured_instruction,
-                        temperature,
-                        response_schema=response_model,
-                    ),
-                    timeout=effective_timeout,
-                )
-        except (LLMServiceException, LLMTimeoutException):
-            raise
-        except asyncio.TimeoutError:
-            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            raise LLMTimeoutException(f"Structured LLM call timed out after {elapsed_ms}ms")
-        except Exception as exc:
-            err_str = str(exc)
-            if "429" in err_str or "ResourceExhausted" in err_str or "quota" in err_str.lower():
-                cooldown_secs = float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
-                self.cooldown_until = time.time() + cooldown_secs
-                raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
-            raise LLMServiceException(f"Structured output call failed: {err_str}")
+        raw_text = ""
+        while attempt <= max_retries:
+            try:
+                if self.provider == "ollama":
+                    raw_text = await asyncio.wait_for(
+                        self._execute_ollama_call(prompt, structured_instruction, temperature, json_mode=True),
+                        timeout=effective_timeout,
+                    )
+                else:
+                    if not self._client:
+                        self._init_client()
+                    if not self._client:
+                        raise LLMServiceException("Gemini client not initialized.")
+                    raw_text = await asyncio.wait_for(
+                        self._execute_api_call(
+                            prompt,
+                            structured_instruction,
+                            temperature,
+                            response_schema=response_model,
+                        ),
+                        timeout=effective_timeout,
+                    )
+                break
+
+            except asyncio.TimeoutError:
+                elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                if attempt < max_retries:
+                    attempt += 1
+                    await asyncio.sleep(1.0)
+                    continue
+                raise LLMTimeoutException(f"Structured LLM call timed out after {elapsed_ms}ms")
+
+            except (LLMConfigException, LLMServiceException, LLMTimeoutException):
+                raise
+
+            except Exception as exc:
+                elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                status_code, err_msg = self._parse_and_classify_error(exc)
+                clean_err_msg = scrub_sensitive(err_msg, self.api_key)
+
+                if status_code in (400, 401, 403, 404):
+                    logger.error(
+                        f"[LLM Config Error] Structured call rejected with HTTP {status_code} after {elapsed_ms}ms: {clean_err_msg}"
+                    )
+                    raise LLMConfigException(clean_err_msg, status_code=status_code)
+                elif status_code == 429:
+                    retry_after = getattr(exc, "retry_after", None)
+                    if retry_after is not None:
+                        try:
+                            retry_after = float(retry_after)
+                        except (ValueError, TypeError):
+                            retry_after = None
+                    if attempt < max_retries and retry_after is not None and retry_after <= 5.0:
+                        attempt += 1
+                        await asyncio.sleep(retry_after)
+                        continue
+                    cooldown_secs = float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
+                    self.cooldown_until = time.time() + cooldown_secs
+                    raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
+                elif status_code in (500, 502, 503, 504):
+                    if attempt < max_retries:
+                        attempt += 1
+                        await asyncio.sleep(1.0)
+                        continue
+                    raise LLMServiceException(f"Structured output upstream error {status_code}: {clean_err_msg}")
+                raise LLMServiceException(f"Structured output call failed: {clean_err_msg}")
 
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
         cleaned_json = self._extract_json_payload(raw_text)
