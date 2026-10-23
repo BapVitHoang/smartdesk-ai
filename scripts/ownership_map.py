@@ -4,7 +4,7 @@ SmartDesk AI - Single Source of Truth Ownership Mapping.
 Authoritative mapping between files/patterns and owners:
   - devA: AI Engine & Evaluation (@TheOrijinnn)
   - devB: Platform, Data & Security (@BapVitHoang)
-  - devC: Frontend UX, QA & Capstone Documentation (@[C_USERNAME])
+  - devC: Frontend UX, QA & Capstone Documentation (@TKhanh)
   - integrator: Shared frozen governance & contracts (Hoang @BapVitHoang wearing the Integrator hat)
 """
 
@@ -12,7 +12,7 @@ Authoritative mapping between files/patterns and owners:
 GITHUB_HANDLES = {
     "devA": "TheOrijinnn",
     "devB": "BapVitHoang",
-    "devC": None,  # TODO: Set GitHub handle for Dev C when assigned
+    "devC": "TKhanh",
     "integrator": "BapVitHoang",
 }
 

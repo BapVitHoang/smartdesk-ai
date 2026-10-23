@@ -11,6 +11,7 @@ import sys
 import os
 import re
 import subprocess
+import unicodedata
 from pathlib import Path
 
 # Ensure UTF-8 output on Windows
@@ -21,14 +22,17 @@ if sys.platform == "win32":
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ROSTER_PATH = REPO_ROOT / "docs" / "TEAM_ROSTER.md"
 
-# Known fabricated names from prior incidents
+# Known fabricated names from prior incidents (NFC normalized)
 FABRICATED_NAMES = [
-    r"Dương\s+Bắp\s+Vịt\s+Hoàng",
-    r"Hoàng\s+Văn\s+Bắp",
-    r"Nguyễn\s+Nhật\s+Huy",
-    r"Trần\s+Quốc\s+Khánh",
-    r"Bắp\s+Vịt\s+Hoàng",
+    unicodedata.normalize("NFC", p) for p in [
+        r"Dương\s+Bắp\s+Vịt\s+Hoàng",
+        r"Hoàng\s+Văn\s+Bắp",
+        r"Nguyễn\s+Nhật\s+Huy",
+        r"Trần\s+Quốc\s+Khánh",
+        r"Bắp\s+Vịt\s+Hoàng",
+    ]
 ]
+
 
 def parse_team_roster(roster_path: Path):
     """
@@ -40,14 +44,15 @@ def parse_team_roster(roster_path: Path):
     allowed_handles = set()
 
     if not roster_path.exists():
-        print(f"[FAIL] docs/TEAM_ROSTER.md not found at {roster_path}")
+        rel_display = "docs/TEAM_ROSTER.md"
+        print(f"[FAIL] {rel_display} not found")
         sys.exit(1)
 
     with open(roster_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     for line in lines:
-        line = line.strip()
+        line = unicodedata.normalize("NFC", line.strip())
         if not line.startswith("|") or "Full Name" in line or ":---" in line:
             continue
         parts = [p.strip() for p in line.split("|")[1:-1]]
@@ -55,6 +60,10 @@ def parse_team_roster(roster_path: Path):
             full_name, mssv, github, git_email, role, verified_str = parts[:6]
             is_verified = verified_str.strip().lower() == "true"
             
+            # Sanitize markdown formatting from cells
+            clean_name = full_name.strip(" *`").strip()
+            clean_mssv = mssv.strip(" *`").strip()
+
             # Extract email and github handle
             email_match = re.search(r"[\w\.-]+@[\w\.-]+", git_email)
             if email_match:
@@ -64,10 +73,10 @@ def parse_team_roster(roster_path: Path):
                 allowed_handles.add(handle_match.group(0).lower())
 
             if is_verified:
-                if full_name and full_name != "CHƯA CÓ DỮ LIỆU":
-                    verified_names.add(full_name.lower())
-                if mssv and mssv != "CHƯA CÓ DỮ LIỆU":
-                    verified_mssvs.add(mssv.strip())
+                if clean_name and clean_name != "CHƯA CÓ DỮ LIỆU":
+                    verified_names.add(clean_name.lower())
+                if clean_mssv and clean_mssv != "CHƯA CÓ DỮ LIỆU":
+                    verified_mssvs.add(clean_mssv)
 
     return verified_names, verified_mssvs, allowed_emails, allowed_handles
 
@@ -81,32 +90,35 @@ def get_tracked_files():
 def check_content(content: str, filename: str, verified_names, verified_mssvs, allowed_emails, is_binary=False):
     r"""
     Checks text content against anti-fabrication rules:
-    (a) pattern 2311\d{4} not in roster with verified_by_user true (excluding allowed git emails)
+    (a) pattern 2[0-5]11\d{4} not in roster with verified_by_user true (excluding allowed git emails)
     (b) full-name-like string next to an MSSV or role not in roster, or known fabricated names
     (c) contribution percentage next to a person / role
     """
     violations = []
-    lines = content.splitlines()
+    # Always NFC normalize incoming text
+    normalized_content = unicodedata.normalize("NFC", content)
+    lines = normalized_content.splitlines()
 
     for idx, line in enumerate(lines, 1):
         loc = f"{filename}:{idx}" if not is_binary else f"{filename} (extracted text)"
+        clean_line = re.sub(r"[*_`]", "", line)
 
         # Check (b) Known fabricated names
         for fab_name in FABRICATED_NAMES:
-            if re.search(fab_name, line, re.IGNORECASE):
+            if re.search(fab_name, line, re.IGNORECASE) or re.search(fab_name, clean_line, re.IGNORECASE):
                 violations.append((loc, f"Disallowed fabricated name found matching '{fab_name}': {line.strip()[:100]}"))
 
-        # Check (a) MSSV pattern: 2311\d{4}
-        mssv_matches = re.finditer(r"\b2311\d{4}\b", line)
+        # Check (a) MSSV pattern: 2[0-5]11\d{4}
+        mssv_matches = list(re.finditer(r"\b2[0-5]11\d{4}\b", line))
         for m in mssv_matches:
             val = m.group(0)
             # Check if this match is part of an allowed email
             start_pos = max(0, m.start() - 20)
             end_pos = min(len(line), m.end() + 30)
-            surrounding = line[start_pos:end_pos]
+            surrounding = line[start_pos:end_pos].lower()
             is_email = False
             for email in allowed_emails:
-                if email in surrounding.lower():
+                if email in surrounding:
                     is_email = True
                     break
             if not is_email:
@@ -122,7 +134,7 @@ def check_content(content: str, filename: str, verified_names, verified_mssvs, a
                     violations.append((loc, f"Invented contribution percentage next to person/role: {line.strip()[:100]}"))
 
         # Check (b) Full-name-like string next to role or MSSV
-        name_role_match = re.search(r"([A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){2,4})\s*(\(|—|-|:|\/|\|)\s*(?:MSSV|`?2311\d{4}|Dev\s+[ABC]|Integrator)", line)
+        name_role_match = re.search(r"([A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){2,4})\s*(\(|—|-|:|\/|\|)\s*(?:MSSV|`?2[0-5]11\d{4}|Dev\s+[ABC]|Integrator)", clean_line)
         if name_role_match:
             candidate_name = name_role_match.group(1).strip()
             if candidate_name.lower() not in verified_names:
@@ -138,7 +150,10 @@ def extract_pdf_text(path: Path):
         text = ""
         for page in reader.pages:
             text += (page.extract_text() or "") + "\n"
-        return text, None
+        norm_text = unicodedata.normalize("NFC", text)
+        # Collapse intra-word spaces caused by font-kerning / diacritic splitting
+        collapsed = re.sub(r"(?<=\b[A-Za-zÀ-ỹ])\s+(?=[A-Za-zÀ-ỹ]\b)", "", norm_text)
+        return norm_text + "\n" + collapsed, None
     except ImportError:
         return None, "pypdf not installed"
     except Exception as e:
@@ -155,7 +170,8 @@ def extract_pptx_text(path: Path):
                 if shape.has_text_frame:
                     for p in shape.text_frame.paragraphs:
                         text += p.text + "\n"
-        return text, None
+        norm_text = unicodedata.normalize("NFC", text)
+        return norm_text, None
     except ImportError:
         return None, "python-pptx not installed"
     except Exception as e:

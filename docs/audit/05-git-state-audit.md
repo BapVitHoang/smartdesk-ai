@@ -66,7 +66,7 @@ D:/SPKT_2023/year_4/newtech/smartdesk-C   74d3319 [feature/c-frontend-docs]
   - *Proof:* `git merge-base feature/a-ai-engine feature/b-platform` = `ebb3b371b6f6ae9339b0fab846f39c63f950d5b2`.
   - `git merge-base feature/b-platform feature/c-frontend-docs` = `ebb3b371b6f6ae9339b0fab846f39c63f950d5b2`.
   - All three feature branches diverged simultaneously from `ebb3b37`. Commit `ebb3b37` contains the completed foundation features (`a8549e2` through `1b78353`) fast-forwarded from `e27f58a`.
-  - Therefore, **`ebb3b37`** is the true shared integration base for the three feature branches. Prior to final integration, `Hoang` should be fast-forwarded to `ebb3b37`.
+  - Therefore, **`ebb3b37`** is the true shared integration base for the three feature branches. As documented in Section 7, `Hoang` was successfully fast-forwarded to `ebb3b37` with `git merge --ff-only`, and has since advanced with governance commits `a6bad26` (CR-001 mapping), `49f918c` (recovery audit), `d080b82` (unverified file purge), and `a46b556` (roster SSOT gate).
 
 ---
 
@@ -191,7 +191,7 @@ Commit 74d3319 (Dev C) on feature/c-frontend-docs
 - **Evaluation & Resolution:**
   - In the SmartDesk AI team model (`AGENTS.md` §6), Developer B (Hoang) wears two hats: **Dev B** (Platform Owner) and **Integrator Hat** (Repository Lead & Shared Contracts).
   - When verified with `python scripts/check_ownership.py --owner devB --as-integrator`, the script returns: **0 cross-owner violations and 0 frozen contract violations (PASS)**.
-  - Hoang was legitimately authorized to touch these frozen contracts to register JWT settings in `config.py`, add `passlib` to `requirements.txt`, update `API_CONTRACT.md`, and document failure cases in `AI_USAGE.md`.
+  - Hoang was legitimately authorized to touch these frozen contracts to register JWT settings in `config.py`, add `google-auth` to `requirements.txt`, update `API_CONTRACT.md`, and document failure cases in `AI_USAGE.md`.
 
 ---
 
@@ -298,11 +298,15 @@ Every stash entry was inspected using `git stash show --stat` and compared again
 | `stash@{4}` | `backend/app/services/llm_service.py` | No (WIP draft) | No | `feature/a-ai-engine` (`cb404fe`) contains the full, completed implementation of error classification and scrubbing. |
 | `stash@{4}` | `docs/requests/devC.md` | No (early draft) | No | Superseded by complete Change Request CR-001 in `feature/c-frontend-docs` (`74d3319`). |
 
-### 8.2 Plain Files Extracted to `docs/audit/recovered/`
-The 3 files whose valuable content existed only in stashes were extracted as standalone plain UTF-8 files:
+### 8.2 Plain Files Extracted to `docs/audit/recovered/` and Subsequent Purge
+The 3 files whose valuable content existed only in stashes were initially extracted during the recovery audit as standalone plain UTF-8 files:
 1. `docs/audit/recovered/PROPOSAL.md` (16,428 bytes, extracted from `stash@{0}:docs/PROPOSAL.md`)
 2. `docs/audit/recovered/REPORT.md` (35,571 bytes, extracted from `stash@{0}:docs/REPORT.md`)
 3. `docs/audit/recovered/ownership_map.py` (6,751 bytes, extracted from `stash@{1}:scripts/ownership_map.py`)
+
+> [!NOTE]
+> **Subsequent Purge (Commit `d080b82`):**
+> Following the anti-fabrication mandate, these 3 extracted files were removed from active Git tracking via `git rm` in commit `d080b82` to eliminate fabricated names, student IDs, and fake contribution percentages from `Hoang`. Their original state remains preserved in Git history and branch `backup/recovered-2` without rewriting history.
 
 ---
 
@@ -385,9 +389,9 @@ The repository's default branch on the GitHub remote is **`master`**, while the 
 ### 12.1 Fabrication Scan Results Across Feature Branches & `backup/recovered-2`
 Scanning `feature/a-ai-engine`, `feature/b-platform`, `feature/c-frontend-docs`, and `backup/recovered-2` for contribution percentages, student IDs, and unverified person names:
 - **Invented / Unverified Full Names & Legacy Stash Audit:**
-  - Found exclusively in `backup/recovered-2:docs/REPORT.md:303-306` (Section 8.1 "Team Contribution Table — REQ-29"):
-    - Contains fabricated student names and unverified student IDs.
-    - Purged on `Hoang` active branch; official source of truth established in `docs/TEAM_ROSTER.md`.
+  - Found in `backup/recovered-2:docs/REPORT.md:303-306` (Section 8.1 "Team Contribution Table — REQ-29"): contains fabricated student names and unverified student IDs.
+  - Also detected in binary deliverables on `feature/c-frontend-docs` (`docs/REPORT.pdf`, `docs/SLIDES.pdf`, `docs/SLIDES.pptx` page/slide 1), prompting action item CR-002 in `docs/requests/devC.md`.
+  - Purged on `Hoang` active branch; official source of truth established in `docs/TEAM_ROSTER.md`.
   - References to `33.3%` in `docs/REPORT.md:271`, `docs/notes/A-eval-report.md:25`, `docs/notes/A.md:30`, `docs/notes/C.md:77`, and `docs/PRESENTATION_AND_DEMO.md:25` correspond to the **legacy RAG baseline pass rate (8/24 cases = 33.3%)**, not author contribution.
 - **Student IDs (MSSV patterns):**
   - `README.md` and `docs/PROPOSAL.md`: Purged on `Hoang` to use neutral identifiers referencing `docs/TEAM_ROSTER.md`.

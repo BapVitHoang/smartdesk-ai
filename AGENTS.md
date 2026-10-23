@@ -165,7 +165,7 @@ backend/app/
    - **Team Composition:**
      - **Dev A / Owner 1 (AI Engine & QA):** `@TheOrijinnn`
      - **Dev B / Owner 2 & Integrator (Platform, Security & Shared Contracts):** `@BapVitHoang` (Hoang wears both the Dev B hat and the Integrator hat)
-     - **Dev C / Owner 3 (Frontend UX, QA & Documentation):** `@[C_USERNAME]`
+     - **Dev C / Owner 3 (Frontend UX, QA & Documentation):** `@TKhanh`
    - **Dev A / Owner 1 (AI Engine, RAG, Structured Output, Guardrails & Eval):**
      - Owns `backend/app/services/llm_service.py`, `rag_service.py`, `ticket_copilot_service.py`, `verification_service.py`, `agent_tools.py`.
      - Owns `backend/app/core/prompts.py`, `backend/app/api/v1/endpoints/chat.py`, `chat_stream.py`, `chat_actions.py`, `knowledge.py`, `ai_usage.py`.
