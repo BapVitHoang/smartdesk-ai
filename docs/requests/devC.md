@@ -1,6 +1,6 @@
-# Developer C — Change Requests & Action Items Log
+# Developer C — Change Requests Log
 
-> Use this file to request changes in frozen files or coordinate work across modules.
+> Use this file to request changes in frozen files or files owned by other workstreams.
 > See [`docs/requests/template.md`](./template.md) for the standard change request format.
 
 ---
