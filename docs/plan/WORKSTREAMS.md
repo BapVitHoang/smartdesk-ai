@@ -2,7 +2,7 @@
 
 > **Version:** 1.1.0  
 > **Status:** FROZEN GOVERNANCE SPECIFICATION  
-> **Target Branch:** `Hoang` / `main`  
+> **Target Branch:** `Hoang`  
 > **Governing Documents:** [`AGENTS.md`](../../AGENTS.md), [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md), [`docs/spec/CONTRACTS.md`](../spec/CONTRACTS.md), [`docs/plan/PLAN.md`](./PLAN.md)
 
 ---
@@ -16,7 +16,7 @@ To achieve high velocity without merge conflicts among a **team of exactly 3 mem
 - **Team Structure (3 Members):**
   - **Dev A (Owner 1):** AI Engine & Evaluation (`@TheOrijinnn`)
   - **Dev B (Owner 2) & Integrator:** Platform, Data & Security + Integrator Hat (`@BapVitHoang`)
-  - **Dev C (Owner 3):** Frontend UX, QA & Capstone Documentation (`@[C_USERNAME]`)
+  - **Dev C (Owner 3):** Frontend UX, QA & Capstone Documentation (`@TKhanh`)
   - *Note: Hoang is Dev B and simultaneously wears the Integrator hat. There is no separate fourth person.*
 - **Frozen Contracts:** All inter-module communication is mediated exclusively through frozen signatures defined in [`docs/spec/CONTRACTS.md`](../spec/CONTRACTS.md) and [`frontend/src/types.ts`](../../frontend/src/types.ts).
 - **No Blocked Dependencies:** When a service needs a capability from another workstream that is not yet merged, it relies on contract stubs and deterministic mocks (defined in `CONTRACTS.md` and `frontend/src/services/mocks/`).

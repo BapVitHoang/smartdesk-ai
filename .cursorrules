@@ -43,3 +43,6 @@ You are an expert fullstack AI engineer working on SmartDesk AI. Strictly adhere
 - Do NOT hardcode or commit API keys, `.env`, or `*.db` files.
 - Use Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
 - Run `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` before starting work.
+
+## 6. Strict Anti-Fabrication Rule (No Hallucination of Project Facts)
+- Never invent names, student IDs, emails, percentages, dates, commit hashes, test counts or metrics. Facts about people come only from `docs/TEAM_ROSTER.md`. If a value is unknown write `CHƯA CÓ DỮ LIỆU` and raise it in `docs/requests/<dev>.md`. Report only numbers you obtained from a command in this session.

@@ -111,7 +111,7 @@ There are currently **5 active stashes** in the repository:
 ### 3.3 Uncommitted Working Tree Work Audit
 
 When auditing the single shared working directory, the following uncommitted changes were detected:
-- `docs/REPORT.md`: Chapter 8 (Team Contribution Table, REQ-29, 33.3% / 33.3% / 33.4%, student IDs) + updated RTM matrix.
+- `docs/REPORT.md`: Chapter 8 (unverified team contribution table, student IDs) + updated RTM matrix.
 - `docs/PROPOSAL.md`: Updated Requirement Traceability Matrix pointing to newly added test suites (`test_create_and_list_workspaces`, `test_auth_security.py`, `test_cross_feature_flows.py`).
 - `AI_USAGE.md`: Case Study 4 & 5 draft (fully committed in `c780921`).
 - `backend/tests/ai/test_llm_request_and_circuit_breaker.py`: Trailing whitespace cleanup.
@@ -287,7 +287,7 @@ Every stash entry was inspected using `git stash show --stat` and compared again
 | `stash@{0}` | `AI_USAGE.md` | No | No | `stash@{0}` contains early draft of Case Studies 4 & 5; `feature/b-platform` (`c780921`) has the authoritative and more detailed version. |
 | `stash@{0}` | `backend/tests/ai/test_llm_request_and_circuit_breaker.py` | No (1 trailing newline) | No | Code content is identical to `feature/a-ai-engine` (`cb404fe`). |
 | `stash@{0}` | `docs/PROPOSAL.md` | No | **YES** | Contains updated Requirement Traceability Matrix pointing to newly added test suites (`test_create_and_list_workspaces`, `test_auth_security.py`, `test_cross_feature_flows.py`). Exists only in stash/backup. |
-| `stash@{0}` | `docs/REPORT.md` | No | **YES** | Contains **Chapter 8** (Team Contribution Table, REQ-29: 33.3% / 33.3% / 33.4%) and student ID mappings (`23110020`, `23110029`, `23110034`). Exists only in stash/backup. |
+| `stash@{0}` | `docs/REPORT.md` | No | **YES** | Contains draft **Chapter 8** (unverified contribution table and unverified student IDs). Exists only in stash/backup; removed from `Hoang` active branch. |
 | `stash@{0}` | `docs/TEST_ACCEPTANCE.md` | **YES** | No | `git diff stash@{0} feature/c-frontend-docs -- docs/TEST_ACCEPTANCE.md` returns empty (100% identical to `74d3319`). |
 | `stash@{0}` | `docs/requests/devC.md` | **YES** | No | `git diff stash@{0} feature/c-frontend-docs -- docs/requests/devC.md` returns empty (100% identical to `74d3319`). |
 | `stash@{1}` | `AI_USAGE.md` | No | No | Early draft of failure case studies; superseded by `feature/b-platform` (`c780921`). |
@@ -383,21 +383,20 @@ The repository's default branch on the GitHub remote is **`master`**, while the 
 ## 12. Fabrication Scan & Multi-Author Attribution (Tasks 8 & 9)
 
 ### 12.1 Fabrication Scan Results Across Feature Branches & `backup/recovered-2`
-Scanning `feature/a-ai-engine`, `feature/b-platform`, `feature/c-frontend-docs`, and `backup/recovered-2` for contribution percentages, student IDs, and student names:
-- **Contribution Percentages (`33.3%`, `33.4%`, `100.0%`):**
+Scanning `feature/a-ai-engine`, `feature/b-platform`, `feature/c-frontend-docs`, and `backup/recovered-2` for contribution percentages, student IDs, and unverified person names:
+- **Invented / Unverified Full Names & Legacy Stash Audit:**
   - Found exclusively in `backup/recovered-2:docs/REPORT.md:303-306` (Section 8.1 "Team Contribution Table — REQ-29"):
-    - Dương Bắp Vịt Hoàng (`23110020`): **33.3%**
-    - Nguyễn Nhật Huy (`23110029`): **33.3%**
-    - Trần Quốc Khánh (`23110034`): **33.4%**
-    - Total: **100.0%**
+    - Contains fabricated student names and unverified student IDs.
+    - Purged on `Hoang` active branch; official source of truth established in `docs/TEAM_ROSTER.md`.
   - References to `33.3%` in `docs/REPORT.md:271`, `docs/notes/A-eval-report.md:25`, `docs/notes/A.md:30`, `docs/notes/C.md:77`, and `docs/PRESENTATION_AND_DEMO.md:25` correspond to the **legacy RAG baseline pass rate (8/24 cases = 33.3%)**, not author contribution.
-- **Student IDs (MSSV `23110020`, `23110029`, `23110034`):**
-  - `README.md:153-155` and `docs/PROPOSAL.md:145-147`: Team roster correctly maps `23110020` (Hoàng), `23110029` (Huy), and `23110034` (Khánh).
-  - `docs/audit/01-gap-analysis.md:27, 37, 65` and `docs/plan/PLAN.md:45, 175-176`: Historical audit notes recording the initial state when only `23110020` had authored git commits.
+- **Student IDs (MSSV patterns):**
+  - `README.md` and `docs/PROPOSAL.md`: Purged on `Hoang` to use neutral identifiers referencing `docs/TEAM_ROSTER.md`.
+  - `docs/audit/01-gap-analysis.md` and `docs/plan/PLAN.md`: Historical audit notes recording the initial state when only `23110020@student.hcmute.edu.vn` had authored git commits.
 - **Author Identity Mapping to Git Shortlog:**
-  - `Bap <23110020@student.hcmute.edu.vn>` $\leftrightarrow$ Dương Bắp Vịt Hoàng (MSSV `23110020`, GitHub `@BapVitHoang`)
-  - `TheOrijinnn <lenguyensonghinh@gmail.com>` $\leftrightarrow$ Nguyễn Nhật Huy (MSSV `23110029`, GitHub `@TheOrijinnn`)
-  - `TKhanhJK <khanhssaa77@gmail.com>` $\leftrightarrow$ Trần Quốc Khánh (MSSV `23110034`, GitHub `@TKhanh` / `@TKhanhJK`)
+  - `Bap <23110020@student.hcmute.edu.vn>` $\leftrightarrow$ GitHub `@BapVitHoang` (Dev B & Integrator)
+  - `TheOrijinnn <lenguyensonghinh@gmail.com>` $\leftrightarrow$ GitHub `@TheOrijinnn` (Dev A)
+  - `TKhanhJK <khanhssaa77@gmail.com>` $\leftrightarrow$ GitHub `@TKhanh` / `@TKhanhJK` (Dev C)
+  - Official full names and student IDs remain `CHƯA CÓ DỮ LIỆU` in `docs/TEAM_ROSTER.md` until verified by human user.
 
 ### 12.2 Authorship Statistics
 - **Commit Shortlog at Integration Base `ebb3b37`:**
@@ -414,4 +413,42 @@ Scanning `feature/a-ai-engine`, `feature/b-platform`, `feature/c-frontend-docs`,
   - `74d3319 Bap feat(c-qa-docs): add offline cross-feature tests, visual verification evidence, capstone report PDF, and presentation slides`
 
 **Formal Statement:** Git history and commit authorship are preserved exactly as recorded. No history rewriting, amending, or rebasing was performed.
+
+---
+
+## 13. Teammate Remote Branches & Attribution Reconciliation (Task 6)
+
+### 13.1 Analysis of Unmerged Remote Branches (`git branch -r --no-merged ebb3b37`)
+Execution of `git branch -r --no-merged ebb3b37` returned:
+- `origin/Hoang`: Current active integration branch containing governance, recovery audits, CR-001, and anti-fabrication purging.
+- `origin/Nguyen`: Legacy development branch containing early UI commits.
+- `origin/feature/a-ai-engine`: Published feature branch for Dev A (tip `cb404fe`).
+- `origin/feature/b-platform`: Published feature branch for Dev B (tip `c780921`).
+- `origin/feature/c-frontend-docs`: Published feature branch for Dev C (tip `74d3319`).
+
+### 13.2 Status of Remote Branches `origin/TKhanh` and `origin/Nguyen2`
+- **`origin/TKhanh`:**
+  - Tip commit is `ebb3b371b6f6ae9339b0fab846f39c63f950d5b2`.
+  - Exactly identical to the integration base commit `ebb3b37`.
+  - All 7 commits authored by `TKhanhJK <khanhssaa77@gmail.com>` (`4c3a472` through `ebb3b37`) are fully merged into `ebb3b37`.
+- **`origin/Nguyen2`:**
+  - Tip commit is `afbb08d506fc3ea1ac6eb3912a8b6e3b3c25aa51`.
+  - Confirmed ancestor of `ebb3b37` via `git merge-base --is-ancestor afbb08d ebb3b37` (Exit code 0).
+  - All 6 AI engine commits authored by `TheOrijinnn` up to `afbb08d` are fully merged into `ebb3b37`.
+
+### 13.3 Discovery and Attribution of `TheOrijinnn`'s 7th Commit
+Across the entire repository (`git log --all --author="TheOrijinnn"`), there are exactly **7 commits** authored by `TheOrijinnn <lenguyensonghinh@gmail.com>`:
+
+| # | Commit | Branch Location | Status in `ebb3b37` | Commit Subject |
+| :-: | :---: | :--- | :---: | :--- |
+| **1** | `56c9496` | `origin/Nguyen` | Unmerged (legacy) | `FIx header UI` (branched from `d377277` prior to `frontend/` restructure) |
+| **2** | `a8549e2` | `ebb3b37`, `origin/Nguyen2` | **Merged** | `feat(ai): externalize hot-reload prompts and define structured AI schemas` |
+| **3** | `192fecc` | `ebb3b37`, `origin/Nguyen2` | **Merged** | `feat(llm): add structured output, SSE streaming, token cost-guard and telemetry endpoints` |
+| **4** | `b4a893b` | `ebb3b37`, `origin/Nguyen2` | **Merged** | `feat(copilot): implement single-call ticket triage copilot and 3-agent verification pipeline` |
+| **5** | `20b203c` | `ebb3b37`, `origin/Nguyen2` | **Merged** | `feat(rag): integrate hybrid BM25 retrieval, DB-backed agent tools and two-phase action confirmation` |
+| **6** | `d39ce73` | `ebb3b37`, `origin/Nguyen2` | **Merged** | `test(ai): add 24-case RAG evaluation benchmark and comprehensive Dev A unit test suite` |
+| **7** | `afbb08d` | `ebb3b37`, `origin/Nguyen2` | **Merged** | `docs(dev-a): document AI engine architecture, usage log and 24-case evaluation report` |
+
+**Conclusion:** The missing 7th commit of `TheOrijinnn` is commit `56c9496` on branch `origin/Nguyen`. Its modifications to `src/components/Header.tsx` were subsequently refactored and superseded during the restructuring to `frontend/src/components/Header.tsx` in commits `a1b05d1` and `cb1c7e7`.
+
 

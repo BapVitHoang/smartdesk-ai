@@ -203,7 +203,7 @@ backend/app/
    - Any attempt to commit cross-module files or frozen shared files on a feature branch will be blocked with exit code 1.
 4. **Git Branch & Commit Convention:**
    - Branch naming: `feature/a-ai-engine` (Dev A), `feature/b-platform` (Dev B), `feature/c-frontend-docs` (Dev C).
-   - Daily rebase on `main` / integration branch.
+   - Daily rebase on `Hoang` (integration branch).
    - Commit messages MUST follow Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
    - NEVER use `git push --force`, `git reset --hard`, or commit `.env` / `*.db` files.
 5. **Mandatory Pre-Commit Verification Gate:**
@@ -212,3 +212,8 @@ backend/app/
      - Backend: `python -m pytest backend/tests/ -v`
      - Frontend: `npm run lint --prefix frontend; npm run build --prefix frontend`
      - Ownership: `python scripts/check_ownership.py --staged`
+6. **Strict Anti-Fabrication Rule (No Hallucination of Project Facts):**
+   - Never invent names, student IDs, emails, percentages, dates, commit hashes, test counts or metrics.
+   - Facts about people come only from `docs/TEAM_ROSTER.md`.
+   - If a value is unknown write `CHƯA CÓ DỮ LIỆU` and raise it in `docs/requests/<dev>.md`.
+   - Report only numbers you obtained from a command in this session.
