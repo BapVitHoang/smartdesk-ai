@@ -178,7 +178,7 @@ class LLMService:
 | `/chat` | `endpoints/chat_actions.py` | Dev A | Tool two-phase user confirmation (`/chat/confirm-action`) |
 | `/agent/ai-usage` | `endpoints/ai_usage.py` | Dev A | AI usage & cost observability summary + reset-cooldown |
 | `/knowledge` | `endpoints/knowledge.py` | Dev A | FAQ & Chunk detail lookup |
-| `/tickets` | `endpoints/tickets.py` | Dev B | Ticket CRUD, triage, server-side sorting, pagination, delete |
+| `/tickets` | `endpoints/tickets.py` | Dev B | Ticket CRUD (POST requires Bearer auth), triage, server-side sorting, pagination, delete |
 | `/agent` | `endpoints/agent.py` | Dev B | Copilot draft regeneration |
 | `/workspaces` | `endpoints/workspaces.py` | Dev B | Workspace management & deletion |
 | `/documents` | `endpoints/documents.py` | Dev B | Document upload, chunking & verification trigger |
@@ -404,6 +404,14 @@ data: {"response":"Xin chào bạn!","citations":[],"latency_ms":412.5,"confiden
   "cooldown_active": false
 }
 ```
+
+---
+
+### 8.9a `POST /api/v1/tickets` (Authenticated Creation & Tenant Binding)
+**Request Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`  
+**Description:** Requires authenticated session (`get_current_user`). For standard customers (`role == "user"`), ticket `customer_email` and `customer_name` are strictly locked to the token owner, preventing customer spoofing. Support staff (`admin`) can submit on behalf of customers.  
+**Response (HTTP 201 Created):** `TicketResponse` object.  
+**Errors:** `401 Unauthorized` if unauthenticated.
 
 ---
 

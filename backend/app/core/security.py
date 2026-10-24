@@ -4,12 +4,14 @@ import asyncio
 import base64
 import hashlib
 import hmac
+import ipaddress
 import logging
 import os
 import re
 import time
 from collections import defaultdict, deque
 from typing import Any, Deque, Dict, Optional, Tuple
+from fastapi import Request
 
 from app.core.config import is_placeholder_secret, settings
 
@@ -220,6 +222,76 @@ class LoginThrottle:
 
 
 login_throttle = LoginThrottle()
+
+
+def is_trusted_proxy_ip(ip_str: str, allowed_cidrs: Optional[str] = None) -> bool:
+    """Checks whether the given IP string belongs to a trusted proxy network."""
+    if not ip_str or ip_str in ("unknown", "testclient"):
+        return False
+    raw_cidrs = allowed_cidrs if allowed_cidrs is not None else getattr(settings, "FORWARDED_ALLOW_IPS", "")
+    if not raw_cidrs:
+        return False
+    try:
+        addr = ipaddress.ip_address(ip_str.strip())
+        if addr.version == 6 and addr.ipv4_mapped:
+            addr = addr.ipv4_mapped
+    except (ValueError, TypeError):
+        return False
+
+    for cidr in raw_cidrs.split(","):
+        cidr_cleaned = cidr.strip()
+        if not cidr_cleaned:
+            continue
+        try:
+            net = ipaddress.ip_network(cidr_cleaned, strict=False)
+            if addr.version == net.version and addr in net:
+                return True
+        except (ValueError, TypeError):
+            continue
+    return False
+
+
+def get_trusted_client_ip(request: Request, allowed_cidrs: Optional[str] = None) -> str:
+    """Resolves real client IP. Only trusts X-Real-IP / X-Forwarded-For if direct peer is a trusted proxy."""
+    direct_ip = request.client.host if request.client else ""
+    if not direct_ip:
+        return "unknown"
+
+    # If the direct caller is NOT in the trusted proxy CIDR list, ignore any forwarded headers (anti-spoofing).
+    if not is_trusted_proxy_ip(direct_ip, allowed_cidrs=allowed_cidrs):
+        return direct_ip
+
+    # Direct caller is a trusted proxy. Check X-Real-IP first (Nginx sets this strictly from $remote_addr).
+    real_ip_header = request.headers.get("x-real-ip", "").strip()
+    if real_ip_header:
+        try:
+            ipaddress.ip_address(real_ip_header)
+            return real_ip_header
+        except (ValueError, TypeError):
+            pass
+
+    # Check X-Forwarded-For (client, proxy1, proxy2)
+    xff = request.headers.get("x-forwarded-for", "").strip()
+    if xff:
+        hops = [h.strip() for h in xff.split(",") if h.strip()]
+        # Walk hops from right to left to find the first untrusted client IP
+        for hop in reversed(hops):
+            try:
+                ipaddress.ip_address(hop)
+                if not is_trusted_proxy_ip(hop, allowed_cidrs=allowed_cidrs):
+                    return hop
+            except (ValueError, TypeError):
+                continue
+        # If all hops were valid, return the leftmost client IP
+        if hops:
+            try:
+                ipaddress.ip_address(hops[0])
+                return hops[0]
+            except (ValueError, TypeError):
+                pass
+
+    return direct_ip
+
 
 
 class GoogleAuthError(Exception):

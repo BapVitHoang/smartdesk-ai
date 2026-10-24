@@ -29,9 +29,21 @@ router = APIRouter()
 )
 async def create_ticket(
     ticket_in: TicketCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> TicketResponse:
-    """Create a new ticket with automatic Copilot triage."""
+    """Create a new ticket with automatic Copilot triage. Requires authentication (REQ-SEC-03)."""
+    # Enforce customer ownership: regular users can only submit tickets for their own email/name
+    if current_user.role != "admin":
+        ticket_in.customer_email = current_user.email
+        ticket_in.customer_name = current_user.full_name or current_user.email.split("@")[0]
+    else:
+        # Support staff / admin can specify customer details or fall back to authenticated staff
+        if not ticket_in.customer_email:
+            ticket_in.customer_email = current_user.email
+        if not ticket_in.customer_name:
+            ticket_in.customer_name = current_user.full_name or "Support Staff"
+
     # Sanitize text fields
     ticket_in.customer_name = sanitize_input(ticket_in.customer_name)
     ticket_in.subject = sanitize_input(ticket_in.subject)

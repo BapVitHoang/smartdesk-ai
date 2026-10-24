@@ -18,7 +18,11 @@ DEMO_ACCOUNT_EMAILS: Set[str] = {
 
 
 async def seed_users(session: AsyncSession) -> None:
-    """Seeds default Admin and Customer accounts with salted password hashes if users table is empty."""
+    """Seeds default Admin and Customer accounts with salted password hashes if users table is empty and DEMO_LOGIN_ENABLED is True."""
+    if not settings.DEMO_LOGIN_ENABLED:
+        logger.info("DEMO_LOGIN_ENABLED is False; skipping demo accounts seeding.")
+        return
+
     res = await session.execute(select(User))
     existing_users = {u.email: u for u in res.scalars().all()}
 

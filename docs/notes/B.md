@@ -133,6 +133,37 @@ Environment found in Task 0 (see Evidence): worktree smartdesk-B, no backend/.en
 
 ---
 
+## Plan (Prompt 2b - Dev B + Integrator: Hardening & Docker)
+
+Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 active, GEMINI_API_KEY set, verify_setup.ps1 10/10 PASS.
+
+- **Task 1A (REQ-SEC-01 - Demo accounts restriction):**
+  files: backend/app/db/seed/seed_users.py, backend/app/api/v1/endpoints/auth.py, backend/tests/platform/test_auth_security.py.
+  approach: skip demo user seeding when DEMO_LOGIN_ENABLED is false; reject demo accounts on /auth/token with generic 401 and /auth/oauth2/login with 403 when DEMO_LOGIN_ENABLED is false; keep flag true by default in compose and .env.example with demo notice.
+  proof: offline tests with monkeypatched DEMO_LOGIN_ENABLED=False proving 401 on password grant, 403 on demo oauth2, and local non-demo user unaffected.
+  risk: tests must monkeypatch per-test with a valid JWT_SECRET_KEY so validate_auth_configuration does not abort.
+- **Task 1B (REQ-SEC-02 - Client IP behind Nginx):**
+  files: backend/Dockerfile (Dev B owned), backend/app/core/config.py (Integrator), backend/app/core/security.py, backend/app/api/v1/endpoints/auth.py, backend/tests/platform/test_proxy_ip.py.
+  approach: start uvicorn with --proxy-headers and --forwarded-allow-ips for trusted Docker/private subnets; implement `get_trusted_client_ip()` that only trusts X-Real-IP / X-Forwarded-For when direct client is in trusted CIDRs (handling IPv6/IPv4 version differences safely); throttle uses this IP.
+  proof: offline unit tests for `get_trusted_client_ip` with trusted proxy, untrusted proxy (spoof rejected), IPv6 loopback, and direct requests.
+  risk: misconfigured CIDRs or unhandled IPv6 TypeError in ipaddress module.
+- **Task 1C (REQ-SEC-03 - POST /api/v1/tickets requires auth):**
+  files: backend/app/api/v1/endpoints/tickets.py, backend/tests/platform/test_ticket_auth.py, docs/spec/CONTRACTS.md, docs/API_CONTRACT.md, docs/requests/devB.md.
+  approach: require `current_user = Depends(get_current_user)`; regular users are strictly bound to `current_user.email` & `full_name`; admins may specify customer email/name for support ticketing; check frontend ticket form and mocks and log Dev C request in devB.md; update contract docs.
+  proof: offline route tests (401 without token, 201 with regular user token binding email, 201 with admin creating for customer).
+  risk: test_api.py uses admin client and expects customer_name from payload (preserved by admin rule).
+- **Task 2 (Docker and PostgreSQL + pgvector):**
+  files: scripts/smoke_docker.ps1 (Integrator).
+  approach: fix demo email to admin@smartdesk.ai in smoke_docker.ps1; add tests for wrong password (401) and unauth protected route (401); run docker compose build & up -d; verify health, frontend nginx, api proxy, SSE; run SQL to verify vector column & <=> cosine search; run pytest inside backend container against PostgreSQL; run smoke_docker.ps1; docker compose down.
+  proof: real SQL query output, containerized pytest against PostgreSQL, smoke_docker.ps1 exit 0.
+  risk: port conflicts (5432, 8000, 3000) or container naming conflicts.
+- **Task 3 (Notes & Requests):**
+  files: docs/notes/B.md, docs/notes/B-ai-usage.md, docs/requests/devB.md.
+  approach: record real outputs in Evidence; update "Giải thích code" for demo flag, proxy IP, and ticket auth; mark REQ-SEC-01..03 as DONE.
+
+
+---
+
 ## Evidence
 
 ### Task 0 - setup check

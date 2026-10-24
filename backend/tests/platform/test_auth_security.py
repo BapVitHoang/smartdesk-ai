@@ -187,18 +187,90 @@ async def test_google_login_admin_emails_allowlist_elevation(
 
 
 @pytest.mark.asyncio
-async def test_demo_login_disabled_returns_403(
+async def test_demo_login_disabled_rejects_demo_admin_on_both_routes_and_preserves_local_user(
     unauth_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Verify demo login returns 403 Forbidden when DEMO_LOGIN_ENABLED is False."""
-    monkeypatch.setattr(settings, "DEMO_LOGIN_ENABLED", False)
+    """Verify DEMO_LOGIN_ENABLED=False rejects demo accounts on both /auth/token and /auth/oauth2/login with 401, while non-demo users remain unaffected."""
+    # 1. When DEMO_LOGIN_ENABLED is True (default), demo admin succeeds on both routes
+    res_token_true = await unauth_client.post(
+        "/api/v1/auth/token",
+        json={"username": "admin@smartdesk.ai", "password": settings.DEMO_ADMIN_PASSWORD},
+    )
+    assert res_token_true.status_code == 200
 
-    res = await unauth_client.post(
+    res_oauth_true = await unauth_client.post(
         "/api/v1/auth/oauth2/login",
         json={"provider": "demo", "email": "admin@smartdesk.ai"},
     )
-    assert res.status_code == 403
-    assert "bị tắt" in res.json()["detail"]
+    assert res_oauth_true.status_code == 200
+
+    # 2. Insert a non-demo user (oauth_provider="local")
+    from sqlalchemy import select
+    from app.db.session import async_session_factory
+    from app.models.user import User
+    from app.core.security import hash_password
+    local_email = "employee@internal.corp"
+    local_pwd = "StrongCorpPassword2026!"
+    async with async_session_factory() as db:
+        res = await db.execute(select(User).where(User.email == local_email))
+        if not res.scalars().first():
+            local_user = User(
+                email=local_email,
+                full_name="Nhân viên nội bộ",
+                role="user",
+                oauth_provider="local",
+                workspace_id=1,
+                password_hash=hash_password(local_pwd),
+                is_active=True,
+            )
+            db.add(local_user)
+            await db.commit()
+
+    # 3. Disable DEMO_LOGIN_ENABLED
+    monkeypatch.setattr(settings, "DEMO_LOGIN_ENABLED", False)
+
+    # Demo admin rejected on /auth/token with generic 401
+    res_token_false = await unauth_client.post(
+        "/api/v1/auth/token",
+        json={"username": "admin@smartdesk.ai", "password": settings.DEMO_ADMIN_PASSWORD},
+    )
+    assert res_token_false.status_code == 401
+    assert res_token_false.json()["detail"] == "Tài khoản hoặc mật khẩu không chính xác."
+
+    # Demo admin rejected on /auth/oauth2/login with generic 401
+    res_oauth_false = await unauth_client.post(
+        "/api/v1/auth/oauth2/login",
+        json={"provider": "demo", "email": "admin@smartdesk.ai"},
+    )
+    assert res_oauth_false.status_code == 401
+    assert res_oauth_false.json()["detail"] == "Tài khoản hoặc mật khẩu không chính xác."
+
+    # Non-demo account can still log in via password grant!
+    res_local = await unauth_client.post(
+        "/api/v1/auth/token",
+        json={"username": local_email, "password": local_pwd},
+    )
+    assert res_local.status_code == 200
+    assert res_local.json()["email"] == local_email
+
+
+@pytest.mark.asyncio
+async def test_seed_users_skipped_when_demo_login_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify seed_users skips adding demo accounts when DEMO_LOGIN_ENABLED is False."""
+    from app.db.seed.seed_users import seed_users
+
+    monkeypatch.setattr(settings, "DEMO_LOGIN_ENABLED", False)
+
+    class DummySession:
+        def __init__(self):
+            self.calls = []
+        async def execute(self, *args, **kwargs):
+            self.calls.append("execute")
+
+    dummy = DummySession()
+    await seed_users(dummy)
+    assert len(dummy.calls) == 0
+
 
 
 @pytest.mark.asyncio

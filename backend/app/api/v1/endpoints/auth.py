@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.deps import get_current_user
 from app.core.security import (
     GoogleAuthError,
+    get_trusted_client_ip,
     login_throttle,
     verify_google_credential,
     verify_password_async,
@@ -80,8 +81,8 @@ def _throttled() -> HTTPException:
 
 
 def _throttle_keys(request: Request, email: str) -> Tuple[str, str]:
-    """Returns the (email, client IP) throttle keys for a login attempt."""
-    client_ip = request.client.host if request.client else "unknown"
+    """Returns the (email, client IP) throttle keys for a login attempt, resolving trusted proxies."""
+    client_ip = get_trusted_client_ip(request)
     return f"email:{email}", f"ip:{client_ip}"
 
 
@@ -118,10 +119,7 @@ async def oauth2_login(
 async def _demo_login(payload: OAuth2LoginRequest, db: AsyncSession) -> TokenResponse:
     """One-click demo login. Never creates users; only works for seeded demo accounts when enabled."""
     if not settings.DEMO_LOGIN_ENABLED:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Đăng nhập demo đã bị tắt trên máy chủ này.",
-        )
+        raise _invalid_credentials()
 
     email = str(payload.email).strip().lower() if payload.email else ""
     forbidden = HTTPException(
@@ -244,7 +242,8 @@ async def login_for_access_token(
 
     # Always run the (constant-time) hash check so unknown emails take as long as wrong passwords.
     password_ok = await verify_password_async(password, user.password_hash if user else None)
-    if not user or not user.is_active or not password_ok:
+    is_demo_disabled = bool(user and user.oauth_provider == "demo" and not settings.DEMO_LOGIN_ENABLED)
+    if not user or not user.is_active or not password_ok or is_demo_disabled:
         login_throttle.record_failure(email_key, ip_key)
         logger.warning("Failed password login attempt from %s", ip_key)
         raise _invalid_credentials()

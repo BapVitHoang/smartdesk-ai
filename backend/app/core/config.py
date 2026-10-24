@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     # In-memory login throttle (failed attempts per key within the window).
     LOGIN_MAX_FAILED_ATTEMPTS: int = 10
     LOGIN_THROTTLE_WINDOW_SECONDS: int = 60
+    # Trusted proxy CIDRs for client IP resolution behind reverse proxies (Nginx / Docker)
+    FORWARDED_ALLOW_IPS: str = "127.0.0.1,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16,::1,fe80::/10"
 
     # Database Configuration (PostgreSQL 16 with pgvector or SQLite async fallback)
     DATABASE_URL: str = f"sqlite+aiosqlite:///{DEFAULT_SQLITE_PATH}"
