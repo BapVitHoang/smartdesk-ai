@@ -3,9 +3,10 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import time
-from typing import Any, AsyncGenerator, Dict, Optional, Tuple, Type
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Type
 import httpx
 
 from app.core.config import settings
@@ -26,15 +27,79 @@ SYSTEM_INSTRUCTION = (
     "4. Cite sources in your response when referencing specific articles using the format [Doc #ID: Title]."
 )
 
+PLACEHOLDER_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
+INVALID_KEY_COOLDOWN_SECONDS = 3600.0
+
+
+def _is_quota_error(err_str: str) -> bool:
+    return (
+        "429" in err_str
+        or "ResourceExhausted" in err_str
+        or "RESOURCE_EXHAUSTED" in err_str
+        or "quota" in err_str.lower()
+    )
+
+
+def _is_invalid_key_error(err_str: str) -> bool:
+    return any(
+        marker in err_str
+        for marker in (
+            "401",
+            "403",
+            "API_KEY_INVALID",
+            "PERMISSION_DENIED",
+            "UNAUTHENTICATED",
+        )
+    )
+
+
+def load_gemini_api_keys() -> List[str]:
+    """Reads GEMINI_API_KEYS (comma/newline list or JSON array) plus GEMINI_API_KEY, de-duplicated, order preserved."""
+    raw = os.environ.get("GEMINI_API_KEYS", "")
+    if not raw:
+        try:
+            from dotenv import dotenv_values
+
+            # Same env files as Settings; later files win, matching pydantic-settings precedence.
+            for env_path in settings.model_config.get("env_file") or []:
+                value = dotenv_values(env_path).get("GEMINI_API_KEYS")
+                if value:
+                    raw = value
+        except ImportError:
+            pass
+
+    candidates: List[str] = []
+    raw = (raw or "").strip()
+    if raw.startswith("["):
+        try:
+            candidates = [str(k) for k in json.loads(raw)]
+        except json.JSONDecodeError:
+            candidates = []
+    else:
+        candidates = raw.replace("\n", ",").split(",")
+    candidates.append(settings.GEMINI_API_KEY or "")
+
+    keys: List[str] = []
+    for key in candidates:
+        key = key.strip().strip('"').strip("'")
+        if key and key != PLACEHOLDER_API_KEY and key not in keys:
+            keys.append(key)
+    return keys
+
 
 class LLMService:
     """Async LLM Service Wrapper supporting Google Gemini and Local Ollama with Cost-Guard Circuit Breaker."""
 
     def __init__(self) -> None:
         self.provider = (settings.AI_PROVIDER or "gemini").lower()
-        self.api_key = settings.GEMINI_API_KEY
+        self.api_keys: List[str] = load_gemini_api_keys()
+        self._key_index: int = 0
+        self._key_blocked_until: Dict[int, float] = {}
+        self.api_key = self.api_keys[0] if self.api_keys else ""
         self.model_name = settings.LLM_MODEL_NAME
-        self.fallback_model_name = getattr(settings, "LLM_FALLBACK_MODEL_NAME", "gemini-2.5-flash-lite")
+        self.fallback_model_name = getattr(
+            settings, "LLM_FALLBACK_MODEL_NAME", "gemini-2.5-flash-lite"
+        )
         self.timeout_seconds = settings.LLM_TIMEOUT_SECONDS
         self.cooldown_until: float = 0.0
         self._client: Any = None
@@ -61,35 +126,80 @@ class LLMService:
 
     def _init_client(self) -> None:
         """Initializes Gemini API client if API key is provided."""
-        if not self.api_key or self.api_key == "YOUR_GEMINI_API_KEY_HERE":
-            logger.warning("No valid GEMINI_API_KEY detected. LLM calls will trigger FallbackService.")
+        if not self.api_key or self.api_key == PLACEHOLDER_API_KEY:
+            logger.warning(
+                "No valid GEMINI_API_KEY detected. LLM calls will trigger FallbackService."
+            )
             return
 
         try:
             from google import genai
+
             self._client = genai.Client(api_key=self.api_key)
             self._sdk_type = "genai"
             logger.info("Initialized Google GenAI SDK client.")
         except ImportError:
             try:
                 import google.generativeai as gai
+
                 gai.configure(api_key=self.api_key)
                 self._client = gai.GenerativeModel(
-                    model_name=self.model_name,
-                    system_instruction=SYSTEM_INSTRUCTION
+                    model_name=self.model_name, system_instruction=SYSTEM_INSTRUCTION
                 )
                 self._sdk_type = "generativeai"
                 logger.info("Initialized Google GenerativeAI legacy SDK client.")
             except ImportError:
-                logger.error("Neither google-genai nor google-generativeai packages are installed.")
+                logger.error(
+                    "Neither google-genai nor google-generativeai packages are installed."
+                )
                 self._client = None
                 self._sdk_type = None
+
+    def _activate_key(self, index: int) -> None:
+        """Switches the active Gemini key and rebuilds the SDK client."""
+        self._key_index = index
+        self.api_key = self.api_keys[index]
+        self._client = None
+        self._init_client()
+
+    def _next_available_key_index(self) -> Optional[int]:
+        """Returns the first key index (starting at the active one) that is not blocked."""
+        now = time.time()
+        total = len(self.api_keys)
+        for offset in range(total):
+            idx = (self._key_index + offset) % total
+            if self._key_blocked_until.get(idx, 0.0) <= now:
+                return idx
+        return None
+
+    def _rotate_key(self, err_str: str) -> bool:
+        """Blocks the failing key and activates the next usable one. Returns False when none is left."""
+        if len(self.api_keys) <= 1:
+            return False
+        block_secs = (
+            INVALID_KEY_COOLDOWN_SECONDS
+            if _is_invalid_key_error(err_str)
+            else float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
+        )
+        failed_index = self._key_index
+        self._key_blocked_until[failed_index] = time.time() + block_secs
+        next_index = self._next_available_key_index()
+        if next_index is None:
+            return False
+        logger.warning(
+            f"[Key-Rotation] Gemini key #{failed_index + 1}/{len(self.api_keys)} blocked for {int(block_secs)}s; "
+            f"switching to key #{next_index + 1}."
+        )
+        self._activate_key(next_index)
+        return True
 
     def is_available(self) -> bool:
         """Check if active AI provider is configured and ready."""
         if self.provider == "ollama":
             return True
-        return bool(self._client and self.api_key and self.api_key != "YOUR_GEMINI_API_KEY_HERE")
+        return bool(
+            self._client and self.api_key and self.api_key != "YOUR_GEMINI_API_KEY_HERE"
+        )
 
     def is_in_cooldown(self) -> bool:
         """Check if Cost-Guard is in cooldown due to 429 Rate Limit (Gemini only)."""
@@ -100,12 +210,16 @@ class LLMService:
     def reset_cooldown(self) -> None:
         """Resets the 60s Cost-Guard Circuit Breaker cooldown lock."""
         self.cooldown_until = 0.0
+        self._key_blocked_until.clear()
         try:
             from app.services.embedding_service import embedding_service
+
             embedding_service.rate_limited_until = 0.0
         except Exception:
             pass
-        logger.info("[Cost-Guard] Cooldown state manually reset. Cloud LLM calls re-enabled.")
+        logger.info(
+            "[Cost-Guard] Cooldown state manually reset. Cloud LLM calls re-enabled."
+        )
 
     @staticmethod
     def estimate_tokens(text: str) -> int:
@@ -120,14 +234,29 @@ class LLMService:
             return 0.0
         in_rate = getattr(settings, "LLM_INPUT_COST_PER_MILLION", 0.30)
         out_rate = getattr(settings, "LLM_OUTPUT_COST_PER_MILLION", 2.50)
-        cost = (input_tokens / 1_000_000.0) * in_rate + (output_tokens / 1_000_000.0) * out_rate
+        cost = (input_tokens / 1_000_000.0) * in_rate + (
+            output_tokens / 1_000_000.0
+        ) * out_rate
         return round(cost, 6)
 
-    def _record_token_metrics(self, prompt: str, system_prompt: str, response_text: str, in_tok: int = 0, out_tok: int = 0) -> None:
+    def _record_token_metrics(
+        self,
+        prompt: str,
+        system_prompt: str,
+        response_text: str,
+        in_tok: int = 0,
+        out_tok: int = 0,
+    ) -> None:
         """Updates last_input_tokens, last_output_tokens, and last_cost_usd."""
-        self.last_input_tokens = in_tok if in_tok > 0 else self.estimate_tokens(f"{system_prompt}\n{prompt}")
-        self.last_output_tokens = out_tok if out_tok > 0 else self.estimate_tokens(response_text)
-        self.last_cost_usd = self.calculate_cost_usd(self.last_input_tokens, self.last_output_tokens)
+        self.last_input_tokens = (
+            in_tok if in_tok > 0 else self.estimate_tokens(f"{system_prompt}\n{prompt}")
+        )
+        self.last_output_tokens = (
+            out_tok if out_tok > 0 else self.estimate_tokens(response_text)
+        )
+        self.last_cost_usd = self.calculate_cost_usd(
+            self.last_input_tokens, self.last_output_tokens
+        )
 
     @property
     def active_model_name(self) -> str:
@@ -135,10 +264,7 @@ class LLMService:
         return self.ollama_model if self.provider == "ollama" else self.model_name
 
     async def generate_response(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-        temperature: float = 0.2
+        self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.2
     ) -> Tuple[str, float]:
         """
         Executes an async generation request with provider-specific timeout and latency measurement.
@@ -154,26 +280,40 @@ class LLMService:
             raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
 
         if not self.is_available():
-            raise LLMServiceException(f"AI provider '{self.provider}' is not configured or client failed to initialize.")
+            raise LLMServiceException(
+                f"AI provider '{self.provider}' is not configured or client failed to initialize."
+            )
 
         start_time = time.perf_counter()
         effective_system_prompt = system_prompt or SYSTEM_INSTRUCTION
-        effective_timeout = self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
+        effective_timeout = (
+            self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
+        )
 
         try:
             if self.provider == "ollama":
                 response_text = await asyncio.wait_for(
-                    self._execute_ollama_call(prompt, effective_system_prompt, temperature),
-                    timeout=effective_timeout
+                    self._execute_ollama_call(
+                        prompt, effective_system_prompt, temperature
+                    ),
+                    timeout=effective_timeout,
                 )
             else:
                 if not self._client:
                     self._init_client()
-                if not self._client or not self.api_key or self.api_key == "YOUR_GEMINI_API_KEY_HERE":
-                    raise LLMServiceException("Gemini API key is not configured or client failed to initialize.")
+                if (
+                    not self._client
+                    or not self.api_key
+                    or self.api_key == "YOUR_GEMINI_API_KEY_HERE"
+                ):
+                    raise LLMServiceException(
+                        "Gemini API key is not configured or client failed to initialize."
+                    )
                 response_text = await asyncio.wait_for(
-                    self._execute_api_call(prompt, effective_system_prompt, temperature),
-                    timeout=effective_timeout
+                    self._execute_api_call(
+                        prompt, effective_system_prompt, temperature
+                    ),
+                    timeout=effective_timeout,
                 )
 
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -181,19 +321,31 @@ class LLMService:
 
         except asyncio.TimeoutError:
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            logger.warning(f"LLM API call timed out after {elapsed_ms}ms (Threshold: {effective_timeout}s)")
+            logger.warning(
+                f"LLM API call timed out after {elapsed_ms}ms (Threshold: {effective_timeout}s)"
+            )
             raise LLMTimeoutException(f"LLM call timed out after {elapsed_ms}ms")
         except (LLMServiceException, LLMTimeoutException):
             raise
         except Exception as e:
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
             err_str = str(e)
-            if "429" in err_str or "ResourceExhausted" in err_str or "quota" in err_str.lower():
-                cooldown_secs = float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
+            if (
+                "429" in err_str
+                or "ResourceExhausted" in err_str
+                or "quota" in err_str.lower()
+            ):
+                cooldown_secs = float(
+                    getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60)
+                )
                 self.cooldown_until = time.time() + cooldown_secs
-                logger.warning(f"[Cost-Guard] Rate limit 429 kích hoạt. Khóa gọi AI trong {int(cooldown_secs)} giây.")
+                logger.warning(
+                    f"[Cost-Guard] Rate limit 429 kích hoạt. Khóa gọi AI trong {int(cooldown_secs)} giây."
+                )
                 raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
-            logger.error(f"LLM API execution error after {elapsed_ms}ms: {str(e)}", exc_info=True)
+            logger.error(
+                f"LLM API execution error after {elapsed_ms}ms: {str(e)}", exc_info=True
+            )
             raise LLMServiceException(f"LLM execution failed: {str(e)}")
 
     async def _execute_ollama_call(
@@ -209,13 +361,11 @@ class LLMService:
             "model": self.ollama_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": prompt},
             ],
             "stream": False,
-            "options": {
-                "temperature": temperature
-            },
-            "keep_alive": self.ollama_keep_alive
+            "options": {"temperature": temperature},
+            "keep_alive": self.ollama_keep_alive,
         }
         if json_mode:
             payload["format"] = "json"
@@ -224,19 +374,29 @@ class LLMService:
             async with httpx.AsyncClient(timeout=self.ollama_timeout) as client:
                 resp = await client.post(url, json=payload)
                 if resp.status_code != 200:
-                    raise LLMServiceException(f"Ollama returned HTTP {resp.status_code}: {resp.text}")
+                    raise LLMServiceException(
+                        f"Ollama returned HTTP {resp.status_code}: {resp.text}"
+                    )
                 data = resp.json()
                 content = (data.get("message", {}).get("content", "") or "").strip()
                 if not content:
-                    raise LLMServiceException("Empty response returned from Ollama provider")
+                    raise LLMServiceException(
+                        "Empty response returned from Ollama provider"
+                    )
                 in_tok = int(data.get("prompt_eval_count", 0) or 0)
                 out_tok = int(data.get("eval_count", 0) or 0)
-                self._record_token_metrics(prompt, system_prompt, content, in_tok, out_tok)
+                self._record_token_metrics(
+                    prompt, system_prompt, content, in_tok, out_tok
+                )
                 return content
         except httpx.ConnectError:
-            raise LLMServiceException(f"Cannot connect to Ollama at {self.ollama_base_url}. Please ensure Ollama is running.")
+            raise LLMServiceException(
+                f"Cannot connect to Ollama at {self.ollama_base_url}. Please ensure Ollama is running."
+            )
         except httpx.TimeoutException:
-            raise LLMTimeoutException(f"Ollama request timed out after {self.ollama_timeout}s")
+            raise LLMTimeoutException(
+                f"Ollama request timed out after {self.ollama_timeout}s"
+            )
         except Exception as exc:
             if isinstance(exc, (LLMServiceException, LLMTimeoutException)):
                 raise
@@ -249,17 +409,50 @@ class LLMService:
         temperature: float,
         response_schema: Optional[Type[Any]] = None,
     ) -> str:
+        """Runs the SDK call, rotating to the next Gemini key on quota or invalid-key errors."""
+        if self.api_keys:
+            start_index = self._next_available_key_index()
+            if start_index is not None and start_index != self._key_index:
+                self._activate_key(start_index)
+
+        attempts = max(1, len(self.api_keys))
+        for attempt in range(attempts):
+            try:
+                return await self._execute_api_call_once(
+                    prompt, system_prompt, temperature, response_schema
+                )
+            except LLMServiceException:
+                raise
+            except Exception as exc:
+                err_str = str(exc)
+                retryable = _is_quota_error(err_str) or _is_invalid_key_error(err_str)
+                if attempt < attempts - 1 and retryable and self._rotate_key(err_str):
+                    continue
+                raise
+        raise LLMServiceException("All Gemini API keys failed.")
+
+    async def _execute_api_call_once(
+        self,
+        prompt: str,
+        system_prompt: str,
+        temperature: float,
+        response_schema: Optional[Type[Any]] = None,
+    ) -> str:
         """Internal dispatcher executing SDK generation call asynchronously with secondary model fallback."""
         clean_prompt = redact_pii(prompt)
         if self._sdk_type == "genai":
+
             def _sync_call() -> Tuple[str, int, int]:
                 from google.genai import types
+
                 thinking_cfg = types.ThinkingConfig(thinking_budget=0)
                 cfg_kwargs: Dict[str, Any] = {
                     "system_instruction": system_prompt,
                     "temperature": temperature,
                     "thinking_config": thinking_cfg,
-                    "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True),
+                    "automatic_function_calling": types.AutomaticFunctionCallingConfig(
+                        disable=True
+                    ),
                 }
                 if response_schema is not None:
                     cfg_kwargs["response_mime_type"] = "application/json"
@@ -274,7 +467,10 @@ class LLMService:
                     )
                 except Exception as primary_err:
                     err_msg = str(primary_err)
-                    fallback_target = getattr(settings, "LLM_FALLBACK_MODEL", "") or self.fallback_model_name
+                    fallback_target = (
+                        getattr(settings, "LLM_FALLBACK_MODEL", "")
+                        or self.fallback_model_name
+                    )
                     if (
                         fallback_target
                         and fallback_target != self.model_name
@@ -294,28 +490,41 @@ class LLMService:
 
                 res_text = (response.text or "").strip()
                 if not res_text:
-                    raise LLMServiceException("Empty response returned from LLM provider")
+                    raise LLMServiceException(
+                        "Empty response returned from LLM provider"
+                    )
 
                 usage = getattr(response, "usage_metadata", None)
-                in_tok = int(getattr(usage, "prompt_token_count", 0) or 0) if usage else 0
-                out_tok = int(getattr(usage, "candidates_token_count", 0) or 0) if usage else 0
+                in_tok = (
+                    int(getattr(usage, "prompt_token_count", 0) or 0) if usage else 0
+                )
+                out_tok = (
+                    int(getattr(usage, "candidates_token_count", 0) or 0)
+                    if usage
+                    else 0
+                )
                 return res_text, in_tok, out_tok
 
             res_text, in_tok, out_tok = await asyncio.to_thread(_sync_call)
-            self._record_token_metrics(clean_prompt, system_prompt, res_text, in_tok, out_tok)
+            self._record_token_metrics(
+                clean_prompt, system_prompt, res_text, in_tok, out_tok
+            )
             return res_text
 
         elif self._sdk_type == "generativeai":
+
             def _sync_call() -> str:
                 generation_config = {"temperature": temperature}
                 response = self._client.generate_content(
-                    clean_prompt,
-                    generation_config=generation_config
+                    clean_prompt, generation_config=generation_config
                 )
                 return (response.text or "").strip()
+
             res_text = await asyncio.to_thread(_sync_call)
             if not res_text:
-                raise LLMServiceException("Empty response returned from legacy Gemini SDK")
+                raise LLMServiceException(
+                    "Empty response returned from legacy Gemini SDK"
+                )
             self._record_token_metrics(clean_prompt, system_prompt, res_text)
             return res_text
 
@@ -356,14 +565,20 @@ class LLMService:
         if self.is_in_cooldown():
             raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
         if not self.is_available():
-            raise LLMServiceException(f"AI provider '{self.provider}' is not configured.")
+            raise LLMServiceException(
+                f"AI provider '{self.provider}' is not configured."
+            )
 
-        effective_timeout = self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
+        effective_timeout = (
+            self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
+        )
 
         try:
             if self.provider == "ollama":
                 raw_text = await asyncio.wait_for(
-                    self._execute_ollama_call(prompt, structured_instruction, temperature, json_mode=True),
+                    self._execute_ollama_call(
+                        prompt, structured_instruction, temperature, json_mode=True
+                    ),
                     timeout=effective_timeout,
                 )
             else:
@@ -384,11 +599,19 @@ class LLMService:
             raise
         except asyncio.TimeoutError:
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            raise LLMTimeoutException(f"Structured LLM call timed out after {elapsed_ms}ms")
+            raise LLMTimeoutException(
+                f"Structured LLM call timed out after {elapsed_ms}ms"
+            )
         except Exception as exc:
             err_str = str(exc)
-            if "429" in err_str or "ResourceExhausted" in err_str or "quota" in err_str.lower():
-                cooldown_secs = float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
+            if (
+                "429" in err_str
+                or "ResourceExhausted" in err_str
+                or "quota" in err_str.lower()
+            ):
+                cooldown_secs = float(
+                    getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60)
+                )
                 self.cooldown_until = time.time() + cooldown_secs
                 raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
             raise LLMServiceException(f"Structured output call failed: {err_str}")
@@ -402,14 +625,22 @@ class LLMService:
         except Exception as val_err:
             try:
                 parsed_obj = json.loads(cleaned_json)
-                if isinstance(parsed_obj, list) and hasattr(response_model, "model_fields") and "items" in response_model.model_fields:
+                if (
+                    isinstance(parsed_obj, list)
+                    and hasattr(response_model, "model_fields")
+                    and "items" in response_model.model_fields
+                ):
                     validated = response_model.model_validate({"items": parsed_obj})
                     return validated, elapsed_ms
                 validated = response_model.model_validate(parsed_obj)
                 return validated, elapsed_ms
             except Exception:
-                logger.warning(f"Structured output validation failed ({val_err}); raw: {cleaned_json[:160]}")
-                raise LLMServiceException(f"Structured output schema validation failed: {val_err}")
+                logger.warning(
+                    f"Structured output validation failed ({val_err}); raw: {cleaned_json[:160]}"
+                )
+                raise LLMServiceException(
+                    f"Structured output schema validation failed: {val_err}"
+                )
 
     async def generate_response_stream(
         self,
