@@ -1,13 +1,16 @@
 """Chat endpoint handling customer RAG inquiries with guardrail refusal logging and automatic fallback."""
 
 import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.endpoints.chat_actions import get_optional_current_user
 from app.core.exceptions import InvalidPromptException
 from app.core.prompts import prompt_registry
 from app.core.security import check_prompt_injection, sanitize_input
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.ai_usage_logger import log_ai_call
 from app.services.llm_service import llm_service
@@ -30,7 +33,8 @@ router = APIRouter()
 )
 async def chat_with_assistant(
     payload: ChatRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ) -> ChatResponse:
     """Customer chat endpoint supporting RAG grounding, tool calling, and graceful fallback."""
     cleaned_message = sanitize_input(payload.message)
@@ -62,7 +66,8 @@ async def chat_with_assistant(
     response = await rag_service.answer_query(
         query=cleaned_message,
         session=db,
-        workspace_id=payload.workspace_id
+        workspace_id=payload.workspace_id,
+        current_user=current_user,
     )
 
     return response

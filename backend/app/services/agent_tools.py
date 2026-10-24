@@ -65,6 +65,8 @@ class AgentToolRegistry:
         action_type: str,
         summary: str,
         parameters: Dict[str, Any],
+        creator_id: Optional[int] = None,
+        creator_email: Optional[str] = None,
     ) -> PendingActionSchema:
         """Stores a mutating tool action awaiting explicit user confirmation."""
         action_id = f"act-{uuid.uuid4().hex[:6]}"
@@ -79,6 +81,8 @@ class AgentToolRegistry:
             "requires_confirmation": True,
             "expires_at": expires_iso,
             "status": "pending",
+            "creator_id": creator_id,
+            "creator_email": creator_email,
         }
         self._pending_actions[action_id] = record
         return PendingActionSchema(
@@ -99,13 +103,88 @@ class AgentToolRegistry:
         action_id: str,
         confirmed: bool,
         db: Optional[AsyncSession] = None,
+        current_user: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """Executes or cancels a stored pending action upon user confirmation."""
         pending = self._pending_actions.get(action_id)
 
+        # 1. Unknown action ID
+        if not pending:
+            return {
+                "action_id": action_id,
+                "status": "not_found",
+                "error_code": "ACTION_NOT_FOUND",
+                "executed": False,
+                "result_message": "Không tìm thấy yêu cầu xác thực hoặc mã hành động không hợp lệ.",
+                "message": "Không tìm thấy yêu cầu xác thực hoặc mã hành động không hợp lệ.",
+                "ticket_id": None,
+                "data": {"status": "not_found"},
+            }
+
+        # 2. Already executed or cancelled
+        if pending.get("status") in ("executed", "cancelled", "already_executed"):
+            return {
+                "action_id": action_id,
+                "status": "already_executed",
+                "error_code": "ALREADY_EXECUTED",
+                "executed": False,
+                "result_message": "Hành động này đã được xử lý trước đó và không thể thực thi lại.",
+                "message": "Hành động này đã được xử lý trước đó và không thể thực thi lại.",
+                "ticket_id": pending.get("ticket_code"),
+                "data": {"status": pending.get("status")},
+            }
+
+        # 3. Check expiration
+        expires_at_str = pending.get("expires_at")
+        if expires_at_str:
+            try:
+                clean_exp = expires_at_str.replace("Z", "+00:00")
+                exp_dt = datetime.datetime.fromisoformat(clean_exp)
+                if datetime.datetime.now(datetime.timezone.utc) > exp_dt:
+                    pending["status"] = "expired"
+                    return {
+                        "action_id": action_id,
+                        "status": "expired",
+                        "error_code": "ACTION_EXPIRED",
+                        "executed": False,
+                        "result_message": "Yêu cầu xác nhận đã hết hạn hiệu lực (30 phút).",
+                        "message": "Yêu cầu xác nhận đã hết hạn hiệu lực (30 phút).",
+                        "ticket_id": None,
+                        "data": {"status": "expired"},
+                    }
+            except Exception as e:
+                logger.warning(f"Error parsing expires_at: {e}")
+
+        # 4. User scoping & RBAC isolation
+        if current_user is not None:
+            user_role = getattr(current_user, "role", "user")
+            if user_role != "admin":
+                user_id = getattr(current_user, "id", None)
+                user_email = str(getattr(current_user, "email", "")).lower()
+                c_id = pending.get("creator_id")
+                c_email = str(pending.get("creator_email", "")).lower()
+
+                has_mismatch = False
+                if c_id is not None and user_id is not None and c_id != user_id:
+                    has_mismatch = True
+                if c_email and user_email and c_email != user_email:
+                    has_mismatch = True
+
+                if has_mismatch:
+                    return {
+                        "action_id": action_id,
+                        "status": "forbidden",
+                        "error_code": "ACTION_FORBIDDEN",
+                        "executed": False,
+                        "result_message": "Quyền truy cập bị từ chối: Bạn không có quyền xác nhận hành động của người dùng khác.",
+                        "message": "Quyền truy cập bị từ chối: Bạn không có quyền xác nhận hành động của người dùng khác.",
+                        "ticket_id": None,
+                        "data": {"status": "forbidden"},
+                    }
+
+        # 5. Cancellation path
         if not confirmed:
-            if pending:
-                pending["status"] = "cancelled"
+            pending["status"] = "cancelled"
             return {
                 "action_id": action_id,
                 "status": "cancelled",
@@ -114,18 +193,6 @@ class AgentToolRegistry:
                 "message": "Thao tác đã bị người dùng hủy bỏ.",
                 "ticket_id": None,
                 "data": {"status": "cancelled"},
-            }
-
-        if not pending:
-            # Graceful handling for synthetic or stateless confirmation IDs in tests/demos
-            return {
-                "action_id": action_id,
-                "status": "executed",
-                "executed": True,
-                "result_message": "Thao tác đã được xác nhận và thực thi thành công.",
-                "message": "Thao tác đã được xác nhận và thực thi thành công.",
-                "ticket_id": "#TICK-1045",
-                "data": {"status": "executed"},
             }
 
         action_type = pending["action_type"]
@@ -145,6 +212,7 @@ class AgentToolRegistry:
             )
             created = await ticket_service.create_ticket(db, ticket_in)
             pending["status"] = "executed"
+            pending["ticket_code"] = created.ticket_code
             sla_h = getattr(created, "estimated_response_hours", getattr(created, "sla_hours", 8))
             msg = f"Ticket {created.ticket_code} đã được tạo thành công với mức ưu tiên {created.priority} (SLA: {sla_h}h)."
             return {
@@ -184,6 +252,7 @@ class AgentToolRegistry:
                 await db.commit()
                 await db.refresh(ticket_obj)
                 pending["status"] = "executed"
+                pending["ticket_code"] = ticket_obj.ticket_code
                 sla_h = getattr(ticket_obj, "estimated_response_hours", 8)
                 msg = (
                     f"Đã cập nhật thành công ticket {ticket_obj.ticket_code}: "
@@ -224,6 +293,7 @@ async def handle_lookup_customer_tickets(
     customer_email: Optional[str] = None,
     ticket_code: Optional[str] = None,
     workspace_id: int = 1,
+    current_user: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Tool 1: Read-only lookup of customer support tickets by email or #TICK-XXXX code."""
     if session is None:
@@ -234,6 +304,12 @@ async def handle_lookup_customer_tickets(
         }
 
     query = select(Ticket)
+
+    # Scoping rule: Non-admin users are strictly constrained to their own tickets
+    if current_user and getattr(current_user, "role", "user") != "admin":
+        user_email = getattr(current_user, "email", "")
+        query = query.where(Ticket.customer_email.ilike(user_email))
+
     if ticket_code:
         formatted = ticket_code.upper() if ticket_code.startswith("#") else f"#{ticket_code.upper()}"
         query = query.where(or_(Ticket.ticket_code.ilike(ticket_code), Ticket.ticket_code.ilike(formatted)))
@@ -329,6 +405,8 @@ async def handle_prepare_escalation_ticket(
     customer_email: str = "an.nguyen@company.vn",
     customer_name: str = "Nguyễn Văn An",
     workspace_id: int = 1,
+    creator_id: Optional[int] = None,
+    creator_email: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Tool 3: Mutating tool that prepares a PendingAction to create an escalation support ticket (requires user confirmation)."""
     norm_category = ticket_copilot_service.infer_category(f"{subject} {description}", category)
@@ -348,6 +426,8 @@ async def handle_prepare_escalation_ticket(
         action_type="create_escalation_ticket",
         summary=summary,
         parameters=params,
+        creator_id=creator_id,
+        creator_email=creator_email or customer_email,
     )
     response_text = (
         f"Tôi đã chuẩn bị yêu cầu tạo phiếu hỗ trợ (ticket) mới cho bạn:\n"
@@ -472,6 +552,7 @@ async def detect_and_route_tool(
     session: Optional[AsyncSession] = None,
     workspace_id: int = 1,
     registry: Optional[AgentToolRegistry] = None,
+    current_user: Optional[Any] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Single-pass deterministic + intent tool router for Chat & Streaming endpoints.
@@ -545,14 +626,22 @@ async def detect_and_route_tool(
         subject = cleaned_subj[:120] if len(cleaned_subj) >= 5 else "Yêu cầu hỗ trợ kỹ thuật khẩn cấp"
         description = f"Khách hàng yêu cầu tạo ticket qua AI Chat: {query.strip()}"
 
+        user_email = customer_email or (getattr(current_user, "email", None) if current_user else "an.nguyen@company.vn")
+        user_name = getattr(current_user, "full_name", "Nguyễn Văn An") if current_user else "Nguyễn Văn An"
+        c_id = getattr(current_user, "id", None) if current_user else None
+        c_email = getattr(current_user, "email", None) if current_user else None
+
         prep = await handle_prepare_escalation_ticket(
             registry=active_registry,
             subject=subject,
             description=description,
             priority=prio,
             category=ticket_copilot_service.infer_category(query),
-            customer_email=customer_email or "an.nguyen@company.vn",
+            customer_email=user_email,
+            customer_name=user_name,
             workspace_id=workspace_id,
+            creator_id=c_id,
+            creator_email=c_email,
         )
         return {
             "tools_called": ["create_escalation_ticket"],
@@ -572,6 +661,7 @@ async def detect_and_route_tool(
             customer_email=customer_email,
             ticket_code=ticket_code,
             workspace_id=workspace_id,
+            current_user=current_user,
         )
         return {
             "tools_called": ["lookup_customer_tickets"],
