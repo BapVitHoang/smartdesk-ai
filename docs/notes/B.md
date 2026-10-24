@@ -125,3 +125,25 @@ Environment found in Task 0 (see Evidence): worktree smartdesk-B, no backend/.en
 - Mutation check (to prove the tests test something): validator disabled -> `6 failed, 7 passed`; startup refusal removed -> `1 failed, 12 passed`; both files restored -> `13 passed in 1.92s`.
 - `python -m pytest backend/tests -q` -> `79 passed in 6.14s`, exit 0.
 - `git grep --untracked -n "<old default string>"` -> one hit, `backend/tests/platform/test_jwt_secret.py:22` (the test that proves rejection). `.env.example` now has `JWT_SECRET_KEY=""`, compose passes `JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}`; `docker compose config -q` exit 0 (config parse only).
+
+### Task 2 - Dependency truth (REQ-11)
+- Clean virtual environment created in `$env:TEMP\sd-venv-clean` with `include-system-site-packages = false` (Python 3.13.7).
+- Executed `pip install -q -r backend/requirements.txt` -> exit 0. Total packages in `pip freeze`: 67 (including transitive dependencies).
+- Executed `pytest backend/tests -q -p no:cacheprovider` inside the clean venv -> `79 passed in 8.76s`, exit 0.
+- Performed full AST scan of all import statements across `backend/app`, `backend/scripts`, and `backend/tests`:
+  - `fastapi`, `uvicorn`: ASGI framework and server runner.
+  - `pydantic`, `pydantic-settings`: Schemas and config management.
+  - `email-validator`: Enforces RFC validation on `EmailStr` in auth and ticket schemas.
+  - `sqlalchemy[asyncio]`, `greenlet`: Async ORM core and greenlet coroutine driver.
+  - `aiosqlite`, `asyncpg`: Dual-driver support for SQLite and PostgreSQL.
+  - `httpx`: Async HTTP client for Ollama and tests.
+  - `google-genai`: Primary SDK for Gemini 3.5 Flash Lite.
+  - `google-generativeai`: Backward-compatibility fallback SDK used in `llm_service.py:75` and `embedding_service.py:57`.
+  - `pytest`, `pytest-asyncio`: Automated test suites.
+  - `python-dotenv`: Environment variable loader for scripts and tests.
+  - `pypdf`: Document ingestion engine in `document_service.py`.
+  - `python-multipart`: Form-data parser for OAuth2 login endpoints.
+  - `pyjwt`: HS256 JWT encoding, decoding, and claims verification.
+  - `google-auth`: Signature verification for Google OAuth2 ID tokens.
+  - `pgvector`: PostgreSQL vector type bindings for hybrid search.
+- Outcome: Zero stale dependencies detected. No packages removed or added. All 20 entries in `backend/requirements.txt` are verified active and necessary.
