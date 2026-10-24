@@ -6,10 +6,10 @@
 **Môn học:** Các Hệ thống AI Ứng dụng & Agentic Nâng cao (Advanced Agentic & Applied AI Systems)  
 **Thời gian thực hiện:** Học kỳ 6 (2026–2027)  
 **Phiên bản tài liệu:** 1.0.0 (Bản chính thức)  
-**Phân quyền nhóm phát triển:**
-- **Nhóm 1 / Dev A (AI Engine, RAG, Structured Output, Guardrails & Eval):** Nguyễn Nhật Huy (`@TheOrijinnn`)
-- **Nhóm 2 / Dev B & Integrator (Platform, Security, Database, Workspaces, Tickets & Shared Contracts):** Hoàng Văn Bắp (`@BapVitHoang`)
-- **Nhóm 3 / Dev C (Frontend UX, QA, Mocks & Capstone Documentation):** Trần Quốc Khánh (`@TKhanh`)
+**Phân quyền nhóm phát triển:** (Họ tên và MSSV: xem docs/TEAM_ROSTER.md)
+- **Nhóm 1 / Dev A (AI Engine, RAG, Structured Output, Guardrails & Eval):** [`@TheOrijinnn`](https://github.com/TheOrijinnn)
+- **Nhóm 2 / Dev B & Integrator (Platform, Security, Database, Workspaces, Tickets & Shared Contracts):** [`@BapVitHoang`](https://github.com/BapVitHoang)
+- **Nhóm 3 / Dev C (Frontend UX, QA, Mocks & Capstone Documentation):** [`@TKhanh`](https://github.com/TKhanh)
 
 ---
 

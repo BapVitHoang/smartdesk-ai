@@ -125,7 +125,7 @@ Review the pitfalls discovered during our project audit before writing code:
 SmartDesk AI is developed by a **team of exactly 3 members** (no separate fourth integrator person):
 - **Hoang (`@BapVitHoang`)**: Dev B (Platform, Data & Security) AND Integrator.
 - **Dev A (`@TheOrijinnn`)**: AI Engine & Evaluation.
-- **Dev C (`@[C_USERNAME]`)**: Frontend UX, QA & Capstone Documentation.
+- **Dev C (`@TKhanh`)**: Frontend UX, QA & Capstone Documentation.
 
 ### 6.1 Configuring Local Git Identity (Per-Repository)
 To ensure individual commit traceability for grading (**REQ-29**, **CRIT-06**), set your identity locally in the repository (do NOT use `--global`):
@@ -153,3 +153,11 @@ If using **GitHub Desktop**:
   3. Any blockers or change requests needed from other modules.
 - **Need a Change in Shared Files?** Create an entry in `docs/requests/dev<A|B|C>.md`.
 - **Pre-PR Verification:** Run `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` before submitting any PR.
+
+---
+
+## 8. Strict Anti-Fabrication Rule (No Hallucination of Project Facts)
+
+> [!CAUTION]
+> **Zero Tolerance for Fabricated Data:**
+> Never invent names, student IDs, emails, percentages, dates, commit hashes, test counts or metrics. Facts about people come only from `docs/TEAM_ROSTER.md`. If a value is unknown write `CHƯA CÓ DỮ LIỆU` and raise it in `docs/requests/<dev>.md`. Report only numbers you obtained from a command in this session.

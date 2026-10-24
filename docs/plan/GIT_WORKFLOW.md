@@ -2,7 +2,8 @@
 
 > **Version:** 1.0.0  
 > **Status:** FROZEN GOVERNANCE SPECIFICATION  
-> **Target Integration Branch:** `Hoang` (or `main`)  
+> **Target Integration Branch:** `Hoang`  
+> **Release Target:** The repository default branch on GitHub is `master`. The final release submission requires a reviewed pull request from `Hoang` into `master`.  
 > **Governing Documents:** [`AGENTS.md`](../../AGENTS.md), [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md), [`docs/plan/WORKSTREAMS.md`](./WORKSTREAMS.md)
 
 ---

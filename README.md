@@ -146,13 +146,15 @@ npm run build --prefix frontend
 
 ## 6. Thành viên Nhóm & Phân công Module (Team Roster & Ownership — REQ-29)
 
-SmartDesk AI được phát triển bởi **nhóm 3 thành viên** (Dev B kiêm nhiệm vai trò Integrator điều phối kiến trúc và release):
+SmartDesk AI được phát triển bởi **nhóm 3 thành viên** (Dev B kiêm nhiệm vai trò Integrator điều phối kiến trúc và release).
 
-| Họ và Tên | MSSV | GitHub | Vai trò chính | Phân công Module & Quyền sở hữu (REQ-29) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Dương Bắp Vịt Hoàng** (Repo Owner) | `23110020` | [`@BapVitHoang`](https://github.com/BapVitHoang) | **Dev B & Integrator** | Platform, Database, OAuth2/JWT, Ticket CRUD, Docker Compose, Frozen Governance & Release |
-| **Nguyễn Nhật Huy** | `23110029` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | AI Engine, RAG Pipeline, Single-call Structured Output, Tool-using Agent, 24-case Eval Benchmark |
-| **Trần Quốc Khánh** | `23110034` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend UX, Streaming Bubble, Confirmation UI, Telemetry View, Integration Tests & Capstone Docs |
+Họ tên và MSSV: xem docs/TEAM_ROSTER.md.
+
+| Định danh (Identifier) | GitHub | Vai trò chính | Phân công Module & Quyền sở hữu (REQ-29) |
+| :--- | :--- | :--- | :--- |
+| **Dev B & Integrator** | [`@BapVitHoang`](https://github.com/BapVitHoang) | **Dev B & Integrator** | Platform, Database, OAuth2/JWT, Ticket CRUD, Docker Compose, Frozen Governance & Release |
+| **Dev A** | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | AI Engine, RAG Pipeline, Single-call Structured Output, Tool-using Agent, 24-case Eval Benchmark |
+| **Dev C** | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend UX, Streaming Bubble, Confirmation UI, Telemetry View, Integration Tests & Capstone Docs |
 
 ---
 

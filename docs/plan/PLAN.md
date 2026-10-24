@@ -42,7 +42,7 @@ Bring **SmartDesk AI** from its current audited compliance baseline (**35.8% net
 ## 2. Phased Task Breakdown (Quick Wins First)
 
 > **Effort Scale:** `XS` ($\le 30$ min) · `S` ($30\text{–}60$ min) · `M` ($1\text{–}2.5$ hrs) · `L` ($2.5\text{–}4$ hrs)  
-> **Owner Placeholders:** `@Lead-AI` (Member 1 / `23110020`), `@Backend-Sec` (Member 2 or Member 1), `@Frontend-QA` (Member 3 or Member 1)
+> **Owner Placeholders:** `@Lead-AI` (Member 1), `@Backend-Sec` (Member 2 or Member 1), `@Frontend-QA` (Member 3 or Member 1)
 
 ### Phase A: Quick Wins & Critical Bug Fixes (Tasks `TASK-01` to `TASK-07` — All $< 1$ Hour Each)
 
@@ -173,7 +173,7 @@ The project remediation is complete when **all 8 gates pass**:
 
 1. **OQ-01 — Official Group Size & Student Roster (`REQ-01`, `REQ-12`, `REQ-29`):**
    - `docs/PROPOSAL.md#L170-L172` lists 3 unnamed roles (*Owner 1, Owner 2, Owner 3*), whereas `git log` shows all 14 commits authored by **1 student** (`Bap <23110020@student.hcmute.edu.vn>`).
-   - **Question:** Is this a **1-member individual project** (`23110020`) or a **2–3 member team**? If 2–3 members, please provide the full names, Student IDs (MSSV), and Git emails of Members 2 and 3 so we can populate the Module Ownership table (`REQ-29`) and Git commit attribution. *(Note: Our architectural plan implements Capabilities A, B, C, and E, so `REQ-12` is satisfied whether you have 1, 2, or 3 members).*
+   - **Question:** Is this a **1-member individual project** (`@BapVitHoang`) or a **2–3 member team**? If 2–3 members, please provide the full names, Student IDs (MSSV), and Git emails of Members 2 and 3 so we can populate the Module Ownership table (`REQ-29`) and Git commit attribution. *(Note: Our architectural plan implements Capabilities A, B, C, and E, so `REQ-12` is satisfied whether you have 1, 2, or 3 members).*
 2. **OQ-02 — Primary LLM Model Target for Live Defense (`AGENTS.md` §1.1 vs `REQ-18`):**
    - `AGENTS.md` §1.1 and `config.py#L28` set `LLM_MODEL_NAME = "gemini-3.5-flash-lite"`, which is not a live Google API model ID (`gemini-2.5-flash-lite` / `gemini-2.0-flash` are live) and also supports local Ollama (`qwen2.5:3b`).
    - **Question:** Should we keep `LLM_MODEL_NAME = "gemini-3.5-flash-lite"` as the default config string (to strictly follow `AGENTS.md`) while transparently mapping/falling back to `gemini-2.5-flash-lite` / `gemini-2.0-flash` in `llm_service.py` when calling Google's live API, OR will you run the live defense primarily on **Local Ollama (`qwen2.5:3b`)**?

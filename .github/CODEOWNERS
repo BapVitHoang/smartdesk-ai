@@ -19,14 +19,11 @@
 /backend/tests/ai/*                           @TheOrijinnn  # devA
 /backend/app/db/seed/*                        @BapVitHoang  # devB
 /backend/tests/platform/*                     @BapVitHoang  # devB
-# TODO: Set GitHub handle for devC
-# /frontend/src/components/*                  @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/features/*                    @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/services/mocks/*              @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /backend/tests/common/*                     @[C_USERNAME]
+/frontend/src/components/*                    @TKhanh  # devC
+/frontend/src/features/*                      @TKhanh  # devC
+/frontend/src/services/mocks/*                @TKhanh  # devC
+/backend/tests/common/*                       @TKhanh  # devC
+/docs/evidence/*                              @TKhanh  # devC
 /.agents/*                                    @BapVitHoang  # integrator
 /.github/*                                    @BapVitHoang  # integrator
 /docs/adr/*                                   @BapVitHoang  # integrator
@@ -102,48 +99,31 @@
 /docs/notes/B.md                              @BapVitHoang  # devB
 /docs/notes/B-ai-usage.md                     @BapVitHoang  # devB
 /docs/requests/devB.md                        @BapVitHoang  # devB
-# TODO: Set GitHub handle for devC
-# /frontend/src/App.tsx                       @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/main.tsx                      @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/index.css                     @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/data.ts                       @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/services/api/auth.ts          @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/services/api/chat.ts          @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/services/api/documents.ts     @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/services/api/telemetry.ts     @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/services/api/tickets.ts       @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/src/services/api/workspaces.ts    @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /frontend/metadata.json                     @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /backend/PYTHON_FILES_EXPLANATION.md        @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /backend/tests/test_api.py                  @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /README.md                                  @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /docs/PROPOSAL.md                           @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /docs/TEST_ACCEPTANCE.md                    @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /docs/REPORT.md                             @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /docs/PRESENTATION_AND_DEMO.md              @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /docs/notes/C.md                            @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /docs/notes/C-ai-usage.md                   @[C_USERNAME]
-# TODO: Set GitHub handle for devC
-# /docs/requests/devC.md                      @[C_USERNAME]
+/frontend/src/App.tsx                         @TKhanh  # devC
+/frontend/src/main.tsx                        @TKhanh  # devC
+/frontend/src/index.css                       @TKhanh  # devC
+/frontend/src/data.ts                         @TKhanh  # devC
+/frontend/src/services/api/auth.ts            @TKhanh  # devC
+/frontend/src/services/api/chat.ts            @TKhanh  # devC
+/frontend/src/services/api/documents.ts       @TKhanh  # devC
+/frontend/src/services/api/telemetry.ts       @TKhanh  # devC
+/frontend/src/services/api/tickets.ts         @TKhanh  # devC
+/frontend/src/services/api/workspaces.ts      @TKhanh  # devC
+/frontend/metadata.json                       @TKhanh  # devC
+/backend/PYTHON_FILES_EXPLANATION.md          @TKhanh  # devC
+/backend/tests/test_api.py                    @TKhanh  # devC
+/README.md                                    @TKhanh  # devC
+/docs/PROPOSAL.md                             @TKhanh  # devC
+/docs/TEST_ACCEPTANCE.md                      @TKhanh  # devC
+/docs/REPORT.md                               @TKhanh  # devC
+/docs/REPORT.pdf                              @TKhanh  # devC
+/docs/SLIDES.pdf                              @TKhanh  # devC
+/docs/SLIDES.pptx                             @TKhanh  # devC
+/docs/DEMO_VIDEO_CHECKLIST.md                 @TKhanh  # devC
+/docs/PRESENTATION_AND_DEMO.md                @TKhanh  # devC
+/docs/notes/C.md                              @TKhanh  # devC
+/docs/notes/C-ai-usage.md                     @TKhanh  # devC
+/docs/requests/devC.md                        @TKhanh  # devC
 /.cursorrules                                 @BapVitHoang  # integrator
 /.env.example                                 @BapVitHoang  # integrator
 /.gitattributes                               @BapVitHoang  # integrator
@@ -172,6 +152,7 @@
 /docs/ARCHITECTURE.md                         @BapVitHoang  # integrator
 /docs/DESIGN.md                               @BapVitHoang  # integrator
 /docs/DEV_START_HERE.md                       @BapVitHoang  # integrator
+/docs/TEAM_ROSTER.md                          @BapVitHoang  # integrator
 /docs/implementation_plan_smartdesk_ai_upgrade.md @BapVitHoang  # integrator
 /docs/requests/template.md                    @BapVitHoang  # integrator
 /frontend/.env.example                        @BapVitHoang  # integrator
@@ -188,6 +169,7 @@
 /frontend/vite.config.ts                      @BapVitHoang  # integrator
 /pytest.ini                                   @BapVitHoang  # integrator
 /scripts/check_ownership.py                   @BapVitHoang  # integrator
+/scripts/check_roster.py                      @BapVitHoang  # integrator
 /scripts/gen_codeowners.py                    @BapVitHoang  # integrator
 /scripts/ownership_map.py                     @BapVitHoang  # integrator
 /scripts/install.bat                          @BapVitHoang  # integrator

@@ -5,7 +5,7 @@
 > **Team Structure (Exactly 3 Members):**
 > - **Dev A (Owner 1):** AI Engine & Evaluation (`@TheOrijinnn`)  
 > - **Dev B (Owner 2) & Integrator:** Platform, Data & Security + Integrator Hat (`@BapVitHoang`)  
-> - **Dev C (Owner 3):** Frontend UX, QA & Capstone Documentation (`@[C_USERNAME]`)  
+> - **Dev C (Owner 3):** Frontend UX, QA & Capstone Documentation (`@TKhanh`)  
 > *Note: Hoang is Dev B and simultaneously wears the Integrator hat. There is no separate fourth person.*
 
 ---
