@@ -304,7 +304,7 @@ Retrieve aggregated token usage, cost tracking, latency metrics, and recent logs
 ---
 
 ### `POST /api/v1/agent/reset-cooldown`
-1-click reset of the circuit breaker cooldown (Admin only).
+1-click reset of the circuit breaker cooldown (Admin only). Note: `POST /api/v1/agent/ai-usage/reset-cooldown` is also served as an alias.
 
 #### Response (HTTP 200 OK)
 ```json

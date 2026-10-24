@@ -159,3 +159,20 @@ Environment found in Task 0 (see Evidence): worktree smartdesk-B, no backend/.en
   - Validated graceful blocker detection: Running `smoke_docker.ps1` correctly detects Docker failure and exits with code 1 without corrupting local state.
   - Per Rule 3 & Rule 8 (No Fabrication, Stop Conditions): PostgreSQL live queries and live container execution are NOT claimed as verified because Docker is offline.
 
+### Task 4 - Cooldown route & small frozen-file fixes (REQ-22, REQ-33)
+- Implemented `POST /api/v1/agent/reset-cooldown` directly in `backend/app/api/v1/endpoints/agent.py` (Dev B owned), guarded by `require_role("admin")`, invoking `llm_service.reset_cooldown()` and returning `ResetCooldownResponse(status="success", message=..., cooldown_active=False)`.
+- Updated `docs/API_CONTRACT.md` (Integrator hat) noting that `POST /api/v1/agent/reset-cooldown` is the primary endpoint and `POST /api/v1/agent/ai-usage/reset-cooldown` is maintained as an alias for telemetry convenience.
+- Created `backend/data/eval_runs/.gitignore` with `*` and `!.gitignore`.
+- Verified `.gitignore` pattern:
+  - `git check-ignore -v backend/data/eval_runs/test_run.json` -> `backend/data/eval_runs/.gitignore:1:*` (ignored).
+  - `git check-ignore -v backend/data/eval_runs/.gitignore` -> `backend/data/eval_runs/.gitignore:2:!.gitignore` (tracked).
+- Registered `backend/data/eval_runs/.gitignore` and `scripts/smoke_docker.ps1` under `integrator` in `scripts/ownership_map.py` and updated `.github/CODEOWNERS`.
+- Created offline platform test `backend/tests/platform/test_agent_reset_cooldown.py`:
+  - `test_reset_cooldown_unauthenticated_rejected`: 401 Unauthorized.
+  - `test_reset_cooldown_regular_user_forbidden`: 403 Forbidden.
+  - `test_reset_cooldown_admin_success_and_clears_timer`: 200 OK and asserts `llm_service.is_in_cooldown() is False`.
+  - `test_reset_cooldown_alias_backward_compatibility`: 200 OK.
+  - Test command output: `4 passed in 0.82s`.
+- Full pytest suite: `83 passed in 7.49s`.
+
+

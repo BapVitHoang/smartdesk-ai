@@ -133,6 +133,7 @@ OWNERSHIP_MAP = {
         "AI_USAGE.md",
         "backend/.env.example",
         "backend/README.md",
+        "backend/data/eval_runs/.gitignore",
         "backend/pytest.ini",
         "backend/requirements.txt",
         "backend/app/__init__.py",
