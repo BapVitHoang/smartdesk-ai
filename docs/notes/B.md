@@ -147,3 +147,15 @@ Environment found in Task 0 (see Evidence): worktree smartdesk-B, no backend/.en
   - `google-auth`: Signature verification for Google OAuth2 ID tokens.
   - `pgvector`: PostgreSQL vector type bindings for hybrid search.
 - Outcome: Zero stale dependencies detected. No packages removed or added. All 20 entries in `backend/requirements.txt` are verified active and necessary.
+
+### Task 3 - Docker & PostgreSQL + pgvector (REQ-07, REQ-11) — BLOCKED
+- Status: **BLOCKED** due to Docker Desktop Linux Engine daemon not running on the host Windows machine.
+- Command executed: `docker version` and `powershell -ExecutionPolicy Bypass -File scripts/smoke_docker.ps1`.
+- Actual output:
+  `ERROR: error during connect: Get "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.47/info": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.`
+- Actions delivered offline (Integrator hat):
+  - Created `scripts/smoke_docker.ps1` (Integrator-owned) automating `docker compose build`, `docker compose up -d`, healthcheck polling on `http://localhost:8000/api/v1/health`, Nginx reverse proxy test on `http://localhost:3000`, demo login authentication (`POST /auth/oauth2/login`), ticket listing (`GET /tickets` verifying `X-Total-Count`), and SQL check for PostgreSQL extension `vector`.
+  - Validated syntax of `scripts/smoke_docker.ps1` using `[System.Management.Automation.Language.Parser]::ParseFile()` -> `SYNTAX_OK` (0 errors).
+  - Validated graceful blocker detection: Running `smoke_docker.ps1` correctly detects Docker failure and exits with code 1 without corrupting local state.
+  - Per Rule 3 & Rule 8 (No Fabrication, Stop Conditions): PostgreSQL live queries and live container execution are NOT claimed as verified because Docker is offline.
+

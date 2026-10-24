@@ -183,6 +183,7 @@ OWNERSHIP_MAP = {
         "scripts/start_all.bat",
         "scripts/start_backend.bat",
         "scripts/verify_setup.ps1",
+        "scripts/smoke_docker.ps1",
         "smartdesk_audit_report.md",
     ],
 }

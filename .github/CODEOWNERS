@@ -177,4 +177,5 @@
 /scripts/start_all.bat                        @BapVitHoang  # integrator
 /scripts/start_backend.bat                    @BapVitHoang  # integrator
 /scripts/verify_setup.ps1                     @BapVitHoang  # integrator
+/scripts/smoke_docker.ps1                     @BapVitHoang  # integrator
 /smartdesk_audit_report.md                    @BapVitHoang  # integrator
