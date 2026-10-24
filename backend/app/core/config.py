@@ -1,17 +1,28 @@
 """Application configuration settings module using Pydantic Settings."""
 
-from typing import List, Union
-from pydantic import field_validator
+from typing import Any, List, Union
+from pydantic import PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import hashlib
 import json
+import secrets
 from pathlib import Path
 
 
 BACKEND_DIR: Path = Path(__file__).resolve().parent.parent.parent
 PROJECT_ROOT: Path = BACKEND_DIR.parent
 DEFAULT_SQLITE_PATH: str = (BACKEND_DIR / "smartdesk.db").as_posix()
-# Placeholder JWT secret. Startup refuses to run with it unless DEMO_LOGIN_ENABLED is true (local demo only).
-DEFAULT_JWT_SECRET_KEY: str = "smartdesk-secret-key-change-in-production-2026"
+# SHA-256 of the placeholder JWT secret that used to be published in the repository. The literal is intentionally
+# NOT stored in code: any secret that is empty or hashes to this value is treated as "not configured".
+KNOWN_DEFAULT_JWT_SECRET_SHA256: str = "ac5ca707a1e2e37c7ee4ba316972dae3f391fc9c4df01e5a205303f274c94263"
+
+
+def is_placeholder_secret(secret: str) -> bool:
+    """Returns True if the secret is empty/whitespace or equals the old publicly known default value."""
+    cleaned = (secret or "").strip()
+    if not cleaned:
+        return True
+    return hashlib.sha256(cleaned.encode("utf-8")).hexdigest() == KNOWN_DEFAULT_JWT_SECRET_SHA256
 
 
 class Settings(BaseSettings):
@@ -54,7 +65,9 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 100
 
     # Authentication & RBAC (Hybrid OAuth2 + Demo Login)
-    JWT_SECRET_KEY: str = DEFAULT_JWT_SECRET_KEY
+    # Empty = not configured. With DEMO_LOGIN_ENABLED=true a random per-process secret is generated at startup;
+    # with DEMO_LOGIN_ENABLED=false the server refuses to start (see core.security.validate_auth_configuration).
+    JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     GOOGLE_OAUTH_CLIENT_ID: str = ""
@@ -94,6 +107,20 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=True
     )
+
+    _jwt_secret_ephemeral: bool = PrivateAttr(default=False)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Replaces an empty/known-default JWT secret by a random per-process one when demo login is enabled."""
+        super().model_post_init(__context)
+        if is_placeholder_secret(self.JWT_SECRET_KEY) and self.DEMO_LOGIN_ENABLED:
+            self.JWT_SECRET_KEY = secrets.token_urlsafe(48)
+            self._jwt_secret_ephemeral = True
+
+    @property
+    def jwt_secret_is_ephemeral(self) -> bool:
+        """True when JWT_SECRET_KEY was generated at startup (tokens become invalid after a restart)."""
+        return self._jwt_secret_ephemeral
 
     @field_validator("DATABASE_URL", "FALLBACK_SQLITE_URL", mode="before")
     @classmethod

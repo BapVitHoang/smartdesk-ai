@@ -89,3 +89,39 @@
   - All verification commands green (10/10 verification gate in `verify_setup.ps1`, 55/55 pytest tests passing, 0 TypeScript errors, clean Vite production build).
   - Stop early condition satisfied after Round 1.
 
+
+
+---
+
+## Plan (Prompt 2 - Dev B + Integrator)
+
+Environment found in Task 0 (see Evidence): worktree smartdesk-B, no backend/.env (git-ignored; created from .env.example, no key), Docker Desktop daemon not running.
+
+- **Task 1 (JWT secret):**
+  files: core/config.py (Integrator), core/security.py, docker-compose.yml, backend/.env.example, tests/platform/test_jwt_secret.py.
+  approach: stop storing the old default literal in code; keep only its SHA-256 to recognise it. A Settings `model_validator(after)` replaces an empty/known-default secret with `secrets.token_urlsafe(48)` when DEMO_LOGIN_ENABLED is true (so tests, which skip lifespan, are covered too) and leaves it unusable when demo is OFF so `validate_auth_configuration` still refuses to start. One startup warning without the secret. compose passes `JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}`; .env.example has an empty value.
+  proof: 3 offline tests + `git grep -n` for the old string (only test files).
+  risk: several workers would each get a different secret (documented in the warning); tests that assume the old default.
+- **Task 2 (dependency truth):** venv in %TEMP% outside the repo, `pip install -r`, import app, pytest; AST scan of imports vs requirements.txt. Remove only packages not imported anywhere and not required by kept packages; add missing ones. risk: local Python 3.13 differs from Docker python:3.11; google-generativeai may be a transitive requirement.
+- **Task 3 (Docker/pgvector):** Docker daemon is down, so per Task 0 this is BLOCKED. Still delivered offline: scripts/smoke_docker.ps1 (syntax-checked with the PowerShell parser only, NOT run). Nothing about PostgreSQL is claimed as verified.
+- **Task 4 (cooldown route):** agent.py gets `POST /agent/reset-cooldown` (admin only, same body as the existing route); the existing `/agent/ai-usage/reset-cooldown` in ai_usage.py (Dev A file, untouched) stays as alias; API_CONTRACT.md states both. backend/data/eval_runs/.gitignore with `*` and `!.gitignore`, proved by `git check-ignore -v`. proof: offline route test (admin 200, user 403, no token 401).
+- **Task 5 (REQ-08):** grep frontend/package.json, frontend/src and a fresh `frontend/dist` (needs `npm ci` in this worktree); `git log -S "AIza"` printing subjects/file names only.
+- **Task 6 (notes):** B.md / B-ai-usage.md by commit subject, section "Giải thích code" using names read from the code.
+- Out-of-scope findings go to docs/requests/devB.md, one line each.
+
+---
+
+## Evidence
+
+### Task 0 - setup check
+- `git merge-base --is-ancestor origin/Hoang HEAD` returned exit 1 before and exit 0 after `git merge origin/Hoang` (merge commit "Merge remote-tracking branch 'origin/Hoang' into feature/b-platform").
+- Identity: `git config user.name` = `Bap`, `git config user.email` = the roster email for the Dev B row. The roster row still has `verified_by_user = false`; the human confirmed in the chat that the full name is Ngô Việt Hoàng and the GitHub name is Bap, and confirmed that smartdesk-B is the worktree.
+- `backend/.env` did not exist in this worktree (it is git-ignored, `git check-ignore -v backend/.env` -> `.gitignore:8:.env`). It was created from `backend/.env.example` (no key). GEMINI_API_KEY: **missing** in this worktree.
+- `docker version` -> exit 1, `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.` => Docker Desktop is not running => Task 3 is BLOCKED (see Task 3).
+- `scripts/verify_setup.ps1` -> `RESULT: 7/10 CHECKS PASSED`. PASS: git, .env, backend deps, backend pytest (`66 passed in 5.44s`), docker-compose config, ownership, roster. FAIL: [4/10] `frontend/node_modules not found`, [6/10] lint and [7/10] build (both fail because node_modules is missing in this fresh worktree; not a code failure, re-run after `npm ci`).
+
+### Task 1 - JWT secret
+- `python -m pytest backend/tests/platform/test_jwt_secret.py -q` -> `13 passed in 1.97s`.
+- Mutation check (to prove the tests test something): validator disabled -> `6 failed, 7 passed`; startup refusal removed -> `1 failed, 12 passed`; both files restored -> `13 passed in 1.92s`.
+- `python -m pytest backend/tests -q` -> `79 passed in 6.14s`, exit 0.
+- `git grep --untracked -n "<old default string>"` -> one hit, `backend/tests/platform/test_jwt_secret.py:22` (the test that proves rejection). `.env.example` now has `JWT_SECRET_KEY=""`, compose passes `JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}`; `docker compose config -q` exit 0 (config parse only).

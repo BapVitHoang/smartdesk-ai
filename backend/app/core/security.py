@@ -11,7 +11,7 @@ import time
 from collections import defaultdict, deque
 from typing import Any, Deque, Dict, Optional, Tuple
 
-from app.core.config import DEFAULT_JWT_SECRET_KEY, settings
+from app.core.config import is_placeholder_secret, settings
 
 logger = logging.getLogger("smartdesk.security")
 
@@ -272,18 +272,22 @@ async def verify_google_credential(credential: str) -> Dict[str, Any]:
 
 def validate_auth_configuration() -> None:
     """
-    Startup guard: refuse to run with the placeholder JWT secret unless DEMO_LOGIN_ENABLED is true
-    (local demo only). Raises RuntimeError so the application never serves tokens signed with a public secret.
+    Startup guard for the JWT secret.
+    - Empty/whitespace or the old publicly known default value while DEMO_LOGIN_ENABLED is false: refuse to start
+      (RuntimeError), so the application never serves tokens signed with a public or missing secret.
+    - Secret generated at startup (Settings replaces a placeholder when demo login is enabled): log ONE warning,
+      without the secret, that tokens become invalid after a restart and differ between worker processes.
     """
-    if settings.JWT_SECRET_KEY == DEFAULT_JWT_SECRET_KEY and not settings.DEMO_LOGIN_ENABLED:
+    if is_placeholder_secret(settings.JWT_SECRET_KEY):
         raise RuntimeError(
-            "JWT_SECRET_KEY is still the default placeholder while DEMO_LOGIN_ENABLED is false. "
+            "JWT_SECRET_KEY is empty or still the known default while DEMO_LOGIN_ENABLED is false. "
             "Set a strong JWT_SECRET_KEY (>= 32 random characters) before starting the server."
         )
-    if settings.JWT_SECRET_KEY == DEFAULT_JWT_SECRET_KEY:
-        logger.error(
-            "SECURITY WARNING: using the default JWT_SECRET_KEY. Acceptable for local demo only; "
-            "set JWT_SECRET_KEY and DEMO_LOGIN_ENABLED=false for any shared deployment."
+    if settings.jwt_secret_is_ephemeral:
+        logger.warning(
+            "JWT_SECRET_KEY is not configured: a random per-process secret was generated. "
+            "All issued tokens become invalid after a restart and are not shared between worker processes. "
+            "Set JWT_SECRET_KEY in the environment for a stable secret."
         )
-    if len(settings.JWT_SECRET_KEY) < 32:
+    elif len(settings.JWT_SECRET_KEY) < 32:
         logger.error("SECURITY WARNING: JWT_SECRET_KEY is shorter than 32 characters.")

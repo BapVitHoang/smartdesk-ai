@@ -29,6 +29,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@postgres:5432/smartdesk
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # No value is committed. Empty = random per-process secret (demo login on) or refuse to start (demo login off).
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       LLM_TIMEOUT_SECONDS: 4.0
       CORS_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
     ports:
