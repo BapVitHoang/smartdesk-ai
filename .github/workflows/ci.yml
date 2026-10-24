@@ -52,6 +52,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      - name: Run Anti-Fabrication & Roster Check
+        run: |
+          python scripts/check_roster.py
+
+      - name: Run Ownership & Governance Consistency Check
+        run: |
+          python scripts/check_ownership.py --verify-consistency
+
       - name: Run pytest test suite
         run: |
           python -m pytest backend/tests/ -v

@@ -57,3 +57,35 @@
 - Date: 2026-10-21 — Implemented HS256 JWT token generation and role-based data isolation on ticket endpoints (`admin` vs `user`), ensuring customers cannot access cross-tenant or other users' support tickets.
 - Date: 2026-10-21 — Added `X-Total-Count` header and server-side sorting to `GET /api/v1/tickets`, hooked up `ticket_copilot_service` into ticket creation, and guarded workspace deletion (`id=1` blocked).
 - Date: 2026-10-21 — Enabled native pgvector SQL cosine search with SQLite in-memory fallback, and masked PII before calling external embedding APIs.
+- Date: 2026-10-23 — Established `docs/TEAM_ROSTER.md` as the single source of truth for personal data with neutral defaults, purged unverified student data across `README.md`, `PROPOSAL.md`, and `REPORT.md`, added `scripts/check_roster.py` gate to `verify_setup.ps1` and CI, and purged recovered stash files containing fabricated data.
+
+---
+
+## 3. Review Rounds (Self-Review Loop)
+
+### Round 1 (2026-10-23)
+- **Subagents Dispatched (4 in parallel):**
+  1. Skeptical Verifier (`a311ce78...`)
+  2. Requirements & Honesty Auditor (`6b77669b...`)
+  3. Security & Robustness Reviewer (`ba7988c7...`)
+  4. Ownership & Merge-Conflict Hunter (`25c98217...`)
+- **Key Findings Identified:**
+  - `FIND-01` / `FIND-OWN-01` (High): Potential 3-way content merge conflict in `docs/requests/devC.md` between `Hoang` (CR-002) and `feature/c-frontend-docs` (CR-001).
+  - `SEC-ROB-01` (High): Decomposed Unicode NFD Vietnamese strings could bypass regex matching in `scripts/check_roster.py`.
+  - `SEC-ROB-02` (High): Markdown bold/backtick formatting (`**Name** (Dev A)`) could break `name_role_match` in `scripts/check_roster.py`.
+  - `SEC-ROB-04` (Medium): Unstripped markdown backticks in `TEAM_ROSTER.md` cells could cause verification false positives.
+  - `AUDIT-02` (Medium): Font kerning / glyph splitting during PDF extraction in `pypdf` (`"Nguy ễ n Nh ậ t Huy"`) could evade text scanning.
+  - `FIND-02` (Medium): Typo in `docs/audit/05-git-state-audit.md:194` referencing `passlib` instead of `google-auth`.
+  - `FIND-03` (Medium): Ambiguity in `docs/audit/05-git-state-audit.md` §8.2 regarding status of extracted plain files.
+  - `FIND-04` (Medium): Binary PDF and slide deliverables on `feature/c-frontend-docs` contained unverified student names and MSSVs.
+  - `FIND-07` / `SEC-ROB-05` / `SEC-ROB-07` (Low): Missing `@TKhanh` handle mapping in `ownership_map.py` and `AGENTS.md:168`, narrow MSSV regex, and absolute path reporting.
+- **Fixes Implemented:**
+  - **Conflict Prevention:** Consolidated both CR-001 (Dev C ownership extensions) and CR-002 (action item for Dev C PDF/slides regeneration) in `docs/requests/devC.md`.
+  - **Check Roster Hardening:** Added `unicodedata.normalize("NFC", ...)` across all inputs and roster entries, stripped markdown formatting from candidate lines and table cells, broadened MSSV regex to `\b(2[0-5]11\d{4})\b`, added intra-word kerning space collapse for PDF extraction, and used relative paths for missing file reporting.
+  - **Documentation Harmonization:** Corrected `passlib` $\to$ `google-auth` in audit notes, clarified the subsequent purge of recovered files in commit `d080b82`, updated `AGENTS.md` and `scripts/ownership_map.py` to map Dev C to `@TKhanh`, and regenerated `.github/CODEOWNERS`.
+- **Rejected Items:** None rejected without rationale. All valid findings were directly resolved and verified.
+- **Stop Condition Evaluation:**
+  - Zero unresolved Blocker or High findings.
+  - All verification commands green (10/10 verification gate in `verify_setup.ps1`, 55/55 pytest tests passing, 0 TypeScript errors, clean Vite production build).
+  - Stop early condition satisfied after Round 1.
+

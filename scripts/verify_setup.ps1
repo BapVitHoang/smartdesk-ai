@@ -7,7 +7,7 @@ Write-Host "  SmartDesk AI - Environment & Toolchain Verification Gate" -Foregro
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 $passedSteps = 0
-$totalSteps = 9
+$totalSteps = 10
 
 function Report-Step($stepNum, $stepName, $success, $detail) {
     if ($success) {
@@ -134,6 +134,19 @@ try {
     }
 } catch {
     $res = Report-Step 9 "Ownership & Governance Consistency" $false $_.Exception.Message
+}
+
+# Step 10: Roster & Anti-Fabrication Check
+try {
+    $rosterOutput = python scripts/check_roster.py 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $res = Report-Step 10 "Roster & Anti-Fabrication Verification" $true "Zero unverified names, fake MSSVs, or invented contribution percentages"
+        $passedSteps++
+    } else {
+        $res = Report-Step 10 "Roster & Anti-Fabrication Verification" $false "Fabrication violations detected: $rosterOutput"
+    }
+} catch {
+    $res = Report-Step 10 "Roster & Anti-Fabrication Verification" $false $_.Exception.Message
 }
 
 Write-Host "=================================================================" -ForegroundColor Cyan

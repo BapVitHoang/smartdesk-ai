@@ -4,7 +4,7 @@ SmartDesk AI - Single Source of Truth Ownership Mapping.
 Authoritative mapping between files/patterns and owners:
   - devA: AI Engine & Evaluation (@TheOrijinnn)
   - devB: Platform, Data & Security (@BapVitHoang)
-  - devC: Frontend UX, QA & Capstone Documentation (@[C_USERNAME])
+  - devC: Frontend UX, QA & Capstone Documentation (@TKhanh)
   - integrator: Shared frozen governance & contracts (Hoang @BapVitHoang wearing the Integrator hat)
 """
 
@@ -12,7 +12,7 @@ Authoritative mapping between files/patterns and owners:
 GITHUB_HANDLES = {
     "devA": "TheOrijinnn",
     "devB": "BapVitHoang",
-    "devC": None,  # TODO: Set GitHub handle for Dev C when assigned
+    "devC": "TKhanh",
     "integrator": "BapVitHoang",
 }
 
@@ -112,6 +112,11 @@ OWNERSHIP_MAP = {
         "docs/PROPOSAL.md",
         "docs/TEST_ACCEPTANCE.md",
         "docs/REPORT.md",
+        "docs/REPORT.pdf",
+        "docs/SLIDES.pdf",
+        "docs/SLIDES.pptx",
+        "docs/DEMO_VIDEO_CHECKLIST.md",
+        "docs/evidence/*",
         "docs/PRESENTATION_AND_DEMO.md",
         "docs/notes/C.md",
         "docs/notes/C-ai-usage.md",
@@ -148,6 +153,7 @@ OWNERSHIP_MAP = {
         "docs/ARCHITECTURE.md",
         "docs/DESIGN.md",
         "docs/DEV_START_HERE.md",
+        "docs/TEAM_ROSTER.md",
         "docs/adr/*",
         "docs/audit/*",
         "docs/implementation_plan_smartdesk_ai_upgrade.md",
@@ -169,6 +175,7 @@ OWNERSHIP_MAP = {
         "frontend/vite.config.ts",
         "pytest.ini",
         "scripts/check_ownership.py",
+        "scripts/check_roster.py",
         "scripts/gen_codeowners.py",
         "scripts/ownership_map.py",
         "scripts/install.bat",

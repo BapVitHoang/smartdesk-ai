@@ -119,7 +119,7 @@ smartdesk-ai/
 To prevent merge conflicts during parallel development, every file in the repository belongs to exactly ONE designated owner. The team consists of **exactly 3 members**:
 - **Dev A (Owner 1):** AI Engine & Evaluation (`@TheOrijinnn`)
 - **Dev B (Owner 2) & Integrator:** Platform, Data & Security + Integrator Hat (`@BapVitHoang`)
-- **Dev C (Owner 3):** Frontend UX, QA & Capstone Documentation (`@[C_USERNAME]`)
+- **Dev C (Owner 3):** Frontend UX, QA & Capstone Documentation (`@TKhanh`)
 
 | Developer / Role | Owned Backend Modules | Owned Frontend, Infra & Docs | Dedicated Test Suites |
 | :--- | :--- | :--- | :--- |

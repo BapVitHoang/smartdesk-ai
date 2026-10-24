@@ -2,6 +2,9 @@
 
 > **Instructions for Developers:**  
 > When working with an AI coding assistant (Cursor, Claude, Copilot, ChatGPT, etc.), copy and paste your entire dedicated prompt below into your assistant session. Each prompt contains strict boundaries, task specifications, and the mandatory governance instructions required to avoid breaking the codebase or violating ownership policies.
+> 
+> **MANDATORY ANTI-FABRICATION RULE (ALL DEVELOPERS & AGENTS):**  
+> Never invent names, student IDs, emails, percentages, dates, commit hashes, test counts or metrics. Facts about people come only from `docs/TEAM_ROSTER.md`. If a value is unknown write `CHƯA CÓ DỮ LIỆU` and raise it in `docs/requests/<dev>.md`. Report only numbers you obtained from a command in this session.
 
 ---
 
