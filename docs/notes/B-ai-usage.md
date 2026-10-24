@@ -66,7 +66,7 @@
 ### Session 5: JWT Dynamic Secret Hardening, Dependency Audit, Docker Smoke Script & Reset-Cooldown Alias
 - **Date:** 2026-10-25
 - **AI Tool Used:** Antigravity AI Assistant
-- **Key Prompt:** "Hoàn thiện Platform Tasks (Dev B + Integrator): Không bao giờ dùng default JWT secret trong code; Kiểm định dependency truth qua clean venv và AST scan; Thêm scripts/smoke_docker.ps1 cho Docker/pgvector; Thêm route POST /agent/reset-cooldown; Kiểm tra cô lập REQ-08."
+- **Key Prompt:** "Thực hiện các tác vụ platform cho Dev B và Integrator: Không bao giờ dùng default JWT secret trong code; Kiểm định dependency truth qua clean venv và AST scan; Thêm scripts/smoke_docker.ps1 cho Docker/pgvector; Thêm route POST /agent/reset-cooldown; Kiểm tra cô lập REQ-08."
 - **Manual Verification & Changes:**
   - Verified SHA-256 detection of known placeholder JWT secrets, generating ephemeral per-process secrets when `DEMO_LOGIN_ENABLED=true` and refusing startup when disabled.
   - Verified clean venv installation (`sd-venv-clean`) with `pip install -q -r backend/requirements.txt` and AST scan across all backend code (all 20 dependencies verified necessary).
