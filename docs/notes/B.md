@@ -50,6 +50,27 @@
 6. **AI Usage & Prompting Log (`docs/notes/B-ai-usage.md`):**
    - Documented all 3 sessions and real bug diagnostics.
 
+### Task B5: Security Hardening & Full Docker Verification (Prompt 2b / `REQ-06`, `REQ-07`, `REQ-09`, `REQ-11`, `REQ-36`, `REQ-39`)
+1. **Demo Account Hardening (`REQ-SEC-01`):**
+   - In `backend/app/db/seed/seed_users.py`: Demo users are seeded only if `settings.DEMO_LOGIN_ENABLED` is true.
+   - In `backend/app/api/v1/endpoints/auth.py`: When `DEMO_LOGIN_ENABLED` is false, demo accounts attempting login via `/auth/token` or `/auth/oauth2/login` (provider="demo") are rejected with `HTTP 401 Unauthorized` returning the exact same generic credential error as a wrong password.
+2. **Client IP Behind Trusted Nginx Proxy (`REQ-SEC-02`):**
+   - Uvicorn configured with `--proxy-headers` and `--forwarded-allow-ips`.
+   - In `backend/app/core/security.py`: Implemented `is_trusted_proxy_ip()` (supporting IPv4 and IPv6 loopback, Docker, and private CIDRs) and `get_trusted_client_ip()` resolving `X-Real-IP` and `X-Forwarded-For` only when the direct peer is a trusted proxy.
+   - Wired `get_trusted_client_ip()` into login throttling to prevent IP spoofing attacks.
+3. **Authenticated Ticket Creation & Customer Isolation (`REQ-SEC-03`):**
+   - In `backend/app/api/v1/endpoints/tickets.py`: `POST /api/v1/tickets` requires `current_user: User = Depends(get_current_user)`.
+   - Regular users (`role == "user"`) have `customer_email` and `customer_name` locked to their authenticated JWT identity, preventing impersonation.
+   - Admins/support agents can file tickets on behalf of customers.
+4. **Real Docker & PostgreSQL + pgvector Verification:**
+   - Docker Desktop active; images built cleanly with `docker compose build`.
+   - Container health verified: `/api/v1/health` reports status `ok` and database `connected`.
+   - Frontend SPA on port 3000 and reverse proxy `/api/v1/` verified functional.
+   - SSE streaming through Nginx verified (`proxy_buffering off;` emitting metadata and token chunks without delay).
+   - PostgreSQL container verified: `pg_extension` confirms `vector 0.8.6`; `knowledge_chunks.embedding` is `vector(768)`; 9 chunks seeded; native `<=>` cosine distance vector query executes successfully.
+   - Pytest suite executed against backend container: 94 passed in 5.94s.
+   - Clean-state smoke test `scripts/smoke_docker.ps1`: all 8 steps passed, clean teardown.
+
 ---
 
 ## 2. Decision Log
@@ -58,6 +79,10 @@
 - Date: 2026-10-21 — Added `X-Total-Count` header and server-side sorting to `GET /api/v1/tickets`, hooked up `ticket_copilot_service` into ticket creation, and guarded workspace deletion (`id=1` blocked).
 - Date: 2026-10-21 — Enabled native pgvector SQL cosine search with SQLite in-memory fallback, and masked PII before calling external embedding APIs.
 - Date: 2026-10-23 — Established `docs/TEAM_ROSTER.md` as the single source of truth for personal data with neutral defaults, purged unverified student data across `README.md`, `PROPOSAL.md`, and `REPORT.md`, added `scripts/check_roster.py` gate to `verify_setup.ps1` and CI, and purged recovered stash files containing fabricated data.
+- Date: 2026-10-25 — Hardened demo authentication: demo users are only seeded and allowed to login when `DEMO_LOGIN_ENABLED=True`. If false, demo logins return generic HTTP 401 matching invalid credentials.
+- Date: 2026-10-25 — Implemented trusted proxy IP resolution (`get_trusted_client_ip`) behind Nginx, ignoring spoofed headers from untrusted sources, and integrated with login throttling.
+- Date: 2026-10-25 — Secured ticket submission: `POST /api/v1/tickets` requires authentication (`get_current_user`), binding customer email/name to JWT identity for regular users, while allowing admins to file on behalf of customers.
+- Date: 2026-10-25 — Verified full containerized stack under Docker Compose with real PostgreSQL 16 + pgvector (0.8.6), unbuffered Nginx SSE streaming, and 94/94 containerized pytest tests passing.
 
 ---
 
@@ -244,6 +269,120 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   - Zero API keys or secrets were ever committed to Git history.
 - Verification Gate: `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` -> `RESULT: ALL 10/10 CHECKS PASSED (100% READY FOR IMPLEMENTATION)`.
 
+### Prompt 2b Evidence (Security Hardening, Docker Compose & PostgreSQL pgvector)
+
+#### Task 0 - Setup check
+- Identity confirmed: `git config user.name` = `Bap`, `git config user.email` = `23110020@student.hcmute.edu.vn`.
+- Branch `feature/b-platform` ancestry confirmed: `git merge-base --is-ancestor origin/feature/b-platform HEAD` exit 0.
+- Docker Desktop Linux Engine confirmed active: `docker version` exit 0 (Docker 27.5.1).
+- `GEMINI_API_KEY`: set in `backend/.env`.
+- `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` -> `RESULT: ALL 10/10 CHECKS PASSED (100% READY FOR IMPLEMENTATION)`.
+
+#### Task 1 - Security Hardening (Offline First)
+- Test suite `backend/tests/platform/test_auth_security.py`:
+  Command: `pytest backend/tests/platform/test_auth_security.py -v` -> `12 passed in 1.94s`.
+  * Verifies demo login works when `DEMO_LOGIN_ENABLED=True`.
+  * Verifies demo login rejected with HTTP 401 when `DEMO_LOGIN_ENABLED=False` on both `/auth/oauth2/login` and `/auth/token`.
+  * Verifies non-demo accounts are unaffected.
+  * Verifies generic error message matches wrong-password response.
+- Test suite `backend/tests/platform/test_proxy_ip.py`:
+  Command: `pytest backend/tests/platform/test_proxy_ip.py -v` -> `7 passed in 0.88s`.
+  * Verifies `is_trusted_proxy_ip` correctly identifies loopback and private subnets.
+  * Verifies `get_trusted_client_ip` extracts client IP only when direct peer is trusted.
+  * Verifies spoofed `X-Forwarded-For` from untrusted peers is ignored.
+  * Verifies throttle blocks client IP based on trusted proxy header.
+- Test suite `backend/tests/platform/test_ticket_auth.py`:
+  Command: `pytest backend/tests/platform/test_ticket_auth.py -v` -> `3 passed in 0.81s`.
+  * Verifies unauthenticated `POST /api/v1/tickets` returns HTTP 401.
+  * Verifies regular user ticket creation locks `customer_email` to `current_user.email`.
+  * Verifies admin can create tickets specifying client customer details.
+- Full offline test suite:
+  Command: `pytest backend/tests/ -q` -> `94 passed in 9.53s`.
+- Commit: "fix(security): enforce demo account restrictions, trusted proxy IP, and authenticated ticket creation".
+
+#### Task 2 - Docker and PostgreSQL + pgvector Verification
+- Build:
+  Command: `docker compose build` -> Built `smartdesk-postgres`, `smartdesk-backend`, `smartdesk-frontend` with exit 0.
+- Start & Health:
+  Command: `docker compose up -d` -> Containers started.
+  Command: `Invoke-RestMethod -Uri "http://localhost:8000/api/v1/health"` ->
+  `{"status":"ok","database":"connected","version":"1.0.0"}`
+- Frontend & Reverse Proxy:
+  Command: `Invoke-WebRequest -Uri "http://localhost:3000" -UseBasicParsing` -> HTTP 200.
+  Command: `Invoke-RestMethod -Uri "http://localhost:3000/api/v1/health"` -> `{"status":"ok","database":"connected","version":"1.0.0"}`
+- Nginx SSE Streaming Unbuffered:
+  Command: `python -c "import urllib.request, json... /api/v1/chat/stream"` ->
+  `Status: 200 Content-Type: text/event-stream; charset=utf-8`
+  First event (`event: metadata`) received in 0.096s, followed immediately by `event: token` chunks.
+  Nginx configuration verified: `proxy_buffering off;` directive present in `/etc/nginx/conf.d/default.conf`.
+- PostgreSQL Container & pgvector Queries:
+  * Extension check:
+    Command: `docker compose exec -T postgres psql -U postgres -d smartdesk -c "SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';"`
+    Output:
+    ```
+     extname | extversion 
+    ---------+------------
+     vector  | 0.8.6
+    (1 row)
+    ```
+  * Seed data row counts:
+    Command: `docker compose exec -T postgres psql -U postgres -d smartdesk -c "SELECT 'users' as tbl, count(*) FROM users UNION ALL SELECT 'workspaces', count(*) FROM workspaces UNION ALL SELECT 'documents', count(*) FROM documents UNION ALL SELECT 'knowledge_chunks', count(*) FROM knowledge_chunks UNION ALL SELECT 'faq_items', count(*) FROM faq_items;"`
+    Output:
+    ```
+           tbl        | count 
+    ------------------+-------
+     users            |     2
+     workspaces       |     3
+     documents        |     2
+     knowledge_chunks |     9
+     faq_items        |    12
+    (5 rows)
+    ```
+  * Column type verification:
+    Command: `docker compose exec -T postgres psql -U postgres -d smartdesk -c "SELECT attname, format_type(atttypid, atttypmod) FROM pg_attribute WHERE attrelid = 'knowledge_chunks'::regclass AND attname = 'embedding';"`
+    Output:
+    ```
+      attname  | format_type 
+    -----------+-------------
+     embedding | vector(768)
+    (1 row)
+    ```
+    Non-null embeddings: `9 / 9` chunks populated.
+  * Vector similarity query via native `<=>` cosine distance:
+    Command: `docker compose exec -T postgres psql -U postgres -d smartdesk -c "SELECT id, chunk_index, ROUND((embedding <=> (SELECT embedding FROM knowledge_chunks LIMIT 1))::numeric, 4) as cosine_distance FROM knowledge_chunks LIMIT 3;"`
+    Output:
+    ```
+     id | chunk_index | cosine_distance 
+    ----+-------------+-----------------
+      1 |           0 |          0.0000
+      2 |           1 |          0.9769
+      3 |           2 |          1.0301
+    (3 rows)
+    ```
+- Containerized Pytest against PostgreSQL:
+  Command: `docker compose exec -T backend pytest` ->
+  `============================== 94 passed in 5.94s ==============================`
+- Automated Clean-State Smoke Test:
+  Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke_docker.ps1`
+  Output:
+  ```
+  [1/8] Checking Docker Engine availability... Docker Engine is active and ready.
+  [2/8] Building Docker images (postgres, backend, frontend)... Build completed successfully.
+  [3/8] Starting containers in detached mode... Containers started.
+  [4/8] Polling backend health... Backend is healthy (attempt 2/30): status=ok, db=connected
+  [5/8] Verifying Nginx frontend and reverse proxy... Frontend SPA (HTTP 200) and reverse proxy /api/v1/ are functional!
+  [6/8] Testing authentication, wrong password (401), and protected route gates...
+    Demo admin login successful: token issued for admin@smartdesk.ai (role=admin)
+    Wrong password rejected with HTTP 401 Unauthorized.
+    Unauthenticated request to /tickets rejected with HTTP 401 Unauthorized.
+    Authenticated ticket listing successful: HTTP 200, X-Total-Count=3
+  [7/8] Verifying pgvector extension in PostgreSQL container... vector | 0.8.6
+  [8/8] Verifying Nginx reverse proxy buffering for SSE token streaming... proxy_buffering off confirmed.
+  ALL DOCKER & POSTGRESQL SMOKE CHECKS PASSED!
+  Tearing down containers and volumes (--remove-orphans -v)... Teardown complete.
+  ```
+  Exit code: 0.
+
 ---
 
 ## 4. Giải thích code (Platform, Data & Security)
@@ -266,7 +405,8 @@ Hệ thống hỗ trợ 3 hình thức xác thực thông qua FastAPI endpoints 
 
 3. **1-Click Demo Login (`POST /api/v1/auth/oauth2/login` với `provider="demo"`):**
    - Chỉ hoạt động khi `settings.DEMO_LOGIN_ENABLED = True` và email nằm trong danh sách tài khoản seed được phép (`admin@smartdesk.local`, `user@smartdesk.local`, `admin@smartdesk.ai`, `an.nguyen@company.vn`, v.v.).
-   - Nếu `DEMO_LOGIN_ENABLED = False`, backend từ chối với `HTTP 403 Forbidden`.
+   - Nếu `DEMO_LOGIN_ENABLED = False`, backend từ chối cả trên `/auth/oauth2/login` và `/auth/token` với `HTTP 401 Unauthorized` kèm thông điệp generic giống như sai mật khẩu, ngăn chặn việc dò tìm tài khoản demo.
+   - Khi `DEMO_LOGIN_ENABLED = False`, script seed `seed_users.py` hoàn toàn bỏ qua việc khởi tạo tài khoản demo vào database.
    - Tuyệt đối không tạo tài khoản mới qua demo login và không thể cấp quyền admin cho một email lạ không thuộc danh sách admin đã seed.
 
 4. **Cơ chế chống Brute-force (Login Throttling):**
@@ -307,6 +447,31 @@ Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
 3. `frontend`: Image Nginx xây dựng từ `frontend/Dockerfile`, phục vụ Single Page Application tĩnh tại cổng 80 (map ra 3000), đồng thời đóng vai trò Reverse Proxy:
    - Proxy đường dẫn `/api/v1/` sang backend FastAPI (`http://backend:8000/api/v1/`).
    - Thiết lập `proxy_buffering off;` nhằm hỗ trợ streaming token Server-Sent Events (SSE) theo thời gian thực mà không bị đệm dữ liệu.
+
+### 4.6 Nhận diện và Bảo vệ địa chỉ IP Client qua Trusted Proxy (`get_trusted_client_ip`)
+- **Vấn đề bảo mật:** Khi chạy phía sau Reverse Proxy (Nginx), toàn bộ kết nối TCP trực tiếp đến Uvicorn đều có địa chỉ IP nguồn là của Nginx (ví dụ `172.18.0.x`). Nếu đọc trực tiếp `request.client.host`, bộ điều tiết tần suất (`LoginRateLimiter`) sẽ nhầm lẫn tất cả người dùng dùng chung một IP, dẫn đến việc khóa nhầm người dùng hợp lệ hoặc bị bypass nếu hacker giả mạo header `X-Forwarded-For`.
+- **Giải pháp triển khai:**
+  1. Cấu hình Uvicorn trong `backend/Dockerfile` với cờ `--proxy-headers` và `--forwarded-allow-ips`.
+  2. Hàm `get_trusted_client_ip(request)` trong `backend/app/core/security.py` thực hiện:
+     - Kiểm tra địa chỉ kết nối trực tiếp `peer_ip` (`request.client.host`) thông qua hàm `is_trusted_proxy_ip()`.
+     - Danh sách mạng proxy tin cậy được cấu hình trong `settings.FORWARDED_ALLOW_IPS` (mặc định bao gồm `127.0.0.1`, loopback IPv6 `::1`, Docker networks `172.16.0.0/12`, private networks `10.0.0.0/8`, `192.168.0.0/16`).
+     - Chỉ khi `peer_ip` thuộc mạng tin cậy, hệ thống mới đọc header `X-Real-IP` hoặc phần tử đầu tiên của `X-Forwarded-For`.
+     - Nếu request đến từ một nguồn không tin cậy nhưng cố tình gửi header `X-Forwarded-For` giả mạo, hệ thống sẽ bỏ qua header này và sử dụng chính `peer_ip` làm định danh throttle.
+
+### 4.7 Xác thực bắt buộc và Ràng buộc danh tính Ticket (`POST /api/v1/tickets`)
+- **Vấn đề bảo mật:** Trước đây endpoint tạo ticket cho phép gửi dữ liệu nặc danh và tùy ý chỉ định `customer_email`, tạo kẽ hở giả mạo người khác để gửi ticket hoặc spam yêu cầu gọi Copilot LLM.
+- **Giải pháp triển khai:**
+  1. Yêu cầu bắt buộc đăng nhập thông qua FastAPI dependency `current_user: User = Depends(get_current_user)`. Bất kỳ yêu cầu nào không có JWT token hợp lệ đều bị từ chối ngay với `HTTP 401 Unauthorized`.
+  2. Đối với khách hàng thông thường (`role == "user"`):
+     - Hệ thống ghi đè và khóa chặt `customer_email` thành `current_user.email` và `customer_name` thành `current_user.full_name`. Khách hàng không thể tạo ticket dưới danh nghĩa người khác.
+  3. Đối với nhân viên hỗ trợ / Quản trị viên (`role == "admin"`):
+     - Cho phép giữ nguyên `customer_email` và `customer_name` từ payload để hỗ trợ viên có thể tiếp nhận và ghi nhận ticket thay cho khách hàng qua điện thoại/kênh khác.
+
+### 4.8 Cấu hình Nginx SSE Streaming không bộ đệm (`proxy_buffering off;`)
+- **Tối ưu truyền phát thời gian thực:**
+  - Nginx mặc định kích hoạt bộ đệm (`proxy_buffering on;`), gom các gói tin nhỏ lại trước khi gửi về client, khiến tính năng truyền token từng chữ (Token-by-Token Streaming) của AI Chat bị giật hoặc hiển thị cả đoạn văn bản cùng lúc.
+  - Trong `frontend/nginx.conf`, khối `location /api/v1/` đã được bổ sung chỉ thị `proxy_buffering off;`, cùng với `proxy_read_timeout 300s;` và `proxy_send_timeout 300s;`.
+  - Kết quả kiểm thử thực tế qua container chứng minh gói tin đầu tiên (`event: metadata`) phản hồi chỉ trong 0.096 giây và các gói tin `event: token` liên tục truyền trực tiếp đến trình duyệt mà không hề bị giữ lại.
 
 
 

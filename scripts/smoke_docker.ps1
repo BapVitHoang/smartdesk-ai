@@ -19,12 +19,11 @@ Write-Host "  SmartDesk AI - Docker Compose & PostgreSQL Smoke Test" -Foreground
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # Step 0: Docker Daemon Check
-Write-Host "`n[1/7] Checking Docker Engine availability..." -ForegroundColor Yellow
+Write-Host "`n[1/8] Checking Docker Engine availability..." -ForegroundColor Yellow
 try {
-    $dockerInfo = docker info 2>&1
+    $dockerVer = docker version
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: Docker engine is not running or unreachable." -ForegroundColor Red
-        Write-Host "Detail: $dockerInfo" -ForegroundColor DarkGray
         Write-Host "Please start Docker Desktop and ensure the Linux engine is active before running this smoke test." -ForegroundColor Yellow
         exit 1
     }
@@ -39,7 +38,7 @@ $cleanupNeeded = $false
 
 try {
     # Step 1: Clean build
-    Write-Host "`n[2/7] Building Docker images (postgres, backend, frontend)..." -ForegroundColor Yellow
+    Write-Host "`n[2/8] Building Docker images (postgres, backend, frontend)..." -ForegroundColor Yellow
     docker compose build
     if ($LASTEXITCODE -ne 0) {
         throw "docker compose build failed with exit code $LASTEXITCODE"
@@ -47,7 +46,7 @@ try {
     Write-Host "Build completed successfully." -ForegroundColor Green
 
     # Step 2: Start services
-    Write-Host "`n[3/7] Starting containers in detached mode..." -ForegroundColor Yellow
+    Write-Host "`n[3/8] Starting containers in detached mode..." -ForegroundColor Yellow
     docker compose up -d
     if ($LASTEXITCODE -ne 0) {
         throw "docker compose up -d failed with exit code $LASTEXITCODE"
@@ -56,7 +55,7 @@ try {
     Write-Host "Containers started. Waiting for service healthchecks..." -ForegroundColor Green
 
     # Step 3: Poll backend health
-    Write-Host "`n[4/7] Polling backend health (http://localhost:8000/api/v1/health)..." -ForegroundColor Yellow
+    Write-Host "`n[4/8] Polling backend health (http://localhost:8000/api/v1/health)..." -ForegroundColor Yellow
     $backendHealthy = $false
     $maxAttempts = 30
     for ($i = 1; $i -le $maxAttempts; $i++) {
@@ -77,7 +76,7 @@ try {
     }
 
     # Step 4: Verify Nginx frontend & reverse proxy
-    Write-Host "`n[5/7] Verifying Nginx frontend and reverse proxy (http://localhost:3000)..." -ForegroundColor Yellow
+    Write-Host "`n[5/8] Verifying Nginx frontend and reverse proxy (http://localhost:3000)..." -ForegroundColor Yellow
     $frontendOk = $false
     for ($i = 1; $i -le 15; $i++) {
         try {
@@ -99,11 +98,13 @@ try {
         throw "Frontend or Nginx API reverse proxy failed verification."
     }
 
-    # Step 5: Test Demo Authentication & Ticket Listing
-    Write-Host "`n[6/7] Testing demo authentication and authenticated API access..." -ForegroundColor Yellow
+    # Step 5: Test Demo Authentication & Auth Gates Inside Docker
+    Write-Host "`n[6/8] Testing authentication, wrong password (401), and protected route gates..." -ForegroundColor Yellow
+
+    # 5a: Demo admin login works
     $loginBody = @{
         provider = "demo"
-        email = "admin@smartdesk.local"
+        email = "admin@smartdesk.ai"
     } | ConvertTo-Json
 
     $loginResp = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/auth/oauth2/login" `
@@ -115,8 +116,61 @@ try {
     if (-not $loginResp.access_token) {
         throw "Demo login succeeded but returned no access_token!"
     }
-    Write-Host "Authentication successful: token issued for $($loginResp.user.email) (role=$($loginResp.user.role))" -ForegroundColor Green
+    Write-Host "Demo admin login successful: token issued for $($loginResp.email) (role=$($loginResp.role))" -ForegroundColor Green
 
+    # 5b: Wrong password gives 401
+    $wrongPasswordOk = $false
+    try {
+        $wrongPassBody = @{
+            username = "admin@smartdesk.ai"
+            password = "DefinitivelyWrongPassword2026!"
+        } | ConvertTo-Json
+        $null = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/auth/token" `
+            -Method Post `
+            -ContentType "application/json" `
+            -Body $wrongPassBody `
+            -TimeoutSec 5
+    } catch {
+        if ($_.Exception.Response.StatusCode.value__ -eq 401) {
+            $wrongPasswordOk = $true
+            Write-Host "Wrong password rejected with HTTP 401 Unauthorized." -ForegroundColor Green
+        } else {
+            throw "Wrong password did not return 401: $_"
+        }
+    }
+    if (-not $wrongPasswordOk) {
+        throw "Wrong password request unexpectedly succeeded!"
+    }
+
+    # 5c: Unauthenticated request to protected route gives 401
+    $unauthProtectedOk = $false
+    try {
+        $dummyTicket = @{
+            customer_name = "Unauth User"
+            customer_email = "unauth@example.com"
+            category = "General"
+            priority = "Low"
+            subject = "Unauthenticated Attempt"
+            description = "This should be blocked."
+        } | ConvertTo-Json
+        $null = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/tickets" `
+            -Method Post `
+            -ContentType "application/json" `
+            -Body $dummyTicket `
+            -TimeoutSec 5
+    } catch {
+        if ($_.Exception.Response.StatusCode.value__ -eq 401) {
+            $unauthProtectedOk = $true
+            Write-Host "Unauthenticated request to /tickets rejected with HTTP 401 Unauthorized." -ForegroundColor Green
+        } else {
+            throw "Unauthenticated request did not return 401: $_"
+        }
+    }
+    if (-not $unauthProtectedOk) {
+        throw "Unauthenticated request to /tickets unexpectedly succeeded!"
+    }
+
+    # 5d: Authenticated ticket listing works
     $authHeader = @{
         "Authorization" = "Bearer $($loginResp.access_token)"
     }
@@ -127,16 +181,25 @@ try {
         -TimeoutSec 5
 
     $totalCount = $ticketResp.Headers["X-Total-Count"]
-    Write-Host "Ticket listing successful: HTTP $($ticketResp.StatusCode), X-Total-Count=$totalCount" -ForegroundColor Green
+    Write-Host "Authenticated ticket listing successful: HTTP $($ticketResp.StatusCode), X-Total-Count=$totalCount" -ForegroundColor Green
 
     # Step 6: Verify PostgreSQL pgvector extension in container
-    Write-Host "`n[7/7] Verifying pgvector extension in PostgreSQL container..." -ForegroundColor Yellow
-    $vectorCheck = docker compose exec -T postgres psql -U postgres -d smartdesk -c "SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';" 2>&1
+    Write-Host "`n[7/8] Verifying pgvector extension in PostgreSQL container..." -ForegroundColor Yellow
+    $vectorCheck = docker compose exec -T postgres psql -U postgres -d smartdesk -c "SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';"
     if ($vectorCheck -match "vector") {
         Write-Host "pgvector extension verified in PostgreSQL database:" -ForegroundColor Green
-        Write-Host $vectorCheck -ForegroundColor DarkGray
+        Write-Host ($vectorCheck -join "`n") -ForegroundColor DarkGray
     } else {
         throw "pgvector extension not found in PostgreSQL! Output: $vectorCheck"
+    }
+
+    # Step 7: Verify Nginx proxy buffering configuration for SSE
+    Write-Host "`n[8/8] Verifying Nginx reverse proxy buffering for SSE token streaming..." -ForegroundColor Yellow
+    $nginxConfig = docker compose exec -T frontend cat /etc/nginx/conf.d/default.conf
+    if ($nginxConfig -match "proxy_buffering\s+off;") {
+        Write-Host "Nginx proxy_buffering off confirmed for real-time SSE streaming." -ForegroundColor Green
+    } else {
+        throw "Nginx configuration missing 'proxy_buffering off;' directive!"
     }
 
     Write-Host "`n=================================================================" -ForegroundColor Green

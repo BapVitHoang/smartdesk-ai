@@ -104,3 +104,4 @@ async def test_auth_endpoint_uses_trusted_proxy_ip_for_throttle(unauth_client: A
     )
     assert res_blocked.status_code == 429
     login_throttle.clear_all()
+

@@ -89,3 +89,4 @@ async def test_ticket_creation_admin_can_specify_customer_details(unauth_client:
     # Admin's specified customer details are preserved
     assert ticket["customer_email"] == customer_email
     assert ticket["customer_name"] == customer_name
+
