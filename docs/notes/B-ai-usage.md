@@ -61,3 +61,24 @@
   - *File:* `backend/app/api/v1/endpoints/auth.py`
   - *Fix Applied:* Enforced explicit `user.is_active` check across all authentication branches (`_demo_login`, `_google_login`, and `login_for_access_token`), raising uniform 401/403 errors for deactivated users.
 
+---
+
+### Session 5: JWT Dynamic Secret Hardening, Dependency Audit, Docker Smoke Script & Reset-Cooldown Alias
+- **Date:** 2026-10-25
+- **AI Tool Used:** Antigravity AI Assistant
+- **Key Prompt:** "Hoàn thiện Platform Tasks (Dev B + Integrator): Không bao giờ dùng default JWT secret trong code; Kiểm định dependency truth qua clean venv và AST scan; Thêm scripts/smoke_docker.ps1 cho Docker/pgvector; Thêm route POST /agent/reset-cooldown; Kiểm tra cô lập REQ-08."
+- **Manual Verification & Changes:**
+  - Verified SHA-256 detection of known placeholder JWT secrets, generating ephemeral per-process secrets when `DEMO_LOGIN_ENABLED=true` and refusing startup when disabled.
+  - Verified clean venv installation (`sd-venv-clean`) with `pip install -q -r backend/requirements.txt` and AST scan across all backend code (all 20 dependencies verified necessary).
+  - Verified syntax of `scripts/smoke_docker.ps1` via PowerShell AST parser and verified blocker detection when Docker daemon is offline.
+  - Verified `POST /api/v1/agent/reset-cooldown` and its alias `POST /api/v1/agent/ai-usage/reset-cooldown` with 4 platform tests.
+  - Verified REQ-08: Grep of `frontend/package.json`, `frontend/src/`, and `frontend/dist/` confirmed 0 client-side Google SDKs or API keys.
+- **AI Mistakes & Corrections (if encountered):**
+  - *Observed Issue 1:* In `backend/tests/platform/test_agent_reset_cooldown.py`, the AI assumed `llm_service._cooldown_until` was a `datetime` object (`datetime.now(timezone.utc) + timedelta(...)`), causing `AssertionError: assert False is True`. Inspection of `backend/app/services/llm_service.py` revealed that `cooldown_until` is a `time.time()` float timestamp.
+  - *Commit Subject:* `feat(agent): expose reset-cooldown on agent router and ignore eval runs`
+  - *Fix Applied:* Updated test to assign `llm_service.cooldown_until = time.time() + 60.0`, resulting in 4/4 passing tests.
+  - *Observed Issue 2:* In `scripts/ownership_map.py`, newly introduced integrator-managed paths (`scripts/smoke_docker.ps1` and `backend/data/eval_runs/.gitignore`) were not listed in the explicit integrator mapping, causing `check_ownership.py` to flag a cross-owner violation.
+  - *Commit Subject:* `chore(docker): add smoke_docker.ps1 script and record daemon blocker`
+  - *Fix Applied:* Added both paths to `integrator` in `scripts/ownership_map.py` and regenerated `.github/CODEOWNERS` via `scripts/gen_codeowners.py`.
+
+

@@ -82,7 +82,7 @@
 - **Fixes Implemented:**
   - **Conflict Prevention:** Consolidated both CR-001 (Dev C ownership extensions) and CR-002 (action item for Dev C PDF/slides regeneration) in `docs/requests/devC.md`.
   - **Check Roster Hardening:** Added `unicodedata.normalize("NFC", ...)` across all inputs and roster entries, stripped markdown formatting from candidate lines and table cells, broadened MSSV regex to `\b(2[0-5]11\d{4})\b`, added intra-word kerning space collapse for PDF extraction, and used relative paths for missing file reporting.
-  - **Documentation Harmonization:** Corrected `passlib` $\to$ `google-auth` in audit notes, clarified the subsequent purge of recovered files in commit `d080b82`, updated `AGENTS.md` and `scripts/ownership_map.py` to map Dev C to `@TKhanh`, and regenerated `.github/CODEOWNERS`.
+  - **Documentation Harmonization:** Corrected `passlib` $\to$ `google-auth` in audit notes, clarified the subsequent purge of recovered files in commit "chore(governance): purge recovered files containing unverified personal data", updated `AGENTS.md` and `scripts/ownership_map.py` to map Dev C to `@TKhanh`, and regenerated `.github/CODEOWNERS`.
 - **Rejected Items:** None rejected without rationale. All valid findings were directly resolved and verified.
 - **Stop Condition Evaluation:**
   - Zero unresolved Blocker or High findings.
@@ -174,5 +174,86 @@ Environment found in Task 0 (see Evidence): worktree smartdesk-B, no backend/.en
   - `test_reset_cooldown_alias_backward_compatibility`: 200 OK.
   - Test command output: `4 passed in 0.82s`.
 - Full pytest suite: `83 passed in 7.49s`.
+
+### Task 5 - Frontend Isolation & Git Secret History Scan (REQ-08)
+- Grep `frontend/package.json` for `@google/genai` or `@google/generative-ai`:
+  `Select-String -Path "frontend/package.json" -Pattern "genai|generative"` -> 0 matches.
+- Grep `frontend/src/` for `@google/` or `AIza`:
+  `Get-ChildItem -Path "frontend/src" -Recurse -File | Select-String -Pattern "@google/|AIza"` -> 0 matches.
+- Executed `npm ci --prefix frontend` -> added 93 packages in 29s, exit 0.
+- Executed `npm run build --prefix frontend` -> Vite 6 build completed in 2.46s, generated `frontend/dist`.
+- Grep `frontend/dist/` for `@google/`, `AIza`, or `generative-ai`:
+  `Get-ChildItem -Path "frontend/dist" -Recurse -File | Select-String -Pattern "@google/|AIza|generative-ai"` -> 0 matches.
+- Git commit secret history scan:
+  `git log -S "AIza" --name-only --oneline` -> Matches found only in documentation and audit files referencing the verification check itself:
+  - Commit "fix(auth): never use a known default JWT secret" (`docs/notes/B.md`)
+  - Commit "docs: add project audit, gap analysis, plan, and specification" (`docs/audit/01-gap-analysis.md`, `docs/plan/PLAN.md`, `docs/spec/SPEC.md`)
+  - Zero API keys or secrets were ever committed to Git history.
+- Verification Gate: `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` -> `RESULT: ALL 10/10 CHECKS PASSED (100% READY FOR IMPLEMENTATION)`.
+
+---
+
+## 4. Giải thích code (Platform, Data & Security)
+
+### 4.1 Quy trình đăng nhập & Xác thực mật khẩu (Login Flow & Password Verification)
+Hệ thống hỗ trợ 3 hình thức xác thực thông qua FastAPI endpoints trong `backend/app/api/v1/endpoints/auth.py`:
+1. **Password Grant (`POST /api/v1/auth/token`):**
+   - Người dùng gửi `username` (email) và `password` theo định dạng chuẩn `OAuth2PasswordRequestForm`.
+   - Backend sử dụng hàm `verify_password_async(plain_password, hashed_password)` trong `backend/app/core/security.py`. Thuật toán băm là `hashlib.scrypt` tiêu chuẩn với muối 16 bytes ngẫu nhiên (`n=16384, r=8, p=1`), định dạng lưu trữ `$scrypt$n=16384,r=8,p=1$<salt_hex>$<hash_hex>`. So khớp băm sử dụng phép so sánh hằng số thời gian `hmac.compare_digest`.
+   - Để ngăn chặn hình thức tấn công dò người dùng thông qua độ trễ thời gian (User Enumeration via Timing Attack), nếu email không tồn tại trong DB, hệ thống sẽ thực hiện xác thực giả lập với chuỗi `_DUMMY_PASSWORD_HASH` đã được tạo sẵn trước khi trả về lỗi.
+   - Khi sai mật khẩu, tài khoản không tồn tại, hoặc tài khoản bị vô hiệu hóa (`is_active=False`), backend đều trả về cùng một mã lỗi `HTTP 401 Unauthorized` kèm thông điệp generic giống hệt nhau: `"Tên đăng nhập hoặc mật khẩu không chính xác"`.
+
+2. **Google OAuth2 ID Token Verification (`POST /api/v1/auth/oauth2/login` với `provider="google"`):**
+   - Client gửi Google ID Token trong trường `credential`.
+   - Backend sử dụng thư viện `google-auth` (`google.oauth2.id_token.verify_oauth2_token`) để giải mã và kiểm tra chữ ký mã hóa bất đối xứng từ Google Public Keys.
+   - Các tham số bảo mật được kiểm tra nghiêm ngặt: `audience == settings.GOOGLE_OAUTH_CLIENT_ID`, `issuer in ["accounts.google.com", "https://accounts.google.com"]`, `email_verified == True`, và hạn sử dụng token (`exp`).
+   - Nếu `GOOGLE_OAUTH_CLIENT_ID` chưa được cấu hình, backend lập tức từ chối với `HTTP 501 Not Implemented`, không bao giờ chấp nhận token không có chữ ký.
+   - Toàn bộ lời gọi xác thực chữ ký đồng bộ qua mạng được bọc trong `asyncio.to_thread` để tránh block ASGI event loop.
+   - Tài khoản tạo mới từ Google luôn nhận vai trò mặc định `"user"`. Chỉ các email nằm trong danh sách cấu hình `settings.ADMIN_EMAILS` mới được nâng quyền thành `"admin"`.
+
+3. **1-Click Demo Login (`POST /api/v1/auth/oauth2/login` với `provider="demo"`):**
+   - Chỉ hoạt động khi `settings.DEMO_LOGIN_ENABLED = True` và email nằm trong danh sách tài khoản seed được phép (`admin@smartdesk.local`, `user@smartdesk.local`, `admin@smartdesk.ai`, `an.nguyen@company.vn`, v.v.).
+   - Nếu `DEMO_LOGIN_ENABLED = False`, backend từ chối với `HTTP 403 Forbidden`.
+   - Tuyệt đối không tạo tài khoản mới qua demo login và không thể cấp quyền admin cho một email lạ không thuộc danh sách admin đã seed.
+
+4. **Cơ chế chống Brute-force (Login Throttling):**
+   - Triển khai bộ đếm sliding-window `LoginRateLimiter` trong bộ nhớ (`backend/app/core/security.py`).
+   - Giới hạn tối đa 10 lần đăng nhập thất bại trong vòng 60 giây trên mỗi địa chỉ IP hoặc email. Khi vượt ngưỡng, hệ thống trả về `HTTP 429 Too Many Requests` với header `Retry-After`.
+
+### 4.2 Cơ chế sinh & Bảo vệ JWT Secret Key (JWT Hygiene)
+- Hệ thống sử dụng thuật toán ký `HS256` với thời hạn token mặc định 60 phút (`exp` claim).
+- Chuỗi secret mặc định trước đây đã được loại bỏ hoàn toàn khỏi mã nguồn; hệ thống chỉ lưu chuỗi băm SHA-256 (`ac5ca707...`) để nhận diện giá trị placeholder.
+- **Trường hợp Demo (`DEMO_LOGIN_ENABLED=True`):** Nếu `JWT_SECRET_KEY` bị để trống hoặc dùng giá trị placeholder, hệ thống tự động sinh một secret ngẫu nhiên bảo mật cao theo từng tiến trình (`secrets.token_urlsafe(48)`), bảo đảm token không thể bị giả mạo chéo giữa các phiên làm việc.
+- **Trường hợp Production (`DEMO_LOGIN_ENABLED=False`):** Nếu `JWT_SECRET_KEY` là giá trị rỗng hoặc placeholder, hàm `validate_auth_configuration()` trong `security.py` sẽ tung ngoại lệ `RuntimeError` và từ chối khởi động backend.
+
+### 4.3 Phân quyền RBAC & Cô lập dữ liệu người dùng (User Data Isolation)
+- Được thực thi tại tầng dependency FastAPI (`get_current_user`, `require_role`) và các câu truy vấn SQLAlchemy trong `backend/app/api/v1/endpoints/tickets.py`:
+  - **Khách hàng thông thường (`role == "user"`):**
+    - Khi truy vấn `GET /api/v1/tickets`, câu lệnh SQL tự động bổ sung điều kiện `Ticket.customer_email == current_user.email`. Khách hàng hoàn toàn không thể xem ticket của khách hàng khác.
+    - Header phân trang `X-Total-Count` cũng được tính toán dựa trên tập dữ liệu đã lọc theo email người dùng.
+    - Khi truy vấn chi tiết `GET /api/v1/tickets/{id}`, nếu ticket không thuộc về khách hàng đó, backend trả về `HTTP 403 Forbidden`.
+    - Khách hàng không thể gọi các thao tác nhạy cảm: `PATCH /tickets/{id}` (cập nhật trạng thái/SLA), `DELETE /tickets/{id}` (xóa ticket), hoặc `POST /agent/tickets/{id}/generate-draft` (sinh nháp Copilot).
+  - **Quản trị viên / Hỗ trợ viên (`role == "admin"`):**
+    - Có toàn quyền xem danh sách tất cả các ticket của hệ thống, phân trang, lọc theo workspace, và thực hiện duyệt/sửa/xóa ticket.
+    - Có quyền gọi `POST /api/v1/agent/reset-cooldown` để mở khóa Cost-Guard circuit breaker khi gặp giới hạn tần suất.
+
+### 4.4 Kiến trúc Vector kép (Dual-Mode Vector Type)
+- Khai báo model `KnowledgeChunk` và `FAQItem` trong `backend/app/models/knowledge.py` sử dụng kỹ thuật đa phương ngữ SQLAlchemy:
+  `Vector(768).with_variant(JSON(), "sqlite")`
+- **Môi trường PostgreSQL 16 (Production / Docker):**
+  - Cột `embedding` được lưu dưới dạng kiểu dữ liệu vector nguyên bản của extension `pgvector`.
+  - Hàm `search_similar_chunks()` trong `embedding_service.py` phát lệnh truy vấn SQL tính khoảng cách cosine trực tiếp trên DB server thông qua toán tử `<=>` (`order_by(KnowledgeChunk.embedding.cosine_distance(query_vector))`), tận dụng chỉ mục vector hiệu năng cao.
+- **Môi trường SQLite (Local Development / Testing):**
+  - Cột `embedding` lưu trữ chuỗi vector dưới định dạng JSON text.
+  - Khi tìm kiếm, dữ liệu được tải vào bộ nhớ và tính toán độ tương đồng cosine bằng hàm `cosine_similarity()` thuần Python, bảo đảm kiểm thử và phát triển offline mượt mà không cần cài đặt PostgreSQL.
+
+### 4.5 Cấu trúc Dịch vụ Docker Compose & Nginx Reverse Proxy
+Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
+1. `postgres`: Image `pgvector/pgvector:pg16`, khởi tạo database `smartdesk`, tự động nạp extension `vector` qua healthcheck `pg_isready`.
+2. `backend`: Image FastAPI xây dựng từ `backend/Dockerfile`, phụ thuộc vào `postgres` (chờ `service_healthy`), kết nối qua async driver `postgresql+asyncpg://`, cấu hình healthcheck gọi `GET /api/v1/health`.
+3. `frontend`: Image Nginx xây dựng từ `frontend/Dockerfile`, phục vụ Single Page Application tĩnh tại cổng 80 (map ra 3000), đồng thời đóng vai trò Reverse Proxy:
+   - Proxy đường dẫn `/api/v1/` sang backend FastAPI (`http://backend:8000/api/v1/`).
+   - Thiết lập `proxy_buffering off;` nhằm hỗ trợ streaming token Server-Sent Events (SSE) theo thời gian thực mà không bị đệm dữ liệu.
+
 
 
