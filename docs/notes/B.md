@@ -376,7 +376,25 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   - Zero API keys or secrets were ever committed to Git history.
 - Verification Gate: `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` -> `RESULT: ALL 10/10 CHECKS PASSED (100% READY FOR IMPLEMENTATION)`.
 
-### Prompt 2b Evidence (Security Hardening, Docker Compose & PostgreSQL pgvector)
+### Prompt 2d Review & Final Verification Notes (Integrator Post-Merge Verification)
+- Date: 2026-10-26 — Completed post-merge verification on branch `verify/final-verification`.
+- Applied pending frozen-file requests: `MRG-DEF-07` (`CONTRACTS.md` status="config_error"), `MRG-DEF-08` (`CONTRACTS.md` / `API_CONTRACT.md` verification report endpoint), `CR-DEVC-02` (frontend ticket query params & telemetry types), and `MRG-DEF-02` (`scripts/check_roster.py` exemption for AI Tool Used lines).
+- Executed real E2E Docker Compose verification across Items A through M:
+  * Item A: Full Docker stack healthy, Nginx reverse proxy functional.
+  * Item B: Demo login admin/user 200, wrong password 401 generic message, forged Google token 501, RBAC route barrier 401/403/200, sliding-window throttle 429 after 10 attempts, DEMO_LOGIN_ENABLED=false 401 barrier, test_jwt_secret.py 13 passed.
+  * Item C: Unauthenticated POST /tickets 401, user ticket email locked to JWT identity, admin ticket created for client, canonical SLA hours (Urgent=2, High=4, Medium=8, Low=24), sort_by=priority asc/desc, pagination non-overlapping, DELETE 204/404, RBAC counts (Admin=45, An Nguyen=16).
+  * Item D: Live RAG in-scope 200, out-of-scope refusal with escalation_recommended=True and zero hallucinated citations, English & Vietnamese prompt injection blocked with HTTP 400 PROMPT_SECURITY_VIOLATION.
+  * Item E: SSE streaming direct and via Nginx unbuffered (event: metadata, token, done).
+  * Item F: Tool agent create_escalation_ticket PendingAction, 1st confirmation executes 1 ticket, 2nd confirmation returns 400 Bad Request, cancel returns executed=false with 0 tickets created, cross-user confirmation returns 403 Forbidden.
+  * Item G: Document upload 201, 3-stage active verification (SyntheticQA -> SandboxRAG -> AI Judge) faithfulness score 0.95 passed, document publish 200. Logged MRG-DEF-10 for PostgreSQL pgvector 768 vs 3072 live embedding dimension mismatch.
+  * Item H: PostgreSQL pgvector extension 0.8.6 verified, <=> cosine operator verified, container pytest against PostgreSQL on smartdesk_test 4 passed, SHOW log_statement confirmed none.
+  * Item I: Admin AI telemetry GET /agent/ai-usage 200, POST /agent/reset-cooldown 401 unauth, 403 user, 200 admin, alias route 200.
+  * Item J: Audited 24-case benchmark: 17 live LLM generative calls, 3 tool calls, 4 guardrail blocks, 0 fallback.
+  * Item K: All 4 core mobile views verified in docs/evidence/ (375x812); frontend code verified for CR-DEVC-01 and CR-DEVC-02.
+  * Item L: smartdesk-backend and smartdesk-postgres bound strictly to 127.0.0.1 (never 0.0.0.0).
+  * Item M: Tracked repo clean of .env, *.db, eval_runs; Git history free of leaked API keys; frontend/dist free of Google SDKs and keys.
+- Composed root `AI_USAGE.md` documenting 5 real failure cases with verified commit hashes from Git history.
+
 
 #### Task 0 - Setup check
 - Identity confirmed: `git config user.name` = `Bap`, `git config user.email` = `23110020@student.hcmute.edu.vn`.
