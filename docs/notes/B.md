@@ -714,6 +714,18 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
 - **Dọn dẹp:**
   - Thực thi `docker compose down` (dừng các container và giữ nguyên volume để phục vụ phát triển tiếp theo).
 
+#### Task 6 - Ownership Sanity
+- **Kết quả kiểm tra phân quyền module với base `origin/Hoang`:**
+  - Lệnh: `python scripts/check_ownership.py --owner devB --as-integrator --base origin/Hoang`
+  - Kết quả: Kiểm tra 38 file đã thay đổi trên nhánh `feature/b-platform`, xác nhận toàn bộ tuân thủ nghiêm ngặt ranh giới sở hữu: `[OK] All modified files conform to module ownership boundaries!`, exit code 0.
+- **Phân công sở hữu file Docker trong `scripts/ownership_map.py`:**
+  - `backend/Dockerfile`: Thuộc quyền sở hữu độc quyền của **`devB`** (dòng 53 trong `scripts/ownership_map.py`).
+  - `docker-compose.yml`: Thuộc quyền sở hữu độc quyền của **`devB`** (dòng 88 trong `scripts/ownership_map.py`).
+- **Giải thích lý do bắt buộc sử dụng cờ `--as-integrator`:**
+  - Nhánh `feature/b-platform` chứa các thay đổi đối với các file hợp đồng dùng chung và cấu hình nền tảng bị đóng băng (Frozen Shared Integration Files), bao gồm: `backend/app/core/config.py`, `backend/app/main.py`, `backend/requirements.txt`, `backend/tests/conftest.py`, `docs/API_CONTRACT.md`, `docs/spec/CONTRACTS.md`, `scripts/smoke_docker.ps1`.
+  - Trong đội ngũ 3 người của SmartDesk AI (theo `docs/TEAM_ROSTER.md` và `AGENTS.md`), **Ngô Việt Hoàng** (`@BapVitHoang` / `Bap`) đảm nhiệm đồng thời hai vai trò: **Dev B** (Platform Owner) và **Integrator** (Architecture & Shared Contracts Owner).
+  - Vì vậy, cờ `--as-integrator` được yêu cầu khi kiểm tra ownership để xác thực rằng Hoàng đang thực thi quyền hạn của vai trò Integrator đối với các file cấu hình và hợp đồng đóng băng của toàn dự án.
+
 ---
 
 ## 4. Giải thích code (Platform, Data & Security)
