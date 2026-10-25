@@ -109,7 +109,8 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
         search?: string;
         workspace_id?: number;
         sort_by?: string;
-      } = { sort_by: sortBy };
+        limit?: number;
+      } = { sort_by: sortBy, limit: 50 };
       if (filterType === 'open') filters.status = 'open';
       if (filterType === 'urgent') filters.priority = 'Urgent';
       if (selectedCategory !== 'all') filters.category = selectedCategory;

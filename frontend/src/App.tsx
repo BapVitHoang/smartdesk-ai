@@ -54,10 +54,10 @@ export default function App() {
       }
     });
 
-    // 3. Fetch real-time tickets from FastAPI backend for the current workspace
+    // 3. Fetch real-time tickets from FastAPI backend for the current workspace (limit: 50 for full seed)
     const loadTicketsForWorkspace = async () => {
       try {
-        const remoteTickets = await getTickets({ workspace_id: currentWorkspaceId }, showToast);
+        const remoteTickets = await getTickets({ workspace_id: currentWorkspaceId, limit: 50 }, showToast);
         if (remoteTickets && remoteTickets.length > 0) {
           setTickets(remoteTickets);
           setSelectedTicket(remoteTickets[0]);
@@ -76,6 +76,17 @@ export default function App() {
 
   const handleUserChanged = (newUser: User | null) => {
     setCurrentUser(newUser);
+
+    // Refresh tickets list for new user context (RBAC isolation: admin gets all 43, user gets isolated tickets)
+    getTickets({ workspace_id: currentWorkspaceId, limit: 50 }, showToast)
+      .then((remoteTickets) => {
+        if (remoteTickets && remoteTickets.length > 0) {
+          setTickets(remoteTickets);
+          setSelectedTicket(remoteTickets[0]);
+        }
+      })
+      .catch((err) => console.warn('Failed to refresh tickets on user change:', err));
+
     // RBAC: If switching to normal user, immediately navigate away from admin-only tabs
     if (newUser && newUser.role === 'user' && (activeTab === 'agent' || activeTab === 'knowledge')) {
       setActiveTab('chat');
