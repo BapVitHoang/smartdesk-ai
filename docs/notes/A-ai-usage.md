@@ -43,3 +43,25 @@
     2. When `KnowledgeChunk` records used SHA-256 pseudo-embeddings in offline/deterministic mode, cosine similarity between query and chunk pseudo-vectors was `< 0.25`, causing Workspace 2 & 3 queries (`EVAL-06..08`) to return empty context.
   - *Commit Hash / File:* Fixed on base commit `c10cf89` in `backend/scripts/run_eval.py#L228` and `backend/app/services/rag_service.py#L97-L145`.
   - *Fix Applied:* Fixed `embedding_service.rate_limited_until` in `llm_service.py` and `run_eval.py`, and added a hybrid BM25 lexical boost over published workspace chunks in `rag_service.retrieve_context_documents()`.
+
+---
+
+### Session 4: Gemini 3.5 400 INVALID_ARGUMENT Root Cause Fix, Circuit Breaker & Audit Gaps (`llm_service.py`, `rag_service.py`, `agent_tools.py`)
+- **Date:** 2026-10-23
+- **AI Tool Used:** Google Antigravity Coding Assistant (Dev A)
+- **Key Prompt:** *"Investigate live generateContent 400 INVALID_ARGUMENT on gemini-3.5-flash-lite, bisect SDK parameters, classify errors (400/401/403/404 as config_error with 0 retries and 0 cooldown, 429 with Retry-After, 5xx with limited retry), address audit gaps (PII redaction before LLM call, two-phase confirmation lifecycle, customer ticket scoping, refusal citations), and run live evaluation."*
+- **Manual Verification & Changes:**
+  - Ran live parameter bisect on `google-genai 2.24.0` against model `gemini-3.5-flash-lite`.
+  - Proved root cause: Gemini 3.5 rejects `thinking_budget` in `ThinkingConfig` with `400 INVALID_ARGUMENT`. Replaced with `types.ThinkingConfig(thinking_level="MINIMAL")` and verified live with 200 OK (< 1,500ms latency).
+  - Executed 4 live calls (grounded RAG, structured ticket copilot, tool routing, SSE streaming) and verified real latency/tokens in telemetry.
+  - Added unit test suites `backend/tests/ai/test_llm_request_and_circuit_breaker.py` and `backend/tests/ai/test_security_audit_gaps.py` (34/34 tests passing across full Dev A suite).
+- **AI Mistakes & Corrections:**
+  - *Observed Issue 1 (Fixture Error):* Initial code for `test_security_audit_gaps.py` declared `db_session` as a test parameter expecting it from `conftest.py`, causing `fixture 'db_session' not found` across 5 database tests.
+    - *Commit / File:* `backend/tests/ai/test_security_audit_gaps.py#L25`.
+    - *Fix Applied:* Defined a local `@pytest_asyncio.fixture async def db_session()` yielding from `session_module.async_session_factory()`, adhering strictly to module boundaries without touching frozen `conftest.py`.
+  - *Observed Issue 2 (Windows Console Encoding):* `scratch/live_verify.py` crashed on Windows console with `UnicodeEncodeError: 'charmap' codec can't encode character '\u1ea1' (cp1252)` when printing Vietnamese response text.
+    - *Commit / File:* `scratch/live_verify.py#L9-L16`.
+    - *Fix Applied:* Added `sys.stdout.reconfigure(encoding="utf-8")` and `sys.stderr.reconfigure(encoding="utf-8")` at script startup.
+  - *Observed Issue 3 (Circuit Breaker Reason):* `rag_service.py` initially caught `LLMConfigException` under generic `except Exception`, returning `fallback_reason = None` instead of `"CONFIG_ERROR"`, which caused `test_rag_fallback_on_llm_config_error_records_telemetry_status` to fail.
+    - *Commit / File:* `backend/app/services/rag_service.py#L436-L470`.
+    - *Fix Applied:* Added explicit `is_config_error` branch setting `fallback_reason = "CONFIG_ERROR"` and recording telemetry `status = "config_error"`.

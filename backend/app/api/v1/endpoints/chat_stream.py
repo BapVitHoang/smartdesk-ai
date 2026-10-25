@@ -1,14 +1,17 @@
 """SSE Token-by-Token Streaming Endpoints for Customer RAG (REQ-04, REQ-10)."""
 
 import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.endpoints.chat_actions import get_optional_current_user
 from app.core.exceptions import InvalidPromptException
 from app.core.prompts import prompt_registry
 from app.core.security import check_prompt_injection, sanitize_input
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.chat import ChatRequest
 from app.services.ai_usage_logger import log_ai_call
 from app.services.llm_service import llm_service
@@ -27,7 +30,8 @@ router = APIRouter()
 )
 async def chat_stream(
     request: ChatRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ) -> StreamingResponse:
     """Streams RAG chat answer token by token with guardrail validation."""
     cleaned_message = sanitize_input(request.message)
@@ -62,6 +66,7 @@ async def chat_stream(
             session=db,
             workspace_id=request.workspace_id,
             session_id=request.session_id,
+            current_user=current_user,
         ),
         media_type="text/event-stream",
         headers={

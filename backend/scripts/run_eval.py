@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import asyncio
+import datetime
 import json
 import re
 import sys
@@ -213,7 +214,7 @@ async def run_upgraded_case(case: Dict[str, Any], session: Any, mode: str) -> Tu
     return passed, f"Grounded answer (citations={cit_ids}, confidence={chat_res.confidence})", elapsed
 
 
-async def execute_benchmark(mode: str, delay: float) -> int:
+async def execute_benchmark(mode: str, delay: float, write_report: bool = False) -> int:
     """Runs the 24-case evaluation benchmark and writes docs/notes/A-eval-report.md."""
     if not EVAL_DATASET_PATH.exists():
         print(f"[ERROR] Evaluation dataset not found at {EVAL_DATASET_PATH}")
@@ -384,9 +385,47 @@ async def execute_benchmark(mode: str, delay: float) -> int:
             f"{b_badge} | {u_badge} | {note_clean} | `{row['up_ms']}` |"
         )
 
-    REPORT_OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_OUTPUT_PATH.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
-    print(f"\n[OK] Wrote evaluation report to: {REPORT_OUTPUT_PATH}")
+    # 5. Save per-run JSON artifact to git-ignored backend/data/eval_runs/
+    run_dir = BACKEND_DIR / "data" / "eval_runs"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    gitignore_file = run_dir / ".gitignore"
+    if not gitignore_file.exists():
+        gitignore_file.write_text("*\n!.gitignore\n", encoding="utf-8")
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    json_path = run_dir / f"eval_run_{mode}_{timestamp}.json"
+    run_payload = {
+        "timestamp": timestamp,
+        "mode": mode,
+        "total_cases": total_cases,
+        "base_pass": total_base_pass,
+        "up_pass": total_up_pass,
+        "base_rate": base_rate,
+        "up_rate": up_rate,
+        "avg_base_ms": avg_base_ms,
+        "avg_up_ms": avg_up_ms,
+        "category_stats": cat_stats,
+        "results": results_table,
+    }
+    json_path.write_text(json.dumps(run_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n[OK] Wrote per-run evaluation JSON to: {json_path}")
+
+    # Check and list failing cases honestly if any
+    failing_cases = [r for r in results_table if not r["up_ok"]]
+    if failing_cases:
+        print(f"\n[ATTENTION] {len(failing_cases)} Upgraded case(s) failed in {mode} mode:")
+        for fc in failing_cases:
+            print(f"  - [{fc['id']}] ({fc['category']} | WS{fc['workspace_id']}): {fc['up_note']}")
+    else:
+        print(f"\n[EXCELLENT] All {total_cases} Upgraded cases passed in {mode} mode (0 failures).")
+
+    # Only write Markdown report if explicitly requested via --write-report
+    if write_report:
+        REPORT_OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        REPORT_OUTPUT_PATH.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
+        print(f"[OK] Updated formal evaluation report: {REPORT_OUTPUT_PATH}")
+    else:
+        print(f"[INFO] Skipping Markdown report update. Use '--write-report' to persist results to {REPORT_OUTPUT_PATH.name}.")
 
     return 0 if total_up_pass == total_cases else 1
 
@@ -405,8 +444,19 @@ def main() -> None:
         default=4.5,
         help="Delay in seconds between requests in 'live' mode to respect Free Tier RPM.",
     )
+    parser.add_argument(
+        "--write-report",
+        action="store_true",
+        help="Persist markdown report to docs/notes/A-eval-report.md (disabled by default).",
+    )
     args = parser.parse_args()
-    exit_code = asyncio.run(execute_benchmark(mode=args.mode, delay=args.delay))
+    exit_code = asyncio.run(
+        execute_benchmark(
+            mode=args.mode,
+            delay=args.delay,
+            write_report=args.write_report,
+        )
+    )
     sys.exit(exit_code)
 
 

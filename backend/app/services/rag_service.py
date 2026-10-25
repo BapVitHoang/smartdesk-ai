@@ -18,7 +18,7 @@ from app.services.agent_tools import detect_and_route_tool
 from app.services.ai_usage_logger import log_ai_call
 from app.services.embedding_service import embedding_service
 from app.services.fallback_service import BM25Engine, fallback_service
-from app.services.llm_service import llm_service
+from app.services.llm_service import LLMConfigException, llm_service
 
 logger = logging.getLogger("smartdesk.rag")
 
@@ -183,7 +183,8 @@ class RAGService:
         self,
         query: str,
         session: Optional[AsyncSession] = None,
-        workspace_id: Optional[int] = None
+        workspace_id: Optional[int] = None,
+        current_user: Optional[Any] = None,
     ) -> ChatResponse:
         """
         Executes end-to-end RAG query resolution with Agent Tool routing, Workspace Persona, and Cost-Guard Circuit Breaker fallback.
@@ -205,6 +206,7 @@ class RAGService:
                 query=query,
                 session=session,
                 workspace_id=ws_id,
+                current_user=current_user,
             )
             if tool_result is not None:
                 latency_ms = round((time.perf_counter() - overall_start) * 1000, 2)
@@ -434,13 +436,16 @@ class RAGService:
         except (LLMTimeoutException, LLMServiceException, Exception) as exc:
             total_latency_ms = round((time.perf_counter() - overall_start) * 1000, 2)
             is_cooldown_error = "FREE_TIER_RATE_LIMIT_COOLDOWN" in str(exc)
+            is_config_error = isinstance(exc, LLMConfigException) or getattr(exc, "telemetry_status", None) == "config_error"
 
-            logger.warning(
-                f"Circuit breaker tripped due to [{type(exc).__name__}: {str(exc)}]. "
-                f"Routing immediately to FallbackService..."
+            log_level = logging.ERROR if is_config_error else logging.WARNING
+            logger.log(
+                log_level,
+                f"Routing to FallbackService due to [{type(exc).__name__}: {str(exc)}]..."
             )
 
             fallback_data = fallback_service.match_faq(query, workspace_id=ws_id, workspace_name=ws_name, docs=docs)
+            telemetry_status = "config_error" if is_config_error else "fallback"
 
             await log_ai_call(
                 endpoint="/api/v1/chat",
@@ -452,18 +457,32 @@ class RAGService:
                 output_tokens=0,
                 cost_usd=0.0,
                 latency_ms=total_latency_ms,
-                status="fallback",
+                status=telemetry_status,
                 workspace_id=ws_id,
                 session=session,
             )
 
+            if is_config_error:
+                fb_reason = "CONFIG_ERROR"
+            elif is_cooldown_error:
+                fb_reason = "FREE_TIER_RATE_LIMIT_COOLDOWN"
+            else:
+                fb_reason = None
+
+            # Guard against claiming unsupported citations when fallback match confidence is low
+            raw_cits = fallback_data.get("citations", [])
+            if fallback_data.get("confidence", 0.0) <= 0.35:
+                citations = []
+            else:
+                citations = [CitationBadge(**c) for c in raw_cits]
+
             return ChatResponse(
                 response=fallback_data["response"],
-                citations=[CitationBadge(**c) for c in fallback_data["citations"]],
+                citations=citations,
                 latency_ms=total_latency_ms,
                 confidence=fallback_data["confidence"],
                 is_fallback=True,
-                fallback_reason="FREE_TIER_RATE_LIMIT_COOLDOWN" if is_cooldown_error else None,
+                fallback_reason=fb_reason,
                 escalation_recommended=fallback_data.get("escalation_recommended", True),
                 tools_called=[],
                 pending_action=None,
@@ -475,12 +494,18 @@ class RAGService:
         session: Optional[AsyncSession] = None,
         workspace_id: Optional[int] = None,
         session_id: Optional[str] = None,
+        current_user: Optional[Any] = None,
     ) -> AsyncGenerator[str, None]:
         """
         Streams RAG response token-by-token via Server-Sent Events (SSE - REQ-04, REQ-10).
         Emits `metadata`, `token`, and `done` events compatible with both CONTRACTS.md §8.3 and frontend streamChatMessage().
         """
-        chat_res = await self.answer_query(query=query, session=session, workspace_id=workspace_id)
+        chat_res = await self.answer_query(
+            query=query,
+            session=session,
+            workspace_id=workspace_id,
+            current_user=current_user,
+        )
         citations_dicts = [c.model_dump() for c in chat_res.citations]
         pending_dict = chat_res.pending_action.model_dump() if chat_res.pending_action else None
 

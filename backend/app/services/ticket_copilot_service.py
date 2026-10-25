@@ -11,7 +11,7 @@ from app.models.workspace import Workspace
 from app.schemas.ai_structured import TicketCopilotStructuredOutput
 from app.services.ai_usage_logger import log_ai_call
 from app.services.fallback_service import fallback_service
-from app.services.llm_service import llm_service
+from app.services.llm_service import LLMConfigException, llm_service
 
 logger = logging.getLogger("smartdesk.ticket_copilot")
 
@@ -158,6 +158,7 @@ class TicketCopilotService:
         )
         prompt_ver = prompt_registry.get_prompt_version("ticket_copilot_structured")
 
+        fallback_telemetry_status = "fallback"
         if llm_service.is_available() and not llm_service.is_in_cooldown():
             try:
                 structured_res, llm_latency = await llm_service.generate_structured_output(
@@ -180,8 +181,12 @@ class TicketCopilotService:
                     session=session,
                 )
                 return structured_res
+            except LLMConfigException as cfg_err:
+                logger.error(f"Single-call structured ticket copilot config error: {cfg_err}")
+                fallback_telemetry_status = "config_error"
             except Exception as exc:
                 logger.info(f"Single-call structured ticket copilot fallback triggered: {exc}")
+                fallback_telemetry_status = "fallback"
 
         # Deterministic Fallback producing a validated TicketCopilotStructuredOutput
         category = self.infer_category(combined_text, category_hint)
@@ -225,7 +230,7 @@ class TicketCopilotService:
             output_tokens=0,
             cost_usd=0.0,
             latency_ms=elapsed_ms,
-            status="fallback",
+            status=fallback_telemetry_status,
             workspace_id=ws_id,
             session=session,
         )
