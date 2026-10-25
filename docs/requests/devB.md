@@ -10,5 +10,5 @@ REQ-SEC-03 | backend/app/api/v1/endpoints/tickets.py | POST /api/v1/tickets is u
 
 ## Change Requests for Dev C (Frontend UX & Mocks)
 CR-DEVC-01 | frontend/src/services/api/tickets.ts | In createTicket(), attach getAuthHeaders() to headers to support authenticated ticket creation (POST /api/v1/tickets now requires Bearer auth per REQ-SEC-03) and prompt unauthenticated visitors to log in | devC
-CR-DEVC-02 | frontend/src/services/api/tickets.ts | 40+ deterministic demo tickets (total 43) are now seeded in Docker PostgreSQL supporting pagination (?page=2) and sorting. Admin sees all 43 tickets; An Nguyen sees isolated tickets (15 tickets in fresh seed, 26 in persisted container). To reset demo data for clean UI testing: run `docker compose down -v` then `docker compose up -d` | devC
+CR-DEVC-02 | frontend/src/services/api/tickets.ts | 40 deterministic demo tickets plus 3 initial tickets (total exactly 43 tickets) are seeded in Docker PostgreSQL supporting pagination (?page=2) and sorting. On a fresh volume, admin sees all 43 tickets; An Nguyen sees exactly 15 tickets (1 initial #TICK-1042 + 14 demo #TICK-1101..1114). The previous count of 26 in persisted container was due to 11 accumulated test tickets. To reset demo data to this verified state: run `docker compose down -v && docker compose up -d` | devC
 

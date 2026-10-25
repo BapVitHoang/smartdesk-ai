@@ -689,6 +689,31 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
     - Xóa ticket vĩnh viễn, giới hạn chỉ dành cho Admin (`require_role("admin")`).
     - Ghi rõ mã lỗi: `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `422 Unprocessable Entity`.
 
+#### Task 5 - Fresh-Volume Truth for Demo Data
+- **Khởi tạo volume hoàn toàn mới (Fresh Volume Initialization):**
+  - Thực thi: `docker compose down -v` xóa sạch container, network và volume `smartdesk-b_pgdata`.
+  - Khởi động lại: `docker compose up -d` tạo volume sạch mới và khởi tạo PostgreSQL 16 + pgvector.
+- **Xác thực kết quả truy vấn qua Nginx Reverse Proxy (`http://localhost:3000/api/v1`):**
+  - Thực thi script Python gửi request:
+    - **Tài khoản Admin (`admin@smartdesk.ai`, provider="demo"):**
+      - `X-Total-Count`: **43**
+      - Độ dài mảng tickets trả về: **43**
+    - **Tài khoản User (`an.nguyen@company.vn`, provider="demo"):**
+      - `X-Total-Count`: **15**
+      - Độ dài mảng tickets trả về: **15**
+- **Xác thực trực tiếp từ cơ sở dữ liệu PostgreSQL:**
+  - Lệnh: `docker exec smartdesk-postgres psql -U postgres -d smartdesk -c "SELECT count(*) FROM tickets;"`
+  - Kết quả: `count = 43`
+- **Giải thích chi tiết sự khác biệt về số lượng:**
+  - **Tổng số ticket hệ thống:** Gồm **3** ticket khởi tạo ban đầu (`#TICK-1042`, `#TICK-1041`, `#TICK-1039` trong `seed_tickets.py`) cộng với **40** ticket demo (`#TICK-1101` đến `#TICK-1140` trong `seed_demo_tickets.py`), tổng cộng chính xác là **43** ticket.
+  - **Số lượng của An Nguyễn:** Gồm **1** ticket khởi tạo (`#TICK-1042`) và **14** ticket demo (`#TICK-1101` đến `#TICK-1114`), tổng cộng chính xác là **15** ticket.
+  - **Phân quyền RBAC:** Tài khoản Admin có quyền xem toàn bộ hệ thống nên nhận đủ 43 ticket; tài khoản khách hàng An Nguyễn bị cô lập dữ liệu theo `customer_email` nên chỉ nhận đúng 15 ticket thuộc sở hữu của mình.
+  - **Lý do số 26 ở Prompt 2c:** Con số 26 ticket ghi nhận trong ghi chú Prompt 2c là do volume Docker tích lũy từ các lần chạy kiểm thử tự động trước đó tạo thêm 11 ticket dưới email của An Nguyễn ($15 + 11 = 26$). Trên volume hoàn toàn sạch mới (fresh volume), số lượng chuẩn xác 100% là 15.
+- **Cập nhật yêu cầu Dev C (`docs/requests/devB.md`):**
+  - Dòng `CR-DEVC-02` đã được cập nhật số liệu thực tế (43 tổng, 15 cho An Nguyễn) và hướng dẫn Dev C lệnh reset chính xác: `docker compose down -v && docker compose up -d`.
+- **Dọn dẹp:**
+  - Thực thi `docker compose down` (dừng các container và giữ nguyên volume để phục vụ phát triển tiếp theo).
+
 ---
 
 ## 4. Giải thích code (Platform, Data & Security)
