@@ -15,17 +15,28 @@ if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 # 1. Configure isolated test database environment BEFORE importing application
+_opt_in_test_url = os.getenv("TEST_DATABASE_URL", "").strip()
 _temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 _temp_db_path = Path(_temp_db.name).resolve().as_posix()
 _temp_db.close()
 
-os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_temp_db_path}"
-os.environ["FALLBACK_SQLITE_URL"] = f"sqlite+aiosqlite:///{_temp_db_path}"
+if _opt_in_test_url:
+    assert "test" in _opt_in_test_url.lower(), (
+        f"TEST_DATABASE_URL '{_opt_in_test_url}' must contain 'test' to prevent dropping non-test databases!"
+    )
+    _active_test_db_url = _opt_in_test_url
+    os.environ["DATABASE_URL"] = _opt_in_test_url
+    os.environ["FALLBACK_SQLITE_URL"] = f"sqlite+aiosqlite:///{_temp_db_path}"
+else:
+    _active_test_db_url = f"sqlite+aiosqlite:///{_temp_db_path}"
+    os.environ["DATABASE_URL"] = _active_test_db_url
+    os.environ["FALLBACK_SQLITE_URL"] = _active_test_db_url
 
 from app.main import app
 from app.db.session import init_db, create_engine_and_factory
 import app.db.session as session_module
 from app.models.user import User
+from starlette.requests import Request
 from app.core.deps import get_current_user
 
 # Predefined test user objects for dependency injection
@@ -50,21 +61,42 @@ _test_regular_user = User(
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_test_database():
-    """Initializes schema and seeds FAQ data in an isolated temporary test database."""
-    test_engine, test_factory = create_engine_and_factory(f"sqlite+aiosqlite:///{_temp_db_path}")
+    """Initializes schema and seeds FAQ data in an isolated test database (PostgreSQL if TEST_DATABASE_URL, else SQLite)."""
+    custom_kwargs = {}
+    if _opt_in_test_url and "postgresql" in _opt_in_test_url:
+        from sqlalchemy.pool import NullPool
+        custom_kwargs["poolclass"] = NullPool
+    test_engine, test_factory = create_engine_and_factory(_active_test_db_url, **custom_kwargs)
     session_module.engine = test_engine
     session_module.async_session_factory = test_factory
 
+    if _opt_in_test_url and "postgresql" in _opt_in_test_url:
+        from app.db.base import Base
+        async with test_engine.begin() as conn:
+            from sqlalchemy import text
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            await conn.run_sync(Base.metadata.drop_all)
+        assert "postgresql" in session_module.engine.url.drivername, "Expected PostgreSQL engine, got fallback!"
+
     await init_db()
+
+    if _opt_in_test_url and "postgresql" in _opt_in_test_url:
+        assert "postgresql" in session_module.engine.url.drivername, (
+            f"init_db() silently fell back to SQLite! Engine url is {session_module.engine.url}"
+        )
 
     yield
 
     try:
+        if _opt_in_test_url and "postgresql" in _opt_in_test_url:
+            from app.db.base import Base
+            async with test_engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
         await test_engine.dispose()
     except Exception:
         pass
     try:
-        if os.path.exists(_temp_db_path):
+        if _temp_db_path and os.path.exists(_temp_db_path):
             os.remove(_temp_db_path)
     except Exception:
         pass
@@ -81,10 +113,17 @@ async def client():
     app.dependency_overrides.pop(get_current_user, None)
 
 
+def _resolve_test_user_from_request(request: Request) -> User:
+    auth_header = request.headers.get("authorization", "")
+    if "admin" in auth_header:
+        return _test_admin_user
+    return _test_regular_user
+
+
 @pytest_asyncio.fixture
 async def admin_client():
     """Authenticated Admin test client via dependency override."""
-    app.dependency_overrides[get_current_user] = lambda: _test_admin_user
+    app.dependency_overrides[get_current_user] = _resolve_test_user_from_request
     transport = ASGITransport(app=app)
     headers = {"Authorization": "Bearer demo_jwt_token_for_admin@smartdesk.ai"}
     async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
@@ -95,7 +134,7 @@ async def admin_client():
 @pytest_asyncio.fixture
 async def user_client():
     """Authenticated Customer test client (an.nguyen@company.vn) via dependency override."""
-    app.dependency_overrides[get_current_user] = lambda: _test_regular_user
+    app.dependency_overrides[get_current_user] = _resolve_test_user_from_request
     transport = ASGITransport(app=app)
     headers = {"Authorization": "Bearer demo_jwt_token_for_an.nguyen@company.vn"}
     async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:

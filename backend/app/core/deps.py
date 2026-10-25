@@ -2,7 +2,6 @@
 
 import logging
 from typing import Callable, Optional
-from datetime import datetime, timezone
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -18,105 +17,55 @@ logger = logging.getLogger("smartdesk.deps")
 security_bearer = HTTPBearer(auto_error=False)
 
 
+def _unauthorized(detail: str) -> HTTPException:
+    """Builds a uniform HTTP 401 response with the Bearer challenge header."""
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=detail,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
     Resolves the authenticated User from the Bearer JWT token.
-    - Decodes HS256 JWT signed with settings.JWT_SECRET_KEY.
-    - Retains backward compatibility for demo tokens ('demo_jwt_token_for_{email}').
-    - Returns HTTP 401 Unauthorized if token is missing, invalid, or expired.
-    - Allows DEV_AUTH_BYPASS only if explicitly configured in settings.
+    - Accepts only HS256 (settings.JWT_ALGORITHM) tokens signed with settings.JWT_SECRET_KEY;
+      tokens with any other algorithm (including "none") are rejected.
+    - Requires `sub` and `exp` claims; the account must exist in the database and be active.
+    - Role is always taken from the database record, never from token claims.
+    - Returns HTTP 401 Unauthorized if the token is missing, invalid, expired, or the account is unknown/inactive.
+    There is no unauthenticated, bypass, or legacy-token fallback.
     """
     if not credentials or not credentials.credentials:
-        if settings.DEV_AUTH_BYPASS:
-            # Temporary development bypass (must never be True in production)
-            return User(
-                id=1,
-                email="admin@smartdesk.ai",
-                full_name="Quản trị viên SmartDesk (Bypass)",
-                role="admin",
-                oauth_provider="demo",
-                workspace_id=1,
-            )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Yêu cầu xác thực. Vui lòng cung cấp Bearer token hợp lệ.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise _unauthorized("Yêu cầu xác thực. Vui lòng cung cấp Bearer token hợp lệ.")
 
     token = credentials.credentials.strip()
 
-    # 1. Backward compatibility for legacy test demo tokens
-    if token.startswith("demo_jwt_token_for_"):
-        email = token.replace("demo_jwt_token_for_", "").strip().lower()
-        role = "admin" if "admin" in email else "user"
-        full_name = "Quản trị viên SmartDesk" if role == "admin" else "Nguyễn Văn An"
-
-        # Check DB to get real user ID/workspace_id if available
-        res = await db.execute(select(User).where(User.email == email))
-        existing_user = res.scalars().first()
-        if existing_user:
-            return existing_user
-
-        return User(
-            id=1 if role == "admin" else 2,
-            email=email,
-            full_name=full_name,
-            role=role,
-            oauth_provider="demo",
-            workspace_id=1,
-        )
-
-    # 2. Real HS256 JWT verification
     try:
         payload = jwt.decode(
             token,
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],
-        )
-        email: Optional[str] = payload.get("sub")
-        if not email:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token không hợp lệ: Thiếu thông tin định danh người dùng (sub).",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        role: str = payload.get("role", "user")
-        user_id: int = payload.get("user_id", 1)
-        full_name: str = payload.get("full_name", email)
-        workspace_id: int = payload.get("workspace_id", 1)
-
-        # Look up user in database
-        res = await db.execute(select(User).where(User.email == email))
-        user = res.scalars().first()
-        if user:
-            return user
-
-        # Fallback to User instance constructed from validated claims
-        return User(
-            id=user_id,
-            email=email,
-            full_name=full_name,
-            role=role,
-            oauth_provider="jwt",
-            workspace_id=workspace_id,
+            options={"require": ["exp", "sub"]},
         )
     except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except (jwt.PyJWTError, Exception) as exc:
-        logger.warning(f"Failed to decode JWT token: {exc}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Token xác thực không hợp lệ: {str(exc)}",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise _unauthorized("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+    except jwt.PyJWTError as exc:
+        logger.warning("Rejected JWT: %s", type(exc).__name__)
+        raise _unauthorized("Token xác thực không hợp lệ.")
+
+    email = payload.get("sub")
+    if not isinstance(email, str) or not email:
+        raise _unauthorized("Token xác thực không hợp lệ.")
+
+    res = await db.execute(select(User).where(User.email == email.strip().lower()))
+    user = res.scalars().first()
+    if user is None or not user.is_active:
+        raise _unauthorized("Token xác thực không hợp lệ.")
+    return user
 
 
 def require_role(required_role: str) -> Callable:

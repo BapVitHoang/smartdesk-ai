@@ -14,6 +14,7 @@ from app.services.document_service import document_service
 
 from app.db.seed.seed_users import seed_users
 from app.db.seed.seed_tickets import seed_tickets
+from app.db.seed.seed_demo_tickets import seed_demo_tickets
 from app.db.seed.seed_ai_usage import seed_ai_usage
 
 logger = logging.getLogger("smartdesk.seed")
@@ -122,6 +123,7 @@ async def seed_all(session: AsyncSession) -> None:
     await seed_users(session)
     await seed_faq(session)
     await seed_tickets(session)
+    await seed_demo_tickets(session)
     await seed_ai_usage(session)
     await seed_sample_documents(session)
 
@@ -130,6 +132,7 @@ __all__ = [
     "seed_all",
     "seed_users",
     "seed_tickets",
+    "seed_demo_tickets",
     "seed_ai_usage",
     "seed_workspaces",
     "seed_faq",

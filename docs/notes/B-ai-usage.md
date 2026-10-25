@@ -42,3 +42,43 @@
   - Verified `Vector(768).with_variant(JSON(), "sqlite")` compatibility across SQLite and PostgreSQL.
   - Verified `redact_pii()` mask is applied before embedding API calls.
   - Verified `docker compose config` parses without syntax errors.
+
+---
+
+### Session 4: Security Hardening — Password Hashing, Google ID Token Verification & Brute-force Throttle (`REQ-06`, `REQ-09`, `REQ-36`)
+- **Date:** 2026-10-23
+- **AI Tool Used:** Antigravity AI Assistant
+- **Key Prompt:** "Khắc phục triệt để lỗ hổng xác thực: kiểm tra mật khẩu bằng salted scrypt, xác thực chữ ký Google ID token qua google-auth, chặn đăng nhập tài khoản ảo và bổ sung sliding-window throttle chống brute-force."
+- **Manual Verification & Changes:**
+  - Verified `hash_password()` and `verify_password_async()` using standard library `hashlib.scrypt` with constant-time compare (`hmac.compare_digest`).
+  - Verified `_DUMMY_PASSWORD_HASH` execution to ensure identical response latency for non-existent users, preventing username enumeration.
+  - Verified Google ID token validation using `google.oauth2.id_token.verify_oauth2_token` with audience check, returning HTTP 501 when unconfigured and rejecting forged/unsigned tokens with HTTP 401.
+  - Verified 1-click Demo login is locked to `DEMO_ACCOUNT_EMAILS` and returns HTTP 403 when `DEMO_LOGIN_ENABLED=false`.
+  - Added sliding-window in-memory throttle returning HTTP 429 after 10 failed attempts per email / client IP.
+  - Created 11 dedicated offline security test cases in `backend/tests/platform/test_auth_security.py` (all PASS).
+- **AI Mistakes & Corrections (if encountered):**
+  - *Observed Issue:* Initial draft implementation in `auth.py` did not check `is_active` status on existing users during Google OAuth2 login and demo login, which would allow deactivated accounts to continue logging in if they authenticated via external provider.
+  - *File:* `backend/app/api/v1/endpoints/auth.py`
+  - *Fix Applied:* Enforced explicit `user.is_active` check across all authentication branches (`_demo_login`, `_google_login`, and `login_for_access_token`), raising uniform 401/403 errors for deactivated users.
+
+---
+
+### Session 5: JWT Dynamic Secret Hardening, Dependency Audit, Docker Smoke Script & Reset-Cooldown Alias
+- **Date:** 2026-10-25
+- **AI Tool Used:** Antigravity AI Assistant
+- **Key Prompt:** "Thực hiện các tác vụ platform cho Dev B và Integrator: Không bao giờ dùng default JWT secret trong code; Kiểm định dependency truth qua clean venv và AST scan; Thêm scripts/smoke_docker.ps1 cho Docker/pgvector; Thêm route POST /agent/reset-cooldown; Kiểm tra cô lập REQ-08."
+- **Manual Verification & Changes:**
+  - Verified SHA-256 detection of known placeholder JWT secrets, generating ephemeral per-process secrets when `DEMO_LOGIN_ENABLED=true` and refusing startup when disabled.
+  - Verified clean venv installation (`sd-venv-clean`) with `pip install -q -r backend/requirements.txt` and AST scan across all backend code (all 20 dependencies verified necessary).
+  - Verified syntax of `scripts/smoke_docker.ps1` via PowerShell AST parser and verified blocker detection when Docker daemon is offline.
+  - Verified `POST /api/v1/agent/reset-cooldown` and its alias `POST /api/v1/agent/ai-usage/reset-cooldown` with 4 platform tests.
+  - Verified REQ-08: Grep of `frontend/package.json`, `frontend/src/`, and `frontend/dist/` confirmed 0 client-side Google SDKs or API keys.
+- **AI Mistakes & Corrections (if encountered):**
+  - *Observed Issue 1:* In `backend/tests/platform/test_agent_reset_cooldown.py`, the AI assumed `llm_service._cooldown_until` was a `datetime` object (`datetime.now(timezone.utc) + timedelta(...)`), causing `AssertionError: assert False is True`. Inspection of `backend/app/services/llm_service.py` revealed that `cooldown_until` is a `time.time()` float timestamp.
+  - *Commit Subject:* `feat(agent): expose reset-cooldown on agent router and ignore eval runs`
+  - *Fix Applied:* Updated test to assign `llm_service.cooldown_until = time.time() + 60.0`, resulting in 4/4 passing tests.
+  - *Observed Issue 2:* In `scripts/ownership_map.py`, newly introduced integrator-managed paths (`scripts/smoke_docker.ps1` and `backend/data/eval_runs/.gitignore`) were not listed in the explicit integrator mapping, causing `check_ownership.py` to flag a cross-owner violation.
+  - *Commit Subject:* `chore(docker): add smoke_docker.ps1 script and record daemon blocker`
+  - *Fix Applied:* Added both paths to `integrator` in `scripts/ownership_map.py` and regenerated `.github/CODEOWNERS` via `scripts/gen_codeowners.py`.
+
+

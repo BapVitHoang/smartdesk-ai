@@ -124,3 +124,22 @@ Tất cả các bài kiểm tra chạy độc lập trên cơ sở dữ liệu S
    - Mã định danh bắt buộc theo định dạng: `#TICK-XXXX`.
    - Mức độ ưu tiên gồm đúng 4 cấp độ: `Low`, `Medium`, `High`, `Urgent`.
    - Vòng đời trạng thái ticket: `open` -> `in_progress` -> `resolved` (hoặc `closed`).
+
+
+---
+
+## 8. Tài khoản Kiểm thử & Mật khẩu Mặc định (Test Accounts - REQ-39)
+
+> **CẢNH BÁO AN TOÀN (DEMO ONLY):** Các mật khẩu dưới đây chỉ dành cho môi trường phát triển cục bộ và kiểm thử đồ án. Khi triển khai production, bắt buộc phải tắt `DEMO_LOGIN_ENABLED=false` và thay đổi `JWT_SECRET_KEY`.
+
+| Tài khoản (Email) | Mật khẩu mặc định | Vai trò (Role) | Quyền hạn truy cập & Ghi chú |
+| :--- | :--- | :--- | :--- |
+| `admin@smartdesk.ai` | `Admin@SmartDesk2026` | `admin` | **Toàn quyền:** Chatbot RAG, Quản lý Ticket, AI Copilot, Quản trị Tri thức & Báo cáo Telemetry AI. |
+| `an.nguyen@company.vn` | `User@SmartDesk2026` | `user` | **Khách hàng:** Hỏi đáp Chatbot, Tạo ticket cá nhân, xem trạng thái ticket (bị khóa/ẩn các tab Quản trị viên). |
+
+### Kiểm tra đăng nhập qua API (cURL):
+\\ash
+curl -X POST "http://localhost:8000/api/v1/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin@smartdesk.ai", "password": "Admin@SmartDesk2026"}'
+\

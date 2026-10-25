@@ -3,12 +3,15 @@ services:
     image: pgvector/pgvector:pg16
     container_name: smartdesk-postgres
     restart: unless-stopped
+    networks:
+      - smartdesk-net
     environment:
       POSTGRES_DB: smartdesk
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      # Local demo default password for evaluator convenience; overridable via environment
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -23,16 +26,21 @@ services:
       dockerfile: Dockerfile
     container_name: smartdesk-backend
     restart: unless-stopped
+    networks:
+      - smartdesk-net
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@postgres:5432/smartdesk
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/smartdesk}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # No value is committed. Empty = random per-process secret (demo login on) or refuse to start (demo login off).
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       LLM_TIMEOUT_SECONDS: 4.0
       CORS_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
+      TRUSTED_PROXY_CIDRS: "127.0.0.1/32,::1/128,172.28.0.0/16"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 15s
@@ -45,6 +53,8 @@ services:
       dockerfile: Dockerfile
     container_name: smartdesk-frontend
     restart: unless-stopped
+    networks:
+      - smartdesk-net
     depends_on:
       - backend
     ports:
@@ -52,3 +62,10 @@ services:
 
 volumes:
   pgdata:
+
+networks:
+  smartdesk-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

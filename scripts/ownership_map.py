@@ -133,6 +133,7 @@ OWNERSHIP_MAP = {
         "AI_USAGE.md",
         "backend/.env.example",
         "backend/README.md",
+        "backend/data/eval_runs/.gitignore",
         "backend/pytest.ini",
         "backend/requirements.txt",
         "backend/app/__init__.py",
@@ -183,6 +184,7 @@ OWNERSHIP_MAP = {
         "scripts/start_all.bat",
         "scripts/start_backend.bat",
         "scripts/verify_setup.ps1",
+        "scripts/smoke_docker.ps1",
         "smartdesk_audit_report.md",
     ],
 }

@@ -29,7 +29,7 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
-def create_engine_and_factory(url: str):
+def create_engine_and_factory(url: str, **custom_kwargs):
     """Factory helper to build async engine and session factory."""
     norm_url = normalize_database_url(url)
     kwargs = {"echo": settings.DEBUG}
@@ -37,8 +37,10 @@ def create_engine_and_factory(url: str):
         kwargs["connect_args"] = {"check_same_thread": False}
     else:
         kwargs["pool_pre_ping"] = True
-        kwargs["pool_size"] = 10
-        kwargs["max_overflow"] = 20
+        if "poolclass" not in custom_kwargs:
+            kwargs["pool_size"] = 10
+            kwargs["max_overflow"] = 20
+    kwargs.update(custom_kwargs)
 
     eng = create_async_engine(norm_url, **kwargs)
     factory = async_sessionmaker(
@@ -80,6 +82,8 @@ async def init_db() -> None:
     from app.models.workspace import Workspace  # noqa: F401
     from app.models.document import Document  # noqa: F401
     from app.models.verification import VerificationReport, VerificationItem  # noqa: F401
+    from app.models.user import User  # noqa: F401
+    from app.models.ai_usage import AIUsageLog  # noqa: F401
 
     def _migrate_sqlite_columns(sync_conn):
         try:
@@ -97,8 +101,22 @@ async def init_db() -> None:
                     sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN chunk_index INTEGER DEFAULT 0")
                 if "page_number" not in kc_cols:
                     sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN page_number INTEGER DEFAULT 1")
+
+            user_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()]
+            if user_cols:
+                if "password_hash" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)")
+                if "is_active" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1")
         except Exception as mig_err:
             logger.warning(f"SQLite auto-migration notice: {mig_err}")
+
+    def _migrate_postgres_columns(sync_conn):
+        try:
+            sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
+            sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE")
+        except Exception as mig_err:
+            logger.warning(f"PostgreSQL auto-migration notice: {mig_err}")
 
     # 1. Synchronize schema, falling back to SQLite if PostgreSQL fails
     try:
@@ -109,6 +127,8 @@ async def init_db() -> None:
             await conn.run_sync(Base.metadata.create_all)
             if "sqlite" in engine.url.drivername:
                 await conn.run_sync(_migrate_sqlite_columns)
+            elif "postgresql" in engine.url.drivername:
+                await conn.run_sync(_migrate_postgres_columns)
         logger.info(f"Database schema synchronized successfully on {engine.url.drivername}.")
     except Exception as e:
         logger.warning(

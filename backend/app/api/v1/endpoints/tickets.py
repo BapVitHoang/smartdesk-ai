@@ -3,7 +3,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Path, Response, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, desc, asc, func
+from sqlalchemy import select, or_, desc, asc, func, case
 import logging
 
 from app.schemas.ticket import TicketCreate, TicketUpdate, TicketResponse
@@ -29,9 +29,21 @@ router = APIRouter()
 )
 async def create_ticket(
     ticket_in: TicketCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> TicketResponse:
-    """Create a new ticket with automatic Copilot triage."""
+    """Create a new ticket with automatic Copilot triage. Requires authentication (REQ-SEC-03)."""
+    # Enforce customer ownership: regular users can only submit tickets for their own email/name
+    if current_user.role != "admin":
+        ticket_in.customer_email = current_user.email
+        ticket_in.customer_name = current_user.full_name or current_user.email.split("@")[0]
+    else:
+        # Support staff / admin can specify customer details or fall back to authenticated staff
+        if not ticket_in.customer_email:
+            ticket_in.customer_email = current_user.email
+        if not ticket_in.customer_name:
+            ticket_in.customer_name = current_user.full_name or "Support Staff"
+
     # Sanitize text fields
     ticket_in.customer_name = sanitize_input(ticket_in.customer_name)
     ticket_in.subject = sanitize_input(ticket_in.subject)
@@ -68,12 +80,16 @@ async def list_tickets(
     search: Optional[str] = Query(None, description="Search term in subject, description, customer name, or ticket code"),
     sort_by: str = Query("created_at", description="Sort field: created_at | priority | status | sla_hours"),
     sort_order: str = Query("desc", description="Sort direction: asc | desc"),
+    page: Optional[int] = Query(None, ge=1, description="Page number (1-based, overrides skip if provided)"),
     skip: int = Query(0, ge=0, description="Offset for pagination"),
     limit: int = Query(20, ge=1, le=100, description="Limit results"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> List[TicketResponse]:
     """Retrieve filtered and sorted ticket list with X-Total-Count header."""
+    if page is not None:
+        skip = (page - 1) * limit
+
     query = select(Ticket)
     count_query = select(func.count(Ticket.id))
 
@@ -113,7 +129,14 @@ async def list_tickets(
     # 2. Server-side sorting
     sort_col = Ticket.created_at
     if sort_by == "priority":
-        sort_col = Ticket.priority
+        # Semantic priority hierarchy: Urgent (1) -> High (2) -> Medium (3) -> Low (4)
+        sort_col = case(
+            (Ticket.priority == "Urgent", 1),
+            (Ticket.priority == "High", 2),
+            (Ticket.priority == "Medium", 3),
+            (Ticket.priority == "Low", 4),
+            else_=5
+        )
     elif sort_by == "status":
         sort_col = Ticket.status
     elif sort_by in {"sla_hours", "sla_due_date"}:
@@ -122,7 +145,8 @@ async def list_tickets(
         sort_col = Ticket.created_at
 
     order_fn = asc if sort_order.lower() == "asc" else desc
-    query = query.order_by(order_fn(sort_col)).offset(skip).limit(limit)
+    # Include Ticket.id.desc() as deterministic tie-breaker for pagination
+    query = query.order_by(order_fn(sort_col), Ticket.id.desc()).offset(skip).limit(limit)
 
     result = await db.execute(query)
     tickets = result.scalars().all()

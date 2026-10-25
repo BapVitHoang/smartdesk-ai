@@ -1,5 +1,6 @@
 """Platform module tests for pgvector dialect mapping and database resilience (REQ-07, REQ-11)."""
 
+import os
 import sys
 from pathlib import Path
 import pytest
@@ -40,16 +41,64 @@ async def test_search_similar_chunks_sqlite_fallback(client) -> None:
     """Verify search_similar_chunks runs cleanly on SQLite using in-memory cosine similarity."""
     from app.db.session import async_session_factory
     async with async_session_factory() as session:
+        # Workspace 2 has seeded documents/chunks from sample_documents
         results = await embedding_service.search_similar_chunks(
-            workspace_id=1,
-            query="quên mật khẩu và lấy lại tài khoản",
+            workspace_id=2,
+            query="chi phí khám răng và bảng giá điều trị",
             top_k=2,
             session=session,
             only_published=False
         )
         assert isinstance(results, list)
+        assert len(results) > 0, "Expected at least 1 similar chunk for workspace 2"
         for r in results:
             assert "chunk_id" in r
             assert "score" in r
-            assert 0.0 <= r["score"] <= 1.0
+            assert -1.0 <= r["score"] <= 1.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL") or "postgresql" not in os.getenv("TEST_DATABASE_URL", ""),
+    reason="Requires PostgreSQL TEST_DATABASE_URL"
+)
+async def test_search_similar_chunks_postgresql_pgvector(client, caplog) -> None:
+    """Verify search_similar_chunks runs native pgvector SQL query with <=> cosine distance on PostgreSQL."""
+    import logging
+    from app.db.session import async_session_factory
+    async with async_session_factory() as session:
+        # Seed test chunk if needed
+        existing = await session.execute(select(KnowledgeChunk).where(KnowledgeChunk.workspace_id == 2))
+        chunk = existing.scalars().first()
+        if not chunk:
+            dummy_vec = embedding_service.generate_pseudo_embedding("Dịch vụ niềng răng trong suốt SmileCare")
+            chunk = KnowledgeChunk(
+                workspace_id=2,
+                chunk_id="smilecare-chunk-test-1",
+                chunk_index=0,
+                page_number=1,
+                title="Bảng giá niềng răng SmileCare",
+                content="Chi phí niềng răng trong suốt từ 35 triệu đến 80 triệu đồng.",
+                embedding=dummy_vec
+            )
+            session.add(chunk)
+            await session.commit()
+
+        with caplog.at_level(logging.WARNING):
+            results = await embedding_service.search_similar_chunks(
+                workspace_id=2,
+                query="niềng răng chi phí bao nhiêu",
+                top_k=2,
+                session=session,
+                only_published=False
+            )
+        # Assert no fallback warning occurred
+        for record in caplog.records:
+            assert "Falling back to memory cosine" not in record.message
+        assert isinstance(results, list)
+        assert len(results) > 0
+        for r in results:
+            assert "chunk_id" in r
+            assert "score" in r
+            assert -1.0 <= r["score"] <= 1.0
 

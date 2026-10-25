@@ -105,3 +105,64 @@ async def test_ticket_creation_integrates_copilot_service(admin_client: AsyncCli
     assert "Authentication" in data["ai_tags"]
     assert data["ai_draft_reply"] is not None
     assert len(data["ai_draft_reply"]) > 20
+
+
+@pytest.mark.asyncio
+async def test_demo_tickets_pagination_and_sorting(admin_client: AsyncClient) -> None:
+    """Verify pagination (?page=2) and sorting with 40+ seeded demo tickets."""
+    # 1. Page 1 vs Page 2 with limit=10
+    res_page1 = await admin_client.get("/api/v1/tickets?sort_by=created_at&sort_order=desc&limit=10&page=1")
+    assert res_page1.status_code == 200
+    total_count = int(res_page1.headers.get("x-total-count", "0"))
+    assert total_count >= 40, f"Expected at least 40 tickets, got {total_count}"
+
+    tickets_p1 = res_page1.json()
+    assert len(tickets_p1) == 10
+    p1_codes = [t["ticket_code"] for t in tickets_p1]
+
+    res_page2 = await admin_client.get("/api/v1/tickets?sort_by=created_at&sort_order=desc&limit=10&page=2")
+    assert res_page2.status_code == 200
+    tickets_p2 = res_page2.json()
+    assert len(tickets_p2) == 10
+    p2_codes = [t["ticket_code"] for t in tickets_p2]
+
+    # Verify page 2 returns distinct rows from page 1
+    assert set(p1_codes).isdisjoint(set(p2_codes)), "Page 1 and Page 2 rows must not overlap!"
+
+    # 2. Verify sorting by priority (Urgent=1 -> High=2 -> Medium=3 -> Low=4)
+    res_prio_asc = await admin_client.get("/api/v1/tickets?sort_by=priority&sort_order=asc&limit=10&page=1")
+    assert res_prio_asc.status_code == 200
+    prio_asc_tickets = res_prio_asc.json()
+    assert len(prio_asc_tickets) == 10
+    # First items in asc must be Urgent
+    assert prio_asc_tickets[0]["priority"] == "Urgent"
+
+    res_prio_desc = await admin_client.get("/api/v1/tickets?sort_by=priority&sort_order=desc&limit=10&page=1")
+    assert res_prio_desc.status_code == 200
+    prio_desc_tickets = res_prio_desc.json()
+    assert len(prio_desc_tickets) == 10
+    # First items in desc must be Low
+    assert prio_desc_tickets[0]["priority"] == "Low"
+
+
+@pytest.mark.asyncio
+async def test_demo_tickets_user_isolation(admin_client: AsyncClient, user_client: AsyncClient) -> None:
+    """Verify regular user (an.nguyen@company.vn) only sees their own tickets among 40+ demo tickets."""
+    # Admin sees all tickets (>= 40)
+    res_admin = await admin_client.get("/api/v1/tickets?limit=100")
+    assert res_admin.status_code == 200
+    admin_total = int(res_admin.headers.get("x-total-count", "0"))
+    assert admin_total >= 40
+
+    # User only sees tickets assigned to an.nguyen@company.vn (15 tickets)
+    res_user = await user_client.get("/api/v1/tickets?limit=100")
+    assert res_user.status_code == 200
+    user_total = int(res_user.headers.get("x-total-count", "0"))
+    assert user_total < admin_total
+    assert user_total >= 14, f"Expected An Nguyen to have at least 14 tickets, got {user_total}"
+
+    user_tickets = res_user.json()
+    assert len(user_tickets) == user_total
+    for t in user_tickets:
+        assert t["customer_email"] == "an.nguyen@company.vn"
+
