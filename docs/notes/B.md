@@ -478,6 +478,25 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   ```
   Parameters: `$1 = '1'`, `$2 = '[768-dim query vector]'`, `$3 = '2'`, `$4 = 'published'`, `$5 = '[768-dim query vector]'`, `$6 = '3'`.
 
+#### Task 3 - Trusted Proxy Narrowing & Anti-Spoofing
+- **Vấn đề bảo mật trước đây:**
+  Giá trị mặc định của `FORWARDED_ALLOW_IPS` từng bao quát các dải mạng riêng tư rộng (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`). Trong môi trường mạng nội bộ hoặc VPS dùng chung, các máy trạm/container khác trong cùng dải có thể gửi header `X-Forwarded-For` giả mạo để thao túng định danh client IP và bypass bộ điều tiết tần suất đăng nhập (`LoginThrottle`).
+- **Giải pháp triển khai:**
+  1. `backend/app/core/config.py`: Thay thế dải mặc định bằng `TRUSTED_PROXY_CIDRS: str = ""` (mặc định rỗng).
+  2. `backend/app/core/security.py`: Hàm `is_trusted_proxy_ip()` khi `TRUSTED_PROXY_CIDRS` rỗng sẽ chỉ tin cậy duy nhất loopback (`127.0.0.1/32` và `::1/128`). Mọi IP riêng tư khác (`10.0.0.1`, `192.168.1.50`, v.v.) đều bị coi là không tin cậy.
+  3. `docker-compose.yml`:
+     - Khai báo bridge network riêng `smartdesk-net` với dải mạng cố định `172.28.0.0/16`. Cả 3 container (`postgres`, `backend`, `frontend`) cùng gắn vào mạng này.
+     - `backend.environment`: Cấu hình `TRUSTED_PROXY_CIDRS: "127.0.0.1/32,::1/128,172.28.0.0/16"`.
+     - `backend.ports`: Khóa chặt cổng backend về `127.0.0.1:8000:8000` (thay vì `0.0.0.0:8000`), buộc mọi truy cập từ bên ngoài phải đi qua Nginx reverse proxy.
+  4. `backend/Dockerfile`: Cập nhật lệnh khởi động Uvicorn:
+     `CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=127.0.0.1,::1,172.28.0.0/16"]`
+  5. `backend/tests/platform/test_proxy_ip.py`: Bổ sung kiểm thử:
+     - `test_untrusted_private_ip_cannot_spoof_client_ip`: Chứng minh `10.0.0.1`, `192.168.1.50`, `172.16.5.10` gửi `X-Forwarded-For` bị bỏ qua, `get_trusted_client_ip()` trả về trực tiếp IP nguồn.
+     - `test_untrusted_private_ip_cannot_bypass_throttle_with_rotating_forwarded_headers`: Chứng minh kẻ tấn công từ IP `10.0.0.1` liên tục đổi header `X-Forwarded-For` mỗi lần gửi vẫn bị ghi nhận vào cùng một bucket IP thực tế và bị khóa với `HTTP 429`.
+- **Kết quả kiểm thử:**
+  - `python -m pytest backend/tests/platform/test_proxy_ip.py -v`: 9 passed in 1.33s.
+  - `python -m pytest backend/tests/ -q`: 96 passed, 1 skipped in 10.51s.
+
 ---
 
 ## 4. Giải thích code (Platform, Data & Security)
@@ -549,7 +568,7 @@ Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
   1. Cấu hình Uvicorn trong `backend/Dockerfile` với cờ `--proxy-headers` và `--forwarded-allow-ips`.
   2. Hàm `get_trusted_client_ip(request)` trong `backend/app/core/security.py` thực hiện:
      - Kiểm tra địa chỉ kết nối trực tiếp `peer_ip` (`request.client.host`) thông qua hàm `is_trusted_proxy_ip()`.
-     - Danh sách mạng proxy tin cậy được cấu hình trong `settings.FORWARDED_ALLOW_IPS` (mặc định bao gồm `127.0.0.1`, loopback IPv6 `::1`, Docker networks `172.16.0.0/12`, private networks `10.0.0.0/8`, `192.168.0.0/16`).
+     - Danh sách mạng proxy tin cậy được cấu hình trong `settings.TRUSTED_PROXY_CIDRS` (khi để trống mặc định chỉ tin cậy loopback `127.0.0.1/32` và `::1/128`; trong Docker Compose được chỉ định rõ subnet cố định `172.28.0.0/16`). Các dải mạng private khác như `10.0.0.0/8`, `192.168.0.0/16` hoàn toàn không được tin cậy mặc định để chống tấn công giả mạo IP trong mạng LAN/VPS dùng chung.
      - Chỉ khi `peer_ip` thuộc mạng tin cậy, hệ thống mới đọc header `X-Real-IP` hoặc phần tử đầu tiên của `X-Forwarded-For`.
      - Nếu request đến từ một nguồn không tin cậy nhưng cố tình gửi header `X-Forwarded-For` giả mạo, hệ thống sẽ bỏ qua header này và sử dụng chính `peer_ip` làm định danh throttle.
 

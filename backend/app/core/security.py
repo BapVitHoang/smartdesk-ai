@@ -228,9 +228,15 @@ def is_trusted_proxy_ip(ip_str: str, allowed_cidrs: Optional[str] = None) -> boo
     """Checks whether the given IP string belongs to a trusted proxy network."""
     if not ip_str or ip_str in ("unknown", "testclient"):
         return False
-    raw_cidrs = allowed_cidrs if allowed_cidrs is not None else getattr(settings, "FORWARDED_ALLOW_IPS", "")
-    if not raw_cidrs:
-        return False
+    if allowed_cidrs is not None:
+        raw_cidrs = allowed_cidrs
+    else:
+        raw_cidrs = getattr(settings, "TRUSTED_PROXY_CIDRS", "") or getattr(settings, "FORWARDED_ALLOW_IPS", "")
+
+    # When empty/unset, trust ONLY loopback (127.0.0.1/32 and ::1/128)
+    if not raw_cidrs or not raw_cidrs.strip():
+        raw_cidrs = "127.0.0.1/32,::1/128"
+
     try:
         addr = ipaddress.ip_address(ip_str.strip())
         if addr.version == 6 and addr.ipv4_mapped:
