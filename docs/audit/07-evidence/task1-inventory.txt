@@ -1,0 +1,324 @@
+=== 1. ANCESTRY MATRIX (row is ancestor of col?) ===
+Row \ Col | Hoang | feature/b-platform | feature/a-ai-engine | Nguyen2 | Nguyen | feature/c-frontend-docs | TKhanh
+------------------------------------------------------------------------------------------------------------------
+Hoang                  | YES    | YES    | no     | YES    | no     | no     | no    
+feature/b-platform     | no     | YES    | no     | no     | no     | no     | no    
+feature/a-ai-engine    | no     | no     | YES    | YES    | no     | no     | no    
+Nguyen2                | no     | no     | no     | YES    | no     | no     | no    
+Nguyen                 | no     | no     | no     | no     | YES    | no     | no    
+feature/c-frontend-docs | no     | no     | no     | no     | no     | YES    | no    
+TKhanh                 | no     | no     | no     | no     | no     | no     | YES   
+
+=== 2, 3, 4. PER-BRANCH INVENTORY, OWNERSHIP & SAFETY SCAN ===
+
+==========================================
+BRANCH: origin/feature/b-platform
+==========================================
+Commits not in origin/Hoang: 24
+Authors (shortlog -sne):
+24	Bap <23110020@student.hcmute.edu.vn>
+Commits:
+5415245 | 2026-10-25 09:16:05 +0700 | Bap <23110020@student.hcmute.edu.vn> | docs(review): log self-review round 1 for prompt 2d and record out-of-scope requests
+6cd64fb | 2026-10-25 09:10:56 +0700 | Bap <23110020@student.hcmute.edu.vn> | docs(notes): record ownership map verification for docker files
+2495197 | 2026-10-25 09:10:29 +0700 | Bap <23110020@student.hcmute.edu.vn> | test(demo): verify fresh volume demo ticket counts and update devC request
+74e8747 | 2026-10-25 09:08:32 +0700 | Bap <23110020@student.hcmute.edu.vn> | docs(contracts): align api contracts with tickets endpoint implementation
+605f536 | 2026-10-25 09:07:06 +0700 | Bap <23110020@student.hcmute.edu.vn> | docs(notes): correct test database truth and relabel review round
+8bf8e67 | 2026-10-25 09:05:58 +0700 | Bap <23110020@student.hcmute.edu.vn> | docs(security): mask db credentials in notes and allow compose password override
+b2b14bb | 2026-10-25 09:04:53 +0700 | Bap <23110020@student.hcmute.edu.vn> | chore(db): reset debug log_statement to default in postgresql volume
+c127385 | 2026-10-25 08:33:19 +0700 | Bap <23110020@student.hcmute.edu.vn> | fix(platform): address review round 3 findings for priority sorting, test truth, and security
+f93b063 | 2026-10-25 08:23:44 +0700 | Bap <23110020@student.hcmute.edu.vn> | fix(scripts): support volume retention by default in smoke_docker.ps1
+31e718a | 2026-10-25 08:21:32 +0700 | Bap <23110020@student.hcmute.edu.vn> | feat(tickets): add deterministic 40 demo tickets for pagination and sorting verification
+211a25a | 2026-10-25 08:16:47 +0700 | Bap <23110020@student.hcmute.edu.vn> | feat(security): narrow trusted proxy cidrs and bind backend to localhost
+ef952b0 | 2026-10-25 08:10:39 +0700 | Bap <23110020@student.hcmute.edu.vn> | feat(db): verify pgvector cosine search and captured sql query on postgresql
+7de6641 | 2026-10-25 08:09:06 +0700 | Bap <23110020@student.hcmute.edu.vn> | test(platform): enable opt-in TEST_DATABASE_URL and verify postgres test run
+d8400eb | 2026-10-25 02:23:42 +0700 | Bap <23110020@student.hcmute.edu.vn> | chore(docker): verify postgres pgvector and full containerized smoke test
+2625827 | 2026-10-25 02:14:15 +0700 | Bap <23110020@student.hcmute.edu.vn> | fix(security): enforce demo account restrictions, trusted proxy IP, and authenticated ticket creation
+13a52db | 2026-10-25 00:30:44 +0700 | Bap <23110020@student.hcmute.edu.vn> | docs(review): log self-review round 2 and out-of-scope security requests
+f10d3ff | 2026-10-25 00:29:21 +0700 | Bap <23110020@student.hcmute.edu.vn> | docs(notes): refine prompt wording to satisfy check_roster gate
+70f7384 | 2026-10-25 00:24:23 +0700 | Bap <23110020@student.hcmute.edu.vn> | docs(notes): update Dev B notes, AI usage log, and code explanation
+8a3d7c6 | 2026-10-25 00:21:55 +0700 | Bap <23110020@student.hcmute.edu.vn> | feat(agent): expose reset-cooldown on agent router and ignore eval runs
+8d027f9 | 2026-10-25 00:20:02 +0700 | Bap <23110020@student.hcmute.edu.vn> | chore(docker): add smoke_docker.ps1 script and record daemon blocker
+cfb4058 | 2026-10-25 00:18:46 +0700 | Bap <23110020@student.hcmute.edu.vn> | docs(deps): record dependency truth and AST import audit
+c221813 | 2026-10-25 00:16:10 +0700 | Bap <23110020@student.hcmute.edu.vn> | fix(auth): never use a known default JWT secret
+aa9eab9 | 2026-10-25 00:11:44 +0700 | Bap <23110020@student.hcmute.edu.vn> | Merge remote-tracking branch 'origin/Hoang' into feature/b-platform
+c780921 | 2026-10-23 05:04:48 +0700 | Bap <23110020@student.hcmute.edu.vn> | fix(auth): verify passwords and Google ID token signature
+Files changed vs merge-base with origin/Hoang (38):
+  M    .github/CODEOWNERS                                           [owner: integrator]
+  M    AI_USAGE.md                                                  [owner: integrator]
+  M    backend/.env.example                                         [owner: integrator]
+  M    backend/Dockerfile                                           [owner: devB]
+  M    backend/README.md                                            [owner: integrator]
+  M    backend/app/api/v1/endpoints/agent.py                        [owner: devB]
+  M    backend/app/api/v1/endpoints/auth.py                         [owner: devB]
+  M    backend/app/api/v1/endpoints/tickets.py                      [owner: devB]
+  M    backend/app/core/config.py                                   [owner: integrator]
+  M    backend/app/core/deps.py                                     [owner: devB]
+  M    backend/app/core/security.py                                 [owner: devB]
+  M    backend/app/db/seed/__init__.py                              [owner: devB]
+  A    backend/app/db/seed/seed_demo_tickets.py                     [owner: devB]
+  M    backend/app/db/seed/seed_users.py                            [owner: devB]
+  M    backend/app/db/session.py                                    [owner: devB]
+  M    backend/app/main.py                                          [owner: integrator]
+  M    backend/app/models/user.py                                   [owner: devB]
+  M    backend/app/services/embedding_service.py                    [owner: devB]
+  A    backend/data/eval_runs/.gitignore                            [owner: integrator]
+  M    backend/requirements.txt                                     [owner: integrator]
+  M    backend/tests/conftest.py                                    [owner: integrator]
+  A    backend/tests/platform/test_agent_reset_cooldown.py          [owner: devB]
+  A    backend/tests/platform/test_auth_security.py                 [owner: devB]
+  A    backend/tests/platform/test_jwt_secret.py                    [owner: devB]
+  M    backend/tests/platform/test_pgvector_and_db.py               [owner: devB]
+  A    backend/tests/platform/test_proxy_ip.py                      [owner: devB]
+  A    backend/tests/platform/test_ticket_auth.py                   [owner: devB]
+  M    backend/tests/test_auth_module.py                            [owner: devB]
+  M    backend/tests/test_tickets_module.py                         [owner: devB]
+  M    docker-compose.yml                                           [owner: devB]
+  M    docs/API_CONTRACT.md                                         [owner: integrator]
+  M    docs/notes/B-ai-usage.md                                     [owner: devB]
+  M    docs/notes/B.md                                              [owner: devB]
+  M    docs/requests/devB.md                                        [owner: devB]
+  M    docs/spec/CONTRACTS.md                                       [owner: integrator]
+  M    scripts/check_ownership.py                                   [owner: integrator]
+  M    scripts/ownership_map.py                                     [owner: integrator]
+  A    scripts/smoke_docker.ps1                                     [owner: integrator]
+Out-of-lane files for origin/feature/b-platform (expected {'devB', 'integrator'}): 0
+Safety Scan:
+  - .env files      : None (0)
+  - *.db files      : None (0)
+  - Secret patterns : None (0)
+  - Files > 5 MB    : None (0)
+  - Unchecked PDF/PPTX : None (0)
+  - Roster text violations (0):
+
+==========================================
+BRANCH: origin/feature/a-ai-engine
+==========================================
+Commits not in origin/Hoang: 1
+Authors (shortlog -sne):
+1	Bap <23110020@student.hcmute.edu.vn>
+Commits:
+cb404fe | 2026-10-23 05:27:52 +0700 | Bap <23110020@student.hcmute.edu.vn> | fix(ai-engine): resolve Gemini 3.5 400 INVALID_ARGUMENT, add circuit breaker error classification, and verify audit gaps
+Files changed vs merge-base with origin/Hoang (14):
+  M    backend/app/api/v1/endpoints/chat.py                         [owner: devA]
+  M    backend/app/api/v1/endpoints/chat_actions.py                 [owner: devA]
+  M    backend/app/api/v1/endpoints/chat_stream.py                  [owner: devA]
+  M    backend/app/services/agent_tools.py                          [owner: devA]
+  M    backend/app/services/llm_service.py                          [owner: devA]
+  M    backend/app/services/rag_service.py                          [owner: devA]
+  M    backend/app/services/ticket_copilot_service.py               [owner: devA]
+  M    backend/scripts/run_eval.py                                  [owner: devA]
+  A    backend/tests/ai/test_llm_request_and_circuit_breaker.py     [owner: devA]
+  A    backend/tests/ai/test_security_audit_gaps.py                 [owner: devA]
+  M    docs/notes/A-ai-usage.md                                     [owner: devA]
+  M    docs/notes/A-eval-report.md                                  [owner: devA]
+  M    docs/notes/A.md                                              [owner: devA]
+  M    docs/requests/devA.md                                        [owner: devA]
+Out-of-lane files for origin/feature/a-ai-engine (expected {'devA'}): 0
+Safety Scan:
+  - .env files      : None (0)
+  - *.db files      : None (0)
+  - Secret patterns : [('backend/tests/ai/test_llm_request_and_circuit_breaker.py', 'AIza')]
+  - Files > 5 MB    : None (0)
+  - Unchecked PDF/PPTX : None (0)
+  - Roster text violations (24):
+      * README.md:153: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * README.md:153: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * README.md:153: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * README.md:154: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_2]': | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * README.md:154: Unverified MSSV '2311XXXX_B' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * README.md:154: Unverified full name '[REDACTED_FABRICATED_NAME_2]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * README.md:155: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_3]': | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * README.md:155: Unverified MSSV '2311XXXX_C' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * README.md:155: Unverified full name '[REDACTED_FABRICATED_NAME_3]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/PROPOSAL.md:145: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * docs/PROPOSAL.md:145: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * docs/PROPOSAL.md:145: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * docs/PROPOSAL.md:146: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_2]': | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * docs/PROPOSAL.md:146: Unverified MSSV '2311XXXX_B' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * docs/PROPOSAL.md:146: Unverified full name '[REDACTED_FABRICATED_NAME_2]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * docs/PROPOSAL.md:147: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_3]': | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/PROPOSAL.md:147: Unverified MSSV '2311XXXX_C' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/PROPOSAL.md:147: Unverified full name '[REDACTED_FABRICATED_NAME_3]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/REPORT.md:10: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_2]': - **Nhóm 1 / Dev A (AI Engine, RAG, Structured Output, Guardrails & Eval):** [REDACTED_FABRICATED_NAME_2] (`@TheO
+      * docs/REPORT.md:11: Disallowed fabricated name found matching 'Hoàng\s+Văn\s+Bắp': - **Nhóm 2 / Dev B & Integrator (Platform, Security, Database, Workspaces, Tickets & Shared Contract
+      * docs/REPORT.md:12: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_3]': - **Nhóm 3 / Dev C (Frontend UX, QA, Mocks & Capstone Documentation):** [REDACTED_FABRICATED_NAME_3] (`@TKhanh`)
+      * docs/notes/A-ai-usage.md:51: Unverified full name 'Google Antigravity Coding Assistant' associated with role/MSSV: - **AI Tool Used:** Google Antigravity Coding Assistant [Dev-A]
+      * docs/plan/PLAN.md:45: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): > **Owner Placeholders:** `@Lead-AI` (Member 1 / `2311XXXX_A`), `@Backend-Sec` (Member 2 or Member 1),
+      * docs/plan/PLAN.md:176: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): - **Question:** Is this a **1-member individual project** (`2311XXXX_A`) or a **2–3 member team**? If 
+
+==========================================
+BRANCH: origin/Nguyen2
+==========================================
+Commits not in origin/Hoang: 4
+Authors (shortlog -sne):
+3	TheOrijinnn <lenguyensonghinh@gmail.com>
+     1	Bap <23110020@student.hcmute.edu.vn>
+Commits:
+62c7e5a | 2026-10-24 20:14:26 +0700 | TheOrijinnn <lenguyensonghinh@gmail.com> | Merge remote-tracking branch 'origin/feature/a-ai-engine' into Nguyen2
+c5c84cb | 2026-10-24 18:40:15 +0700 | TheOrijinnn <lenguyensonghinh@gmail.com> | Merge remote-tracking branch 'origin/Hoang' into Nguyen2
+a03536f | 2026-10-24 18:37:39 +0700 | TheOrijinnn <lenguyensonghinh@gmail.com> | feat(llm): rotate Gemini API keys on quota/invalid-key errors
+cb404fe | 2026-10-23 05:27:52 +0700 | Bap <23110020@student.hcmute.edu.vn> | fix(ai-engine): resolve Gemini 3.5 400 INVALID_ARGUMENT, add circuit breaker error classification, and verify audit gaps
+Files changed vs merge-base with origin/Hoang (15):
+  M    backend/app/api/v1/endpoints/chat.py                         [owner: devA]
+  M    backend/app/api/v1/endpoints/chat_actions.py                 [owner: devA]
+  M    backend/app/api/v1/endpoints/chat_stream.py                  [owner: devA]
+  M    backend/app/services/agent_tools.py                          [owner: devA]
+  M    backend/app/services/llm_service.py                          [owner: devA]
+  M    backend/app/services/rag_service.py                          [owner: devA]
+  M    backend/app/services/ticket_copilot_service.py               [owner: devA]
+  M    backend/scripts/run_eval.py                                  [owner: devA]
+  A    backend/tests/ai/test_key_rotation.py                        [owner: devA]
+  A    backend/tests/ai/test_llm_request_and_circuit_breaker.py     [owner: devA]
+  A    backend/tests/ai/test_security_audit_gaps.py                 [owner: devA]
+  M    docs/notes/A-ai-usage.md                                     [owner: devA]
+  M    docs/notes/A-eval-report.md                                  [owner: devA]
+  M    docs/notes/A.md                                              [owner: devA]
+  M    docs/requests/devA.md                                        [owner: devA]
+Out-of-lane files for origin/Nguyen2 (expected {'devA'}): 0
+Safety Scan:
+  - .env files      : None (0)
+  - *.db files      : None (0)
+  - Secret patterns : [('backend/tests/ai/test_llm_request_and_circuit_breaker.py', 'AIza')]
+  - Files > 5 MB    : None (0)
+  - Unchecked PDF/PPTX : None (0)
+  - Roster text violations (1):
+      * docs/notes/A-ai-usage.md:51: Unverified full name 'Google Antigravity Coding Assistant' associated with role/MSSV: - **AI Tool Used:** Google Antigravity Coding Assistant [Dev-A]
+
+==========================================
+BRANCH: origin/Nguyen
+==========================================
+Commits not in origin/Hoang: 1
+Authors (shortlog -sne):
+1	TheOrijinnn <lenguyensonghinh@gmail.com>
+Commits:
+56c9496 | 2026-09-22 13:16:10 +0700 | TheOrijinnn <lenguyensonghinh@gmail.com> | FIx header UI
+Files changed vs merge-base with origin/Hoang (4):
+  M    package-lock.json                                            [owner: UNMAPPED]
+  M    package.json                                                 [owner: UNMAPPED]
+  A    run.md                                                       [owner: UNMAPPED]
+  M    src/components/Header.tsx                                    [owner: UNMAPPED]
+Out-of-lane files for origin/Nguyen (expected {'devA'}): 4
+  [OUT-OF-LANE] M package-lock.json -> owned by UNMAPPED
+  [OUT-OF-LANE] M package.json -> owned by UNMAPPED
+  [OUT-OF-LANE] A run.md -> owned by UNMAPPED
+  [OUT-OF-LANE] M src/components/Header.tsx -> owned by UNMAPPED
+Safety Scan:
+  - .env files      : None (0)
+  - *.db files      : None (0)
+  - Secret patterns : None (0)
+  - Files > 5 MB    : None (0)
+  - Unchecked PDF/PPTX : None (0)
+  - Roster text violations (0):
+
+==========================================
+BRANCH: origin/feature/c-frontend-docs
+==========================================
+Commits not in origin/Hoang: 1
+Authors (shortlog -sne):
+1	Bap <23110020@student.hcmute.edu.vn>
+Commits:
+74d3319 | 2026-10-23 05:21:30 +0700 | Bap <23110020@student.hcmute.edu.vn> | feat(c-qa-docs): add offline cross-feature tests, visual verification evidence, capstone report PDF, and presentation slides
+Files changed vs merge-base with origin/Hoang (23):
+  A    backend/tests/common/__init__.py                             [owner: devC]
+  A    backend/tests/common/test_cross_feature_flows.py             [owner: devC]
+  M    backend/tests/test_api.py                                    [owner: devC]
+  A    docs/DEMO_VIDEO_CHECKLIST.md                                 [owner: devC]
+  A    docs/REPORT.pdf                                              [owner: devC]
+  A    docs/SLIDES.pdf                                              [owner: devC]
+  A    docs/SLIDES.pptx                                             [owner: devC]
+  M    docs/TEST_ACCEPTANCE.md                                      [owner: devC]
+  A    docs/evidence/agent-dashboard-desktop-1440x900.png           [owner: devC]
+  A    docs/evidence/agent-dashboard-mobile-375x812.png             [owner: devC]
+  A    docs/evidence/agent-ticket-delete-confirm.png                [owner: devC]
+  A    docs/evidence/chat-desktop-1440x900.png                      [owner: devC]
+  A    docs/evidence/chat-mobile-375x812.png                        [owner: devC]
+  A    docs/evidence/chat-tool-confirmation-card.png                [owner: devC]
+  A    docs/evidence/knowledge-manager-desktop.png                  [owner: devC]
+  A    docs/evidence/knowledge-verification-trace-modal.png         [owner: devC]
+  A    docs/evidence/rbac-user-mode-locked.png                      [owner: devC]
+  A    docs/evidence/telemetry-panel-desktop.png                    [owner: devC]
+  A    docs/evidence/telemetry-panel-mobile.png                     [owner: devC]
+  A    docs/evidence/ticket-form-desktop.png                        [owner: devC]
+  A    docs/evidence/ticket-form-mobile.png                         [owner: devC]
+  M    docs/notes/C-ai-usage.md                                     [owner: devC]
+  M    docs/requests/devC.md                                        [owner: devC]
+Out-of-lane files for origin/feature/c-frontend-docs (expected {'devC'}): 0
+Safety Scan:
+  - .env files      : None (0)
+  - *.db files      : None (0)
+  - Secret patterns : None (0)
+  - Files > 5 MB    : None (0)
+  - Unchecked PDF/PPTX : ['docs/REPORT.pdf', 'docs/SLIDES.pdf', 'docs/SLIDES.pptx']
+  - Roster text violations (23):
+      * README.md:153: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * README.md:153: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * README.md:153: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * README.md:154: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_2]': | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * README.md:154: Unverified MSSV '2311XXXX_B' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * README.md:154: Unverified full name '[REDACTED_FABRICATED_NAME_2]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * README.md:155: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_3]': | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * README.md:155: Unverified MSSV '2311XXXX_C' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * README.md:155: Unverified full name '[REDACTED_FABRICATED_NAME_3]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/PROPOSAL.md:145: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * docs/PROPOSAL.md:145: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * docs/PROPOSAL.md:145: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * docs/PROPOSAL.md:146: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_2]': | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * docs/PROPOSAL.md:146: Unverified MSSV '2311XXXX_B' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * docs/PROPOSAL.md:146: Unverified full name '[REDACTED_FABRICATED_NAME_2]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * docs/PROPOSAL.md:147: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_3]': | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/PROPOSAL.md:147: Unverified MSSV '2311XXXX_C' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/PROPOSAL.md:147: Unverified full name '[REDACTED_FABRICATED_NAME_3]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/REPORT.md:10: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_2]': - **Nhóm 1 / Dev A (AI Engine, RAG, Structured Output, Guardrails & Eval):** [REDACTED_FABRICATED_NAME_2] (`@TheO
+      * docs/REPORT.md:11: Disallowed fabricated name found matching 'Hoàng\s+Văn\s+Bắp': - **Nhóm 2 / Dev B & Integrator (Platform, Security, Database, Workspaces, Tickets & Shared Contract
+      * docs/REPORT.md:12: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_3]': - **Nhóm 3 / Dev C (Frontend UX, QA, Mocks & Capstone Documentation):** [REDACTED_FABRICATED_NAME_3] (`@TKhanh`)
+      * docs/plan/PLAN.md:45: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): > **Owner Placeholders:** `@Lead-AI` (Member 1 / `2311XXXX_A`), `@Backend-Sec` (Member 2 or Member 1),
+      * docs/plan/PLAN.md:176: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): - **Question:** Is this a **1-member individual project** (`2311XXXX_A`) or a **2–3 member team**? If 
+
+==========================================
+BRANCH: origin/TKhanh
+==========================================
+Commits not in origin/Hoang: 1
+Authors (shortlog -sne):
+1	TKhanhJK <khanhssaa77@gmail.com>
+Commits:
+44a7859 | 2026-10-25 17:51:38 +0700 | TKhanhJK <khanhssaa77@gmail.com> | feat(ux): support authenticated ticket creation and 43 demo tickets pagination (CR-DEVC-01, CR-DEVC-02)
+Files changed vs merge-base with origin/Hoang (8):
+  M    docs/PRESENTATION_AND_DEMO.md                                [owner: devC]
+  M    docs/REPORT.md                                               [owner: devC]
+  M    docs/notes/C-ai-usage.md                                     [owner: devC]
+  M    docs/notes/C.md                                              [owner: devC]
+  M    frontend/src/App.tsx                                         [owner: devC]
+  M    frontend/src/components/AgentDashboardView.tsx               [owner: devC]
+  M    frontend/src/components/TicketFormView.tsx                   [owner: devC]
+  M    frontend/src/services/api/tickets.ts                         [owner: devC]
+Out-of-lane files for origin/TKhanh (expected {'devC'}): 0
+Safety Scan:
+  - .env files      : None (0)
+  - *.db files      : None (0)
+  - Secret patterns : None (0)
+  - Files > 5 MB    : None (0)
+  - Unchecked PDF/PPTX : None (0)
+  - Roster text violations (23):
+      * README.md:153: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * README.md:153: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * README.md:153: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * README.md:154: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_2]': | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * README.md:154: Unverified MSSV '2311XXXX_B' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * README.md:154: Unverified full name '[REDACTED_FABRICATED_NAME_2]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * README.md:155: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_3]': | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * README.md:155: Unverified MSSV '2311XXXX_C' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * README.md:155: Unverified full name '[REDACTED_FABRICATED_NAME_3]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/PROPOSAL.md:145: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * docs/PROPOSAL.md:145: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_1]': | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * docs/PROPOSAL.md:145: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_1]** (Repo Owner) | `2311XXXX_A` | [`@BapVitHoang`](https://github.com/BapVitHoan
+      * docs/PROPOSAL.md:146: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_2]': | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * docs/PROPOSAL.md:146: Unverified MSSV '2311XXXX_B' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * docs/PROPOSAL.md:146: Unverified full name '[REDACTED_FABRICATED_NAME_2]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_2]** | `2311XXXX_B` | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | **Dev A** | 
+      * docs/PROPOSAL.md:147: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_3]': | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/PROPOSAL.md:147: Unverified MSSV '2311XXXX_C' found (not verified in docs/TEAM_ROSTER.md): | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/PROPOSAL.md:147: Unverified full name '[REDACTED_FABRICATED_NAME_3]' associated with role/MSSV: | **[REDACTED_FABRICATED_NAME_3]** | `2311XXXX_C` | [`@TKhanh`](https://github.com/TKhanh) | **Dev C** | Frontend U
+      * docs/REPORT.md:10: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_2]': - **Nhóm 1 / Dev A (AI Engine, RAG, Structured Output, Guardrails & Eval):** [REDACTED_FABRICATED_NAME_2] (`@TheO
+      * docs/REPORT.md:11: Disallowed fabricated name found matching 'Hoàng\s+Văn\s+Bắp': - **Nhóm 2 / Dev B & Integrator (Platform, Security, Database, Workspaces, Tickets & Shared Contract
+      * docs/REPORT.md:12: Disallowed fabricated name found matching '[REDACTED_FABRICATED_NAME_3]': - **Nhóm 3 / Dev C (Frontend UX, QA, Mocks & Capstone Documentation):** [REDACTED_FABRICATED_NAME_3] (`@TKhanh`)
+      * docs/plan/PLAN.md:45: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): > **Owner Placeholders:** `@Lead-AI` (Member 1 / `2311XXXX_A`), `@Backend-Sec` (Member 2 or Member 1),
+      * docs/plan/PLAN.md:176: Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): - **Question:** Is this a **1-member individual project** (`2311XXXX_A`) or a **2–3 member team**? If 
