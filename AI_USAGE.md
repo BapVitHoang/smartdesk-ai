@@ -1,60 +1,84 @@
 # AI Usage, Verification & Engineering Log (`AI_USAGE.md`)
 
 > **Project:** SmartDesk AI – Intelligent Customer Support & Knowledge Synthesizer  
-> **Requirement Alignment:** `REQ-28` / `CRIT-09` (Mandatory AI Usage Disclosure, Verification Protocol, and Real Failure/Fix Case Studies)
+> **Requirement Alignment:** `REQ-28` / `CRIT-06` & `CRIT-09` (Mandatory AI Usage Disclosure, 4-Gate Verification Protocol, and Real Failure/Fix Case Studies)  
+> **Single Source of Truth for Team Members:** [`docs/TEAM_ROSTER.md`](./docs/TEAM_ROSTER.md)  
+> **Team Members & Workstreams:**
+> - **Dev A (AI Engine, RAG Pipeline & Evaluation):** Lê Nguyên (`@TheOrijinnn`, MSSV `23110043`)
+> - **Dev B (Platform, Data & Security) & Integrator:** Ngô Việt Hoàng (`@BapVitHoang`, MSSV `23110020`)
+> - **Dev C (Frontend UX, QA & Documentation):** Tống Gia Khánh (`@TKhanh`, MSSV `23110032`)
 
 ---
 
 ## 1. AI Tools & Models Used During Development
 
-| Tool / Model | Role in Development | Scope of Usage |
-| :--- | :--- | :--- |
-| **Google Antigravity / Claude / Gemini Coding Assistants** | Architecture auditing, FastAPI async scaffolding, React 19 + Tailwind CSS v4 component implementation, and Pytest test generation. | Used under strict human supervision governed by [`AGENTS.md`](./AGENTS.md) and [`.cursorrules`](./.cursorrules). |
-| **Google Gemini (`gemini-3.5-flash-lite` & `gemini-2.5-flash-lite`)** | Runtime cloud LLM for grounded customer RAG (`rag_service.py`), ticket copilot drafting (`ticket_service.py`), and 3-stage knowledge verification (`verification_service.py`). | Replaced retired `gemini-1.5-flash` after live API verification. |
-| **Google `gemini-embedding-001`** | Runtime cloud vector embedding model for `KnowledgeChunk` and `FAQItem` semantic indexing. | Replaced retired `text-embedding-004`. |
-| **Local Ollama (`qwen2.5:3b` & `nomic-embed-text`)** | Local, zero-cost AI provider for offline development, evaluation benchmarks, and rate-limit-free demonstrations. | Integrated in `llm_service.py` and `embedding_service.py` (`AI_PROVIDER=ollama`). |
+| Workstream / Member | AI Tool / Model | Primary Use Cases | Governance & Verification Scope |
+| :--- | :--- | :--- | :--- |
+| **Dev A (Lê Nguyên / `@TheOrijinnn`)** | Google Antigravity Coding Assistant (Gemini 3.5 / Claude) | RAG pipeline, tool registration (`agent_tools.py`), structured outputs (`ai_structured.py`), 24-case benchmark evaluation (`run_eval.py`). | Verified against `CONTRACTS.md`, live Gemini API parameter specs, and unit tests (`backend/tests/ai/`). |
+| **Dev B & Integrator (Ngô Việt Hoàng / `@BapVitHoang`)** | Google Antigravity Coding Assistant (Claude 3.7 / Gemini 3.5) | FastAPI architecture, pgvector dual-dialect mapping, salted scrypt password hashing, sliding-window throttle, JWT secret hardening, Docker Compose orchestration. | Verified with clean venv AST audit, offline security suites (`test_auth_security.py`, `test_jwt_secret.py`), Docker Compose smoke test (`smoke_docker.ps1`). |
+| **Dev C (Tống Gia Khánh / `@TKhanh`)** | Google Antigravity Coding Assistant (Gemini 3.5 / Claude) | React 19 SPA, SSE streaming receiver (`chat.ts`), Telemetry & Cost-Guard panel (`TelemetryPanel.tsx`), 3-agent verification trace modal, Capstone documentation (`REPORT.md`, `PRESENTATION_AND_DEMO.md`). | Verified with `npm run lint` (`tsc --noEmit`), `npm run build` (Vite 6), headless responsive verification (`1440x900`, `375x812`), and cross-feature offline flows (`test_cross_feature_flows.py`). |
+| **Runtime Cloud LLM** | Google Gemini (`gemini-3.5-flash-lite`, fallback `gemini-2.5-flash-lite`) | Real-time grounded RAG chat, single-call ticket copilot triage, 3-stage synthetic QA verification. | Enforced minimal thinking budget (`thinking_level="MINIMAL"`), strict timeout (4.0s), and externalized system prompts (`prompts.json`). |
+| **Runtime Cloud Embeddings** | Google `gemini-embedding-001` | Semantic embeddings for `KnowledgeChunk` and `FAQItem` records. | Verified dual-mode with PII masking (`redact_pii`). |
+| **Runtime Local LLM (Dual-Mode)** | Ollama (`qwen2.5:3b` + `nomic-embed-text`) | Offline development and rate-limit-free CI execution. | Selected via `AI_PROVIDER=ollama`. |
+| **Deterministic Fallback Engine** | Pure-Python Okapi BM25 + SHA-256 Pseudo-Embeddings | Non-AI deterministic fallback when offline, timeout, or rate-limited. | Fallback on `seed_faq.json` and published workspace chunks. |
 
 ---
 
 ## 2. Human Verification Workflow (How AI-Generated Code Was Audited)
 
-Every piece of AI-assisted code or configuration was subjected to a 4-gate verification protocol before acceptance:
-1. **Contract & Type Gate:** Checked against frozen Pydantic v2 schemas (`backend/app/schemas/`) and TypeScript interfaces (`frontend/src/types.ts` + `npm run lint --prefix frontend`).
-2. **Live API & Model Probe Gate:** Never trusted training-cutoff model names from AI assistants; verified actual model availability against `genai.Client().models.get()` and local Ollama endpoints.
-3. **Automated Integration Test Gate:** Executed `pytest backend/tests/ -v` across online, offline (`GEMINI_API_KEY=""`), and simulated rate-limit (`HTTP 429`) conditions.
-4. **Security & Edge-Case Gate:** Tested prompt injection patterns (`core/security.py`), cross-workspace RAG isolation (`workspace_id`), and CWD-independent path resolution.
+Every piece of AI-assisted code or configuration was subjected to a strict 4-gate verification protocol before acceptance:
+1. **Contract & Type Gate:** Checked against frozen Pydantic v2 schemas (`backend/app/schemas/`), frozen interfaces (`docs/spec/CONTRACTS.md`, `docs/API_CONTRACT.md`), and TypeScript types (`frontend/src/types.ts` via `npm run lint --prefix frontend`).
+2. **Live API & Parameter Probe Gate:** Never trusted training-cutoff assumptions from AI models; verified live API behaviors with live diagnostic probes (e.g. diagnosing Gemini 3.5 `thinking_budget` vs `thinking_level="MINIMAL"`).
+3. **Automated Integration Test Gate:** Executed offline pytest suites (`pytest backend/tests/ -q`) with empty `GEMINI_API_KEY` to guarantee 100% deterministic test pass without external network dependencies.
+4. **Security & Governance Gate:** Verified anti-fabrication rules (`python scripts/check_roster.py`), module ownership boundaries (`python scripts/check_ownership.py`), PII redaction (`redact_pii`), and prompt injection defenses (English & Vietnamese).
 
 ---
 
-## 3. Real Failure & Human Fix Case Studies From This Repository
+## 3. Real AI Failure Cases & Human Fixes (Audited from Git History)
 
-### Case Study 1: Retired Google Gemini Model Names (`gemini-1.5-flash` & `text-embedding-004` Returning HTTP 404)
-- **What the AI Assistant Generated:** Initial AI-assisted scaffolding configured `LLM_MODEL_NAME = "gemini-1.5-flash"` and `EMBEDDING_MODEL_NAME = "text-embedding-004"` based on historical documentation.
-- **Why It Failed (Evidence):** When tested against the live Google GenAI SDK (`google-genai`), both `models/gemini-1.5-flash` and `models/text-embedding-004` returned `404 NOT_FOUND` (`is not found for API version v1beta`), causing every live RAG query to trip the circuit breaker and fall back to BM25.
-- **How We Diagnosed & Fixed It (Commit `8c64aa6` + Foundation Hardening):**
-  1. Ran a live diagnostic probe against `client.models.get()` to enumerate active models.
-  2. Updated `backend/app/core/config.py` to use `gemini-3.5-flash-lite` (primary LLM) and `gemini-embedding-001` (embeddings), and added an automatic secondary cloud model fallback (`gemini-2.5-flash-lite`) inside `backend/app/services/llm_service.py`.
-  3. Verified live round-trip latency at `922.74 ms` (`PASS`).
+Below are 5 real failure cases where AI-generated code introduced bugs or security vulnerabilities, accompanied by diagnosis and exact commit hashes from Git history:
 
-### Case Study 2: SQLite Relative Path Drift & Session Re-Binding in Standalone Scripts
-- **What the AI Assistant Generated:** AI-generated code used a relative SQLite URL (`sqlite+aiosqlite:///./smartdesk.db`), relative sample document paths (`Path("backend/data") / rel_path`), and imported `from app.db.session import async_session_factory` by value in `backend/scripts/reembed_chunks.py` and `export_finetune_dataset.py`.
-- **Why It Failed (Evidence):**
-  1. Running `pytest` or scripts from the repo root created a duplicate `./smartdesk.db` in the project root while `uvicorn` running inside `backend/` read `backend/smartdesk.db`.
-  2. When PostgreSQL failed and `init_db()` rebound `session.async_session_factory` to SQLite, scripts that had imported `async_session_factory` by value still held the broken PostgreSQL factory reference.
-- **How We Diagnosed & Fixed It (Commit `4dfd685` + Restructure Cleanup):**
-  1. Added `BACKEND_DIR` path resolution in `backend/app/core/config.py` (`resolve_sqlite_path` validator) so `smartdesk.db` always resolves to `backend/smartdesk.db` regardless of working directory.
-  2. Anchored sample document seeding in `backend/app/db/session.py` to `BACKEND_DIR / "data" / rel_path`.
-  3. Updated `reembed_chunks.py` and `export_finetune_dataset.py` to reference `db_session.async_session_factory` via module attribute after `await db_session.init_db()`.
+### Case Study 1: Gemini 3.5 Flash Lite HTTP 400 `INVALID_ARGUMENT` Parameter Incompatibility
+- **Workstream:** Dev A (AI Engine)
+- **Observed Issue:** Live API calls to `gemini-3.5-flash-lite` returned `HTTP 400 INVALID_ARGUMENT` on `generateContent`.
+- **Root Cause:** The AI assistant configured `ThinkingConfig(thinking_budget=0)` based on documentation for other models. In `google-genai 2.24.0`, Gemini 3.5 rejects integer `thinking_budget` with `400 INVALID_ARGUMENT`.
+- **Diagnosis & Fix Applied:** Bisected SDK parameters live against Google GenAI API; replaced `thinking_budget` with `types.ThinkingConfig(thinking_level="MINIMAL")`, restoring sub-1,500ms response latency.
+- **Commit Hash:** Fixed by Dev A (`@TheOrijinnn` / Integrator) in commit [`cb404fe`](https://github.com/BapVitHoang/smartdesk-ai/commit/cb404fe) (*"fix(ai-engine): resolve Gemini 3.5 400 INVALID_ARGUMENT, add circuit breaker error classification, and verify audit gaps"*).
 
-### Case Study 3: Free-Tier Rate Limit (HTTP 429) Cascade During Document Verification
-- **What the AI Assistant Generated:** The initial document ingestion and 3-stage verification pipeline called Gemini embeddings sequentially for every chunk and then fired multiple LLM calls for Synthetic QA generation, RAG self-testing, and AI Judge scoring without rate-limit state tracking.
-- **Why It Failed (Evidence):** Uploading a multi-page document and clicking "Verify" exceeded Google Gemini Free Tier's 15 RPM quota (`HTTP 429 ResourceExhausted`), causing subsequent requests to hang or fail and risking frontend timeout (`5000ms`).
-- **How We Diagnosed & Fixed It (Commit `4abcf8c`):**
-  1. Implemented a stateful **Cost-Guard Circuit Breaker** (`cooldown_until = time.time() + 60.0`) in `llm_service.py` and `embedding_service.py` that immediately stops external API calls for 60 seconds upon any HTTP 429 and switches to deterministic 768-dim SHA-256 unit pseudo-vectors and local BM25 fallback.
-  2. Parallelized `run_rag_self_test` with `asyncio.gather()` and added `AI_PROVIDER=ollama` (`qwen2.5:3b` + `nomic-embed-text`) for unlimited local execution.
+### Case Study 2: Auth Module Password Check Bypass & Google Token Forgery Vulnerability
+- **Workstream:** Dev B (Platform & Security)
+- **Observed Issue:** Initial AI-generated authentication accepted arbitrary passwords for any seeded account and decoded Google ID tokens without cryptographic signature verification (`verify_signature=False`).
+- **Root Cause:** The assistant prioritized making local mock tests pass without external Google network dependencies or salted hashing setup.
+- **Diagnosis & Fix Applied:** Implemented salted scrypt password hashing with constant-time verification (`hmac.compare_digest`), dummy hash evaluation for unknown users to prevent timing attacks, and verified Google ID token cryptographic signatures using `google.oauth2.id_token.verify_oauth2_token`.
+- **Commit Hash:** Fixed by Dev B (`@BapVitHoang`) in commit [`c780921`](https://github.com/BapVitHoang/smartdesk-ai/commit/c780921) (*"fix(auth): verify passwords and Google ID token signature"*).
+
+### Case Study 3: Known Public Default JWT Secret in Codebase
+- **Workstream:** Dev B & Integrator
+- **Observed Issue:** A static literal JWT secret key was hardcoded in settings and compose configuration.
+- **Root Cause:** The AI assistant scaffolded a default placeholder secret for local convenience, creating a critical vulnerability where any attacker could mint valid admin tokens.
+- **Diagnosis & Fix Applied:** Purged the default literal from source code; stored only its SHA-256 hash (`KNOWN_DEFAULT_JWT_SECRET_SHA256`) to detect placeholders; generated ephemeral per-process secrets (`secrets.token_urlsafe(48)`) when `DEMO_LOGIN_ENABLED=True`, and refused server startup with `RuntimeError` when demo login is disabled.
+- **Commit Hash:** Fixed by Integrator (`@BapVitHoang`) in commit [`c221813`](https://github.com/BapVitHoang/smartdesk-ai/commit/c221813) (*"fix(auth): never use a known default JWT secret"*).
+
+### Case Study 4: Hallucinated Lucide Icon Member & TypeScript Compilation Crash
+- **Workstream:** Dev C (Frontend UX)
+- **Observed Issue:** `npm run build` crashed with `error TS2724: '"lucide-react"' has no exported member named 'MessageSquareCheck'`.
+- **Root Cause:** The AI assistant hallucinated an icon component name that does not exist in `lucide-react`.
+- **Diagnosis & Fix Applied:** Replaced the non-existent icon with canonical `MessageSquare` and validated strict TypeScript type checking (`tsc --noEmit`).
+- **Commit Hash:** Fixed by Dev C (`@TKhanh`) in commit [`1b78353`](https://github.com/BapVitHoang/smartdesk-ai/commit/1b78353) (*"feat(ux): implement rbac role switcher, ticket sorting, pagination, delete, and multi-agent trace"*).
+
+### Case Study 5: Unbounded Query Count Clashing with RBAC Tenant Filters
+- **Workstream:** Dev B (Tickets & Data)
+- **Observed Issue:** The pagination count query `select(func.count(Ticket.id))` returned the total ticket count of the whole database in `X-Total-Count` instead of the user's filtered count.
+- **Root Cause:** The AI assistant built the count query separately without replicating active RBAC user email and tenant where-clauses.
+- **Diagnosis & Fix Applied:** Replicated all active where clauses (RBAC customer email filter, workspace ID, status, category, priority, search) into `count_query`.
+- **Commit Hash:** Fixed by Dev B (`@BapVitHoang`) in commit [`deee867`](https://github.com/BapVitHoang/smartdesk-ai/commit/deee867) (*"feat(tickets): add server-side sorting, X-Total-Count header, delete API and copilot triage"*).
 
 ---
 
-## 4. Planned AI Engineering Extensions (`TODO` for Phase B–D Execution)
-- [ ] `TODO (Phase B - TASK-B04)`: Log AI Usage Diary entries for SSE Token Streaming (`/api/v1/chat/stream`) and Agent Tool Calling (`agent_tools.py`).
-- [ ] `TODO (Phase C - TASK-C02)`: Attach before-vs-after benchmark table from `backend/scripts/run_eval.py` (24-case evaluation dataset across Default, SmileCare, and TechStore workspaces).
+## 4. Benchmark & Evaluation Summary
+
+Across all 24 evaluation test cases in `backend/data/eval_dataset.json` evaluated in `backend/scripts/run_eval.py`:
+- **Legacy Baseline Pass Rate:** 8/24 (`33.3%`)
+- **Upgraded Pipeline Pass Rate:** 24/24 (`100.0%`)
+- **Delta Improvement:** `+66.7%` (`+16` cases improved)
+- **Breakdown:** 10/10 Normal (`100%`), 6/6 Edge (`100%`), 8/8 Should-Refuse (`100%`).
