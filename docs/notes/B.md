@@ -220,6 +220,30 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   proof: Run smoke_docker.ps1 from clean state; volume retained; exit 0.
   risk: Leftover container states if script fails early.
 
+## Plan (Prompt 2d - Dev B + Integrator: Clean-up After 2c Report)
+
+- **Task 0 (Setup check):**
+  files: docs/notes/B.md.
+  approach: Verify clean branch feature/b-platform, ancestry with origin/feature/b-platform, identity Bap <23110020@student.hcmute.edu.vn>, Docker 27.5.1 running, GEMINI_API_KEY set, and verify_setup.ps1 10/10 PASS.
+- **Task 1 (Undo debug logging in retained volume - MUST run before Task 5):**
+  files: PostgreSQL volume in smartdesk-postgres, docs/notes/B.md.
+  approach: Run `SHOW log_statement;` (expect 'all'). Run `ALTER SYSTEM RESET log_statement; SELECT pg_reload_conf();`. Run fresh `SHOW log_statement;` in new session (expect 'none'). Verify no script/compose permanently sets it via `git grep -i "log_statement"`.
+- **Task 2 (Credentials in notes & compose override):**
+  files: docs/notes/B.md, docker-compose.yml, backend/.env.example.
+  approach: Replace literal password with `<db-password>` in docs/notes/B.md (including plan). Parameterize BOTH `POSTGRES_PASSWORD` and `DATABASE_URL` in docker-compose.yml with `${POSTGRES_PASSWORD:-<demo-default>}`. Document in .env.example. List commits `1ae0471`, `7de6641`, `ef952b0` without rewriting history.
+- **Task 3 (Notes truth on test database & review rounds):**
+  files: docs/notes/B.md.
+  approach: Replace claims that earlier 94 passed was PostgreSQL with SQLite truth; relabel Prompt 2c review as '2c round 1' noting test-only verification and stopped challenge subagent; correct Decision Log date 2026-10-20 to 2026-10-21 (commit b753b95).
+- **Task 4 (Contract documents match code):**
+  files: docs/API_CONTRACT.md, docs/spec/CONTRACTS.md, docs/notes/B.md.
+  approach: Docs only (no code edits). Align GET /tickets params (`page`, `limit`, `skip`, `search`), priority sort order (`asc` = Urgent (1) first, `desc` = Low (4) first), `X-Total-Count` CORS expose, authenticated POST /tickets with field locking, per-route error codes.
+- **Task 5 (Fresh-volume truth for demo data - runs after Task 1):**
+  files: docs/requests/devB.md, docs/notes/B.md.
+  approach: Run `docker compose down -v` then `up -d`. Authenticate via /auth/oauth2/login. Query admin tickets (X-Total-Count=43), An Nguyen tickets (X-Total-Count=15), and DB count (43). Explain derivation (3+40=43; 1+14=15; 26 in 2c was accumulated test tickets). Update CR-DEVC-02. End with `docker compose down`.
+- **Task 6 (Ownership sanity):**
+  files: docs/notes/B.md.
+  approach: Run `python scripts/check_ownership.py --owner devB --as-integrator --base origin/Hoang`. Document `--as-integrator` requirement for frozen contracts and that `backend/Dockerfile` and `docker-compose.yml` are owned by `devB`.
+
 ## Plan (Prompt 2b - Dev B + Integrator: Hardening & Docker)
 
 Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 active, GEMINI_API_KEY set, verify_setup.ps1 10/10 PASS.
@@ -563,6 +587,54 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   - Toàn bộ 8/8 bước smoke checks đều PASS, exit code 0.
   - Kiểm tra volume sau khi teardown: `docker volume ls` $\to$ volume `smartdesk-b_pgdata` vẫn tồn tại nguyên vẹn.
   - Khởi động lại container và truy vấn PostgreSQL: `SELECT count(*) FROM tickets;` $\to$ giữ nguyên chính xác **43** tickets.
+
+### Prompt 2d Evidence
+
+#### Task 0 - Setup Check
+- **Working Tree & Git State:**
+  - Branch: `feature/b-platform` (Worktree `..\smartdesk-B`).
+  - Ancestry: `git merge-base --is-ancestor origin/feature/b-platform HEAD` exit code 0.
+  - Identity: `Bap` <`23110020@student.hcmute.edu.vn`>.
+  - Docker Desktop: Engine 27.5.1 running.
+  - API Key: `GEMINI_API_KEY: set` in `backend/.env`.
+  - Toolchain Verification Gate: `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` -> `ALL 10/10 CHECKS PASSED (100% READY)`.
+
+#### Task 1 - Undo Debug Logging in Retained Database Volume
+- **Before Reset (Inspection on smartdesk-postgres):**
+  - Command: `docker exec smartdesk-postgres psql -U postgres -d smartdesk -c "SHOW log_statement; SHOW log_min_duration_statement;"`
+    Output:
+    ```
+     log_statement 
+    ---------------
+     all
+    (1 row)
+
+     log_min_duration_statement 
+    ----------------------------
+     -1
+    (1 row)
+    ```
+  - Inspection of `/var/lib/postgresql/data/postgresql.auto.conf`:
+    Contains line: `log_statement = 'all'`.
+- **Reset Execution:**
+  - Command: `docker exec smartdesk-postgres psql -U postgres -d smartdesk -c "ALTER SYSTEM RESET log_statement;" -c "SELECT pg_reload_conf();"`
+    Output: `ALTER SYSTEM`, `pg_reload_conf: t`.
+- **After Reset Verification (Fresh Session):**
+  - Command: `docker exec smartdesk-postgres psql -U postgres -d smartdesk -c "SHOW log_statement; SHOW log_min_duration_statement;"`
+    Output:
+    ```
+     log_statement 
+    ---------------
+     none
+    (1 row)
+
+     log_min_duration_statement 
+    ----------------------------
+     -1
+    (1 row)
+    ```
+  - Inspection of `/var/lib/postgresql/data/postgresql.auto.conf`: `log_statement` line completely removed.
+  - Search across repository: `git grep -i "log_statement"` confirmed no script, compose file, or Dockerfile permanently enables statement logging.
 
 ---
 
