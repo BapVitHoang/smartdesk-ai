@@ -442,6 +442,42 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   - Output: `94 passed in 7.84s`
   - Exit code: 0.
 
+#### Task 2 - Application pgvector Similarity Search on PostgreSQL
+- **Code State Analysis (`backend/app/services/embedding_service.py`):**
+  `embedding_service.search_similar_chunks()` detects dialect via `getattr(session, "bind", None) or session.get_bind()`.
+  On PostgreSQL, it executes a native SQL pgvector cosine distance query using `KnowledgeChunk.embedding.cosine_distance(query_vector)`, which compiles to the `<=>` operator in SQL with `LIMIT top_k`. On SQLite, it falls back cleanly to in-memory cosine similarity.
+- **Automated Test Coverage:**
+  `backend/tests/platform/test_pgvector_and_db.py`:
+  * `test_search_similar_chunks_sqlite_fallback` PASSED.
+  * `test_search_similar_chunks_postgresql_pgvector` PASSED (verifies native pgvector query on PostgreSQL without fallback warnings).
+  Command: `docker compose exec -T -e TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@postgres:5432/smartdesk_test backend pytest tests/platform/test_pgvector_and_db.py -v` -> `4 passed in 0.56s`.
+- **Live Captured SQL Statement from PostgreSQL Logs (`log_statement='all'`):**
+  Captured from `smartdesk-postgres` during `POST /api/v1/chat` query on Workspace 2 (SmileCare):
+  ```sql
+  SELECT 
+      knowledge_chunks.id, 
+      knowledge_chunks.chunk_id, 
+      knowledge_chunks.parent_doc_id, 
+      knowledge_chunks.workspace_id, 
+      knowledge_chunks.document_id, 
+      knowledge_chunks.chunk_index, 
+      knowledge_chunks.page_number, 
+      knowledge_chunks.title, 
+      knowledge_chunks.content, 
+      knowledge_chunks.source_url, 
+      knowledge_chunks.embedding, 
+      knowledge_chunks.created_at, 
+      $1::INTEGER - (knowledge_chunks.embedding <=> $2) AS score, 
+      documents.status AS doc_status 
+  FROM knowledge_chunks 
+  LEFT OUTER JOIN documents ON knowledge_chunks.document_id = documents.id 
+  WHERE knowledge_chunks.workspace_id = $3::INTEGER 
+    AND (knowledge_chunks.document_id IS NULL OR documents.status = $4::VARCHAR) 
+  ORDER BY knowledge_chunks.embedding <=> $5 
+  LIMIT $6::INTEGER
+  ```
+  Parameters: `$1 = '1'`, `$2 = '[768-dim query vector]'`, `$3 = '2'`, `$4 = 'published'`, `$5 = '[768-dim query vector]'`, `$6 = '3'`.
+
 ---
 
 ## 4. Giải thích code (Platform, Data & Security)

@@ -247,8 +247,8 @@ class EmbeddingService:
         # Detect dialect to determine if PostgreSQL pgvector can be used
         is_postgres = False
         try:
-            bind = session.get_bind()
-            if bind and "postgresql" in bind.dialect.name:
+            bind = getattr(session, "bind", None) or session.get_bind()
+            if bind and "postgresql" in getattr(bind.dialect, "name", ""):
                 is_postgres = True
         except Exception:
             pass
