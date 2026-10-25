@@ -519,6 +519,19 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
 - **Kiểm thử tự động:**
   - `python -m pytest backend/tests/test_tickets_module.py -v`: 7 passed in 0.65s (bao gồm `test_demo_tickets_pagination_and_sorting` và `test_demo_tickets_user_isolation`).
 
+#### Task 5 - Smoke Script Volume Retention
+- **Vấn đề tồn đọng trước đây:**
+  Script `scripts/smoke_docker.ps1` trước đây luôn chạy `docker compose down -v` trong khối `finally`, hủy toàn bộ volume dữ liệu PostgreSQL (`pgdata`), xóa sạch extension pgvector và các bảng dữ liệu seed khiến việc kiểm tra đối soát thủ công sau khi chạy script gặp khó khăn.
+- **Giải pháp triển khai:**
+  1. Thêm tham số `[switch]$RemoveVolumes = $false` vào `scripts/smoke_docker.ps1`.
+  2. Mặc định ($false), khối `finally` thực hiện `docker compose down --remove-orphans` (không có cờ `-v`), giữ nguyên vẹn volume database trên máy host để nhà phát triển có thể kiểm tra dữ liệu sau smoke test. Chỉ khi người dùng truyền `-RemoveVolumes` thì cờ `-v` mới được kích hoạt.
+  3. Bổ sung bước kiểm tra phân trang (bước 5e) trong kịch bản smoke test: gọi `GET /api/v1/tickets?limit=10&page=2` xác nhận phản hồi đúng 10 tickets trang 2 với `X-Total-Count=43`.
+- **Bằng chứng xác minh thực tế:**
+  - Lệnh thực thi: `powershell -ExecutionPolicy Bypass -File scripts/smoke_docker.ps1` (không truyền `-RemoveVolumes`).
+  - Toàn bộ 8/8 bước smoke checks đều PASS, exit code 0.
+  - Kiểm tra volume sau khi teardown: `docker volume ls` $\to$ volume `smartdesk-b_pgdata` vẫn tồn tại nguyên vẹn.
+  - Khởi động lại container và truy vấn PostgreSQL: `SELECT count(*) FROM tickets;` $\to$ giữ nguyên chính xác **43** tickets.
+
 ---
 
 ## 4. Giải thích code (Platform, Data & Security)

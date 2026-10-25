@@ -9,7 +9,8 @@
 #   - REQ-30 / REQ-31: Ticket listing and X-Total-Count header via API
 
 param (
-    [switch]$KeepRunning = $false
+    [switch]$KeepRunning = $false,
+    [switch]$RemoveVolumes = $false
 )
 
 $ErrorActionPreference = "Stop"
@@ -183,6 +184,15 @@ try {
     $totalCount = $ticketResp.Headers["X-Total-Count"]
     Write-Host "Authenticated ticket listing successful: HTTP $($ticketResp.StatusCode), X-Total-Count=$totalCount" -ForegroundColor Green
 
+    # 5e: Verify pagination (?page=2) returns valid page
+    $ticketPage2 = Invoke-WebRequest -Uri "http://localhost:8000/api/v1/tickets?limit=10&page=2" `
+        -Method Get `
+        -Headers $authHeader `
+        -UseBasicParsing `
+        -TimeoutSec 5
+    $p2Obj = $ticketPage2.Content | ConvertFrom-Json
+    Write-Host "Pagination verified: page=2 returned $($p2Obj.Count) tickets (X-Total-Count=$($ticketPage2.Headers['X-Total-Count']))." -ForegroundColor Green
+
     # Step 6: Verify PostgreSQL pgvector extension in container
     Write-Host "`n[7/8] Verifying pgvector extension in PostgreSQL container..." -ForegroundColor Yellow
     $vectorCheck = docker compose exec -T postgres psql -U postgres -d smartdesk -c "SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';"
@@ -211,8 +221,13 @@ try {
     exit 1
 } finally {
     if ($cleanupNeeded -and -not $KeepRunning) {
-        Write-Host "`nTearing down containers and volumes (--remove-orphans -v)..." -ForegroundColor Yellow
-        docker compose down -v --remove-orphans
+        if ($RemoveVolumes) {
+            Write-Host "`nTearing down containers and volumes (--remove-orphans -v)..." -ForegroundColor Yellow
+            docker compose down -v --remove-orphans
+        } else {
+            Write-Host "`nTearing down containers retaining database volume (--remove-orphans)..." -ForegroundColor Yellow
+            docker compose down --remove-orphans
+        }
         Write-Host "Teardown complete." -ForegroundColor Green
     } elseif ($KeepRunning) {
         Write-Host "`nKeeping containers running as requested (-KeepRunning)." -ForegroundColor Cyan
