@@ -662,6 +662,33 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
 - **Chuẩn hóa ngày Decision Log:**
   - Ngày cấu hình dual-dialect vector type `Vector(768).with_variant(JSON(), "sqlite")` đã được sửa từ `2026-10-20` thành `2026-10-21`, đồng bộ chuẩn xác với git log của commit `b753b95`.
 
+#### Task 4 - Contract Documents Match Code (Documents Only)
+- **Rà soát và đồng bộ hai file hợp đồng (`docs/API_CONTRACT.md` và `docs/spec/CONTRACTS.md`):**
+  - Đã so sánh chi tiết mã nguồn `backend/app/api/v1/endpoints/tickets.py` với các tài liệu hợp đồng và cập nhật hoàn toàn (không sửa file Python nào):
+  - **`GET /api/v1/tickets`:**
+    - Thay thế tham số cũ `page_size` bằng chuẩn `limit: int = Query(20, ge=1, le=100)`.
+    - Bổ sung `skip: int = Query(0, ge=0)`.
+    - Bổ sung `page: Optional[int] = Query(None, ge=1)` kèm giải thích công thức chuyển đổi `skip = (page - 1) * limit`.
+    - Bổ sung `search: Optional[str] = Query(None)` tìm kiếm chuỗi không phân biệt hoa thường trên ticket code, subject, description, customer name, customer email.
+    - Làm rõ quy luật sắp xếp mức độ ưu tiên (`sort_by="priority"`): sử dụng SQL `case()` rank: Urgent (1), High (2), Medium (3), Low (4). `sort_order=asc` đưa Urgent lên đầu (rank 1); `sort_order=desc` đưa Low lên đầu (rank 4). Tie-breaker thứ cấp luôn là `Ticket.id.desc()` để phân trang xác thực.
+    - Tài liệu hóa header `X-Total-Count` được phơi bày qua CORS `Access-Control-Expose-Headers`.
+    - Ghi rõ mã lỗi: `401 Unauthorized`, `422 Unprocessable Entity`.
+  - **`POST /api/v1/tickets`:**
+    - Ghi nhận bắt buộc xác thực Bearer token (`Authorization: Bearer <token>`) theo `REQ-SEC-03`.
+    - Khóa trường danh tính: Người dùng thông thường (`role == "user"`) bị khóa cứng `customer_email` và `customer_name` theo JWT token owner (ghi đè payload). Hỗ trợ viên (`role == "admin"`) có thể chỉ định thông tin khách hàng.
+    - Bảo vệ chống Prompt Injection: Kiểm tra qua `check_prompt_injection()`, trả về `HTTP 400 Bad Request` với mã `PROMPT_SECURITY_VIOLATION`.
+    - Ghi rõ mã lỗi: `400 Bad Request`, `401 Unauthorized`, `422 Unprocessable Entity`.
+  - **`GET /api/v1/tickets/{ticket_id}`:**
+    - Bổ sung đặc tả hoàn chỉnh cho endpoint: tham số đường dẫn `ticket_id: str` (số nguyên hoặc mã formatted `#TICK-XXXX`).
+    - Kiểm soát phân quyền: User thường chỉ xem được ticket của chính mình (`403 Forbidden` nếu xem ticket người khác); Admin xem được mọi ticket.
+    - Ghi rõ mã lỗi: `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `422 Unprocessable Entity`.
+  - **`PATCH /api/v1/tickets/{ticket_id}`:**
+    - Cập nhật thông tin và nháp trả lời của Copilot, giới hạn chỉ dành cho Admin/Agent (`require_role("admin")`).
+    - Ghi rõ mã lỗi: `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `422 Unprocessable Entity`.
+  - **`DELETE /api/v1/tickets/{ticket_id}`:**
+    - Xóa ticket vĩnh viễn, giới hạn chỉ dành cho Admin (`require_role("admin")`).
+    - Ghi rõ mã lỗi: `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `422 Unprocessable Entity`.
+
 ---
 
 ## 4. Giải thích code (Platform, Data & Security)

@@ -409,24 +409,42 @@ data: {"response":"Xin chào bạn!","citations":[],"latency_ms":412.5,"confiden
 
 ### 8.9a `POST /api/v1/tickets` (Authenticated Creation & Tenant Binding)
 **Request Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`  
-**Description:** Requires authenticated session (`get_current_user`). For standard customers (`role == "user"`), ticket `customer_email` and `customer_name` are strictly locked to the token owner, preventing customer spoofing. Support staff (`admin`) can submit on behalf of customers.  
+**Description:** Requires authenticated session (`get_current_user`) per `REQ-SEC-03`.
+- **Identity Binding:** For standard customers (`role == "user"`), ticket `customer_email` and `customer_name` are strictly locked to token identity (`current_user.email` and `current_user.full_name`), ignoring/overwriting payload values to prevent spoofing. Support staff (`admin`) can submit on behalf of customers.
+- **Security Guardrail:** Input fields are sanitized. `subject` and `description` are scanned via `check_prompt_injection()`. If suspicious jailbreak patterns are detected, the request is rejected immediately with HTTP 400.  
 **Response (HTTP 201 Created):** `TicketResponse` object.  
-**Errors:** `401 Unauthorized` if unauthenticated.
+**Exact Error Codes:**
+- `400 Bad Request`: Prompt injection detected in `subject` or `description` (`detail: "PROMPT_SECURITY_VIOLATION: ..."`).
+- `401 Unauthorized`: Unauthenticated (missing, invalid, or expired JWT bearer token).
+- `422 Unprocessable Entity`: Request body validation error (missing required fields or invalid types).
 
 ---
 
 ### 8.10 `GET /api/v1/tickets` (With Server Sort, Pagination & `X-Total-Count`)
+**Request Headers:** `Authorization: Bearer <token>`  
+**Description:** Retrieve, filter, search, sort, and paginate tickets. Enforces RBAC tenant data isolation (`role == "user"` sees only tickets where `customer_email == current_user.email`; `role == "admin"` sees all tickets).
+
 **Query Parameters:**
+- `workspace_id`: Optional filter by workspace ID (`int`).
 - `status`: Optional filter (`open`, `in_progress`, `resolved`).
 - `category`: Optional filter (`Authentication`, `Billing`, `Bug Report`, etc.).
 - `priority`: Optional filter (`Low`, `Medium`, `High`, `Urgent`).
+- `search`: Optional case-insensitive substring search (`Optional[str] = Query(None)`). Searches across ticket code, subject, description, customer name, and customer email.
 - `sort_by`: `created_at` | `priority` | `status` | `sla_hours` (default `created_at`).
 - `sort_order`: `asc` | `desc` (default `desc`).
-- `page`: int $\ge 1$ (default `1`).
-- `page_size`: int $\ge 1$ (default `20`).
+- `page`: Page index (`Optional[int] = Query(None, ge=1)`). When provided, 1-based page number automatically translates to offset `skip = (page - 1) * limit`.
+- `skip`: Pagination offset (`int = Query(0, ge=0)`, default `0`). Overridden when `page` is provided.
+- `limit`: Page limit (`int = Query(20, ge=1, le=100)`, default `20`, max `100`). Replaces legacy `page_size`.
+
+**Priority Sorting Behavior:**
+When `sort_by="priority"`, sorting evaluates a semantic SQL `case()` rank:
+- Rank 1: `"Urgent"`, Rank 2: `"High"`, Rank 3: `"Medium"`, Rank 4: `"Low"`.
+- `sort_order=asc`: Returns **Urgent first** (`Urgent (1) -> High (2) -> Medium (3) -> Low (4)`).
+- `sort_order=desc`: Returns **Low first** (`Low (4) -> Medium (3) -> High (2) -> Urgent (1)`).
+- **Tie-Breaker:** Secondary sorting is always `Ticket.id.desc()` for stable pagination.
 
 **Response Headers:**
-- `X-Total-Count: 42`
+- `X-Total-Count: 42` (total matching tickets before pagination). Exposed to frontend browsers via CORS `Access-Control-Expose-Headers: X-Total-Count`.
 
 **Response Body (HTTP 200 OK):**
 ```json
@@ -451,10 +469,47 @@ data: {"response":"Xin chào bạn!","citations":[],"latency_ms":412.5,"confiden
 ]
 ```
 
+**Exact Error Codes:**
+- `401 Unauthorized`: Missing, invalid, or expired JWT bearer token.
+- `422 Unprocessable Entity`: Query parameter validation error (`page < 1`, `limit > 100`, etc.).
+
+---
+
+### 8.10a `GET /api/v1/tickets/{ticket_id}` (Ticket Detail with Customer Ownership)
+**Request Headers:** `Authorization: Bearer <token>`  
+**Description:** Retrieve single ticket by integer ID or formatted code (`#TICK-XXXX`). Regular users (`role == "user"`) can only access tickets belonging to their own email (`ticket.customer_email == current_user.email`). Support staff (`role == "admin"`) can inspect any ticket.  
+**Path Parameters:** `ticket_id: str` (e.g. `1042` or `#TICK-1042`).  
+**Response Body (HTTP 200 OK):** `TicketResponse` object.  
+**Exact Error Codes:**
+- `401 Unauthorized`: Missing, invalid, or expired JWT bearer token.
+- `403 Forbidden`: Access denied; standard user attempting to inspect another customer's ticket.
+- `404 Not Found`: Ticket not found by ID or formatted code.
+- `422 Unprocessable Entity`: Path parameter validation error.
+
+---
+
+### 8.10b `PATCH /api/v1/tickets/{ticket_id}` (Update Status & AI Draft)
+**Request Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`  
+**Description:** Update ticket properties (`status`, `category`, `priority` with SLA recalculation, `ai_draft_reply`). Restricted to admin role (`require_role("admin")`).  
+**Path Parameters:** `ticket_id: str` (e.g. `1042` or `#TICK-1042`).  
+**Response Body (HTTP 200 OK):** Updated `TicketResponse` object.  
+**Exact Error Codes:**
+- `401 Unauthorized`: Missing, invalid, or expired JWT bearer token.
+- `403 Forbidden`: Authenticated user is not an admin (`role != "admin"`).
+- `404 Not Found`: Ticket not found by ID or formatted code.
+- `422 Unprocessable Entity`: Request body validation error.
+
 ---
 
 ### 8.11 `DELETE /api/v1/tickets/{ticket_id}` & `DELETE /api/v1/workspaces/{workspace_id}`
-**Response:** `HTTP 204 No Content` (empty body).
+**Request Headers:** `Authorization: Bearer <token>`  
+**Description:** Delete ticket or workspace permanently (workspace 1 is protected from deletion). Restricted to admin role (`require_role("admin")`).  
+**Response:** `HTTP 204 No Content` (empty body).  
+**Exact Error Codes for `DELETE /tickets/{ticket_id}`:**
+- `401 Unauthorized`: Missing, invalid, or expired JWT bearer token.
+- `403 Forbidden`: Authenticated user is not an admin (`role != "admin"`).
+- `404 Not Found`: Ticket not found by ID or formatted code.
+- `422 Unprocessable Entity`: Path parameter validation error.
 
 ---
 
