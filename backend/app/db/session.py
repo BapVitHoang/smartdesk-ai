@@ -29,7 +29,7 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
-def create_engine_and_factory(url: str):
+def create_engine_and_factory(url: str, **custom_kwargs):
     """Factory helper to build async engine and session factory."""
     norm_url = normalize_database_url(url)
     kwargs = {"echo": settings.DEBUG}
@@ -37,8 +37,10 @@ def create_engine_and_factory(url: str):
         kwargs["connect_args"] = {"check_same_thread": False}
     else:
         kwargs["pool_pre_ping"] = True
-        kwargs["pool_size"] = 10
-        kwargs["max_overflow"] = 20
+        if "poolclass" not in custom_kwargs:
+            kwargs["pool_size"] = 10
+            kwargs["max_overflow"] = 20
+    kwargs.update(custom_kwargs)
 
     eng = create_async_engine(norm_url, **kwargs)
     factory = async_sessionmaker(

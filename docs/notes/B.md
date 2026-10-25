@@ -158,6 +158,36 @@ Environment found in Task 0 (see Evidence): worktree smartdesk-B, no backend/.en
 
 ---
 
+## Plan (Prompt 2c - Dev B + Integrator: Close Gaps in 2b Report)
+
+Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 active, GEMINI_API_KEY set, verify_setup.ps1 10/10 PASS.
+
+- **Task 1 (Database truth & opt-in TEST_DATABASE_URL):**
+  files: backend/tests/conftest.py (Integrator), docs/notes/B.md.
+  approach: State conftest.py hardcoded SQLite via tempfile; add opt-in TEST_DATABASE_URL (read before app import; if set, fail-fast assert PostgreSQL driver, skip SQLite fallback, clean tables; if unset, remain on isolated SQLite temp db); pre-create `smartdesk_test` PostgreSQL DB with pgvector in container; run pytest against PostgreSQL via TEST_DATABASE_URL; correct earlier wording in B.md.
+  proof: Pytest summary line showing PostgreSQL run with host/db name (no password) + offline SQLite run.
+  risk: Dialect differences between SQLite and PostgreSQL (JSON columns, vector types).
+- **Task 2 (Application pgvector on PostgreSQL):**
+  files: backend/app/services/embedding_service.py (Dev B), backend/tests/platform/test_pgvector_and_db.py, docs/notes/B.md.
+  approach: Verify embedding_service.py search_similar_chunks uses `<=>` cosine distance on PostgreSQL; ensure dialect detection is robust; add test for PostgreSQL vector query against workspace_id=2 (SmileCare, which has chunks) and keep SQLite test; capture real app SQL query with `<=>` in Docker via PostgreSQL query logs.
+  proof: Captured SQL statement with `<=>` operator and passing PostgreSQL vector test.
+  risk: Silent in-memory fallback on error; test must assert native vector query executed.
+- **Task 3 (Narrow trusted proxy CIDRs):**
+  files: backend/app/core/config.py (Integrator), backend/app/core/security.py, backend/Dockerfile, docker-compose.yml, backend/tests/platform/test_proxy_ip.py.
+  approach: Add TRUSTED_PROXY_CIDRS to config.py (empty = loopback only 127.0.0.1/32,::1/128); update is_trusted_proxy_ip to use TRUSTED_PROXY_CIDRS; set explicit subnet in docker-compose.yml (172.28.0.0/16) and configure compose TRUSTED_PROXY_CIDRS; bind backend to 127.0.0.1:8000:8000; update Dockerfile CMD; test that untrusted private IP (e.g. 10.0.0.1) cannot spoof headers.
+  proof: Offline tests in test_proxy_ip.py pass; smoke_docker.ps1 passes with narrower trust.
+  risk: Nginx container connection rejected if subnet is misconfigured.
+- **Task 4 (Deterministic demo tickets for pagination/sorting):**
+  files: backend/app/api/v1/endpoints/tickets.py (support page query param), backend/app/db/seed/seed_demo_tickets.py, backend/app/db/seed/__init__.py, docs/requests/devB.md, docs/notes/B.md.
+  approach: Add `page` query param mapping to `skip = (page - 1) * limit`; seed 40 deterministic tickets using direct ORM instantiations (no LLM overhead) across categories, priorities, statuses and dates if DEMO_LOGIN_ENABLED=True and count <= 3; verify admin sees X-Total-Count >= 40, user sees only own tickets, sort_by and page 2 return different rows; log note for Dev C in devB.md.
+  proof: API responses recorded in B.md showing count, role isolation, and sorted pagination.
+  risk: Duplicate seed execution if called repeatedly; avoided by checking ticket count <= 3.
+- **Task 5 (Smoke script volume retention):**
+  files: scripts/smoke_docker.ps1 (Integrator).
+  approach: Add -RemoveVolumes switch (default $false); only pass -v to `docker compose down` when switch is present; verify volume remains by default across restarts.
+  proof: Run smoke_docker.ps1 from clean state; volume retained; exit 0.
+  risk: Leftover container states if script fails early.
+
 ## Plan (Prompt 2b - Dev B + Integrator: Hardening & Docker)
 
 Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 active, GEMINI_API_KEY set, verify_setup.ps1 10/10 PASS.
@@ -359,9 +389,9 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
       3 |           2 |          1.0301
     (3 rows)
     ```
-- Containerized Pytest against PostgreSQL:
-  Command: `docker compose exec -T backend pytest` ->
-  `============================== 94 passed in 5.94s ==============================`
+- Containerized Pytest in Prompt 2b:
+  Command: `docker compose exec -T backend pytest` -> `94 passed in 5.94s`.
+  *Note on Database Truth:* As audited in Prompt 2c Task 1, `backend/tests/conftest.py` lines 18-24 previously hardcoded `os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_temp_db_path}"` unconditionally at the session level. Therefore, despite running inside the Docker container, earlier test runs actually executed on an in-container temporary SQLite database, not PostgreSQL. Real PostgreSQL execution was enabled in Prompt 2c Task 1 via `TEST_DATABASE_URL`.
 - Automated Clean-State Smoke Test:
   Command: `powershell -ExecutionPolicy Bypass -File scripts/smoke_docker.ps1`
   Output:
@@ -382,6 +412,35 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   Tearing down containers and volumes (--remove-orphans -v)... Teardown complete.
   ```
   Exit code: 0.
+
+### Prompt 2c Evidence
+
+#### Task 1 - Database Truth & TEST_DATABASE_URL
+- **Audit of Previous Test Runs:**
+  In `backend/tests/conftest.py`, lines 18-24 previously had:
+  ```python
+  _temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+  _temp_db_path = Path(_temp_db.name).resolve().as_posix()
+  _temp_db.close()
+  os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_temp_db_path}"
+  os.environ["FALLBACK_SQLITE_URL"] = f"sqlite+aiosqlite:///{_temp_db_path}"
+  ```
+  And lines 54-56:
+  ```python
+  test_engine, test_factory = create_engine_and_factory(f"sqlite+aiosqlite:///{_temp_db_path}")
+  session_module.engine = test_engine
+  session_module.async_session_factory = test_factory
+  ```
+  Therefore, all earlier 94 tests unconditionally used a temporary SQLite database file, even when invoked inside Docker.
+- **Implementation:**
+  - Added opt-in `TEST_DATABASE_URL` in `backend/tests/conftest.py`. When set, it configures `DATABASE_URL` before importing `app.main` and asserts `assert "postgresql" in session_module.engine.url.drivername`. When unset, it preserves 100% of the existing temporary SQLite behavior.
+  - Updated `create_engine_and_factory` in `backend/app/db/session.py` to accept `**custom_kwargs` and configured `poolclass=NullPool` for PostgreSQL test runs to eliminate asyncpg cross-event-loop future errors.
+  - Created separate test database `smartdesk_test` in the PostgreSQL container (never using the demo `smartdesk` DB).
+- **PostgreSQL Pytest Run (Real Containerized Proof):**
+  - Command: `docker compose exec -T -e TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@postgres:5432/smartdesk_test backend pytest tests/ -q`
+  - Target URL Host and DB: `postgres:5432/smartdesk_test`
+  - Output: `94 passed in 7.84s`
+  - Exit code: 0.
 
 ---
 
