@@ -68,7 +68,7 @@
 | **`origin/Nguyen`** (`56c9496`) | no | no | no | no | no | no | - |
 
 ### 1.3 Merge Set Selection Rationale
-1. **`origin/feature/b-platform` (`5415245`)**: Included (Task 2). Contains all 22 Dev B + Integrator platform/security/Docker/contract commits on top of `origin/Hoang`.
+1. **`origin/feature/b-platform` (`5415245`)**: Included (Task 2). Contains all 24 commits on `origin/feature/b-platform` not in `origin/Hoang` (23 non-merge Dev B + Integrator platform/security/Docker/contract commits plus 1 merge commit `aa9eab9`).
 2. **`origin/Nguyen2` (`62c7e5a`)**: Included (Task 3). Because `origin/feature/a-ai-engine` (`cb404fe`) is a strict ancestor of `origin/Nguyen2` (`62c7e5a`), merging `origin/Nguyen2` brings in both `cb404fe` and `TheOrijinnn`'s 3 subsequent commits (`a03536f`, `c5c84cb`, `62c7e5a`). A separate merge of `origin/feature/a-ai-engine` is unnecessary.
 3. **`origin/feature/c-frontend-docs` (`74d3319`) AND `origin/TKhanh` (`44a7859`)**: Both included sequentially (Task 4a then Task 4b). Neither is an ancestor of the other: `origin/feature/c-frontend-docs` (`2026-10-23`) contains Dev C's cross-feature tests, visual evidence screenshots, `REPORT.pdf`, and `SLIDES.pdf`/`SLIDES.pptx`, while `origin/TKhanh` (`2026-10-25`) contains `TKhanhJK`'s frontend UX updates for `CR-DEVC-01` and `CR-DEVC-02`.
 4. **`origin/Nguyen` (`56c9496`)**: **Excluded.** Single commit from `2026-09-22` (`FIx header UI`) created before the repository was restructured into `frontend/` and `backend/`. It modifies 4 obsolete root-level `UNMAPPED` paths (`package.json`, `package-lock.json`, `run.md`, `src/components/Header.tsx`) that no longer exist in the canonical structure.
@@ -92,7 +92,7 @@ All merges were executed on `integration/merge-all` using `git merge --no-ff`:
 
 | File | Branches Involved | Policy Rule Applied | What Was Kept | Who Must Confirm |
 | :--- | :--- | :--- | :--- | :--- |
-| `AI_USAGE.md` | `origin/Hoang` vs `origin/feature/b-platform` | **P8** (`docs/TEAM_ROSTER.md` and `AI_USAGE.md`: take `origin/Hoang`'s version; record other edit as proposal) | Kept `origin/Hoang` (`9fc5443`) version intact; saved `origin/feature/b-platform`'s addition (Section 3.7 log entry) to `docs/audit/07-alternatives/AI_USAGE-b-platform.patch` | `@BapVitHoang` (Integrator) |
+| `AI_USAGE.md` | `origin/Hoang` vs `origin/feature/b-platform` | **P8** (`docs/TEAM_ROSTER.md` and `AI_USAGE.md`: take `origin/Hoang`'s version; record other edit as proposal) | Kept `origin/Hoang` (`9fc5443`) version intact; saved `origin/feature/b-platform`'s addition (Case Studies 4 & 5 and Section 4 Benchmark & Evaluation Summary from commit `70f7384`) to `docs/audit/07-alternatives/AI_USAGE-b-platform.patch` | `@BapVitHoang` (Integrator) |
 | `docs/requests/devC.md` | `HEAD` (`origin/Hoang`) vs `origin/feature/c-frontend-docs` | **P6** (Per-person logs/requests: keep newest and union any entry from older version) | Kept union containing both `CR-001` (from `origin/feature/c-frontend-docs` & `origin/Hoang`) and `CR-002` (from `origin/Hoang`) | `@TKhanh` (Dev C) & `@BapVitHoang` (Integrator) |
 | `docs/notes/C-ai-usage.md` | `HEAD` (`origin/feature/c-frontend-docs`) vs `origin/TKhanh` | **P6** (Same owner has two versions: keep newest and add entry that exists only in older one) | Kept Sessions 1–4, Session 5 (`2026-10-22`, Cross-Feature Offline Tests & Real AI Failure Audit from `feature/c-frontend-docs`), and Session 6 (`2026-10-25`, CR-DEVC-01 & CR-DEVC-02 from `TKhanh`) | `@TKhanh` (Dev C) |
 
@@ -118,7 +118,7 @@ Evaluated against the canonical `OWNERSHIP_MAP` in `scripts/ownership_map.py` (e
 
 - **Semantic Conflicts (`NEEDS HUMAN DECISION` per P9):** **0 files.** No semantic conflicts occurred where two branches made incompatible code changes to the same file.
 - **Policy P8 Proposal Saved in `docs/audit/07-alternatives/`:**
-  - `AI_USAGE.md` -> Patch saved at [`docs/audit/07-alternatives/AI_USAGE-b-platform.patch`](./07-alternatives/AI_USAGE-b-platform.patch). Contains Section `3.7` documenting the `check_roster.py` false positive on `docs/notes/B.md` fixed in commit `f10d3ff` on `origin/feature/b-platform`. Kept `origin/Hoang`'s `AI_USAGE.md` per **P8** pending Integrator/human approval in Prompt 5.
+  - `AI_USAGE.md` -> Patch saved at [`docs/audit/07-alternatives/AI_USAGE-b-platform.patch`](./07-alternatives/AI_USAGE-b-platform.patch). Contains Case Study 4 (Auth Module password/Google ID token signature fix in `eef0af8`), Case Study 5 (Gemini HTTP 400 `GenerateContentConfig` fix in `192fecc` & `afbb08d`), and Section 4 (Benchmark & Evaluation Summary — 24/24 Passed) added in commit `70f7384` on `origin/feature/b-platform`. Kept `origin/Hoang`'s `AI_USAGE.md` per **P8** pending Integrator/human approval in Prompt 5.
 
 ---
 
@@ -167,10 +167,18 @@ Per Rule 1 and Tasks 3–5, defects that already existed on a source branch or m
 
 ## 8. Authorship Table (`origin/Hoang..integration/merge-all`)
 
-Exact output of `git shortlog -sne origin/Hoang..integration/merge-all` (prior to committing this report; no percentages):
+Exact output of `git shortlog -sne origin/Hoang..ac2fc81` (across the 4 branch merges prior to audit report commits; no percentages):
 
 ```text
     30	Bap <23110020@student.hcmute.edu.vn>
+     3	TheOrijinnn <lenguyensonghinh@gmail.com>
+     1	TKhanhJK <khanhssaa77@gmail.com>
+```
+
+Exact output of `git shortlog -sne origin/Hoang..integration/merge-all` (including the Task 7 audit report commit `ee504da` and the Review Round 1 commit; no percentages):
+
+```text
+    32	Bap <23110020@student.hcmute.edu.vn>
      3	TheOrijinnn <lenguyensonghinh@gmail.com>
      1	TKhanhJK <khanhssaa77@gmail.com>
 ```
@@ -221,3 +229,24 @@ All raw command outputs are stored in `docs/audit/07-evidence/`:
    git worktree remove ..\smartdesk-merge
    ```
    *(Note: Do NOT run `git worktree remove` until human inspection and fast-forward into `Hoang` are complete.)*
+
+---
+
+## Review round 1
+
+- **Skeptical Verifier (`8ff53ad6-4f20-4d05-ba32-69c8b449be6e`):** `VERDICT: FAIL`
+  - *Finding 1:* Section 1.3 stated `origin/feature/b-platform` had `22` commits on top of `origin/Hoang`, whereas `task1-inventory.txt:17` and `git rev-list --count origin/Hoang..origin/feature/b-platform` show `24` commits (23 non-merge commits + 1 merge commit `aa9eab9`).
+  - *Finding 2:* Sections 3 and 5 described `docs/audit/07-alternatives/AI_USAGE-b-platform.patch` as containing "Section 3.7 log entry", whereas `AI_USAGE-b-platform.patch` actually contains Case Study 4 (`eef0af8`), Case Study 5 (`192fecc` & `afbb08d`), and Section 4 (Benchmark & Evaluation Summary — 24/24 Passed) from commit `70f7384`.
+  - *Finding 3:* Section 8 showed `30 Bap` (before report commit) without also showing the updated count on `HEAD` including the report/review commits.
+- **Requirements and Honesty Auditor (`22823912-b17c-49c3-9122-606567724590`):** `VERDICT: FAIL`
+  - Confirmed Tasks 0–7 and test integrity are satisfied, and reported the same 3 documentation accuracy findings in `docs/audit/07-merge-report.md` (lines 71, 95, 121, 173).
+- **Security and Robustness Reviewer (`6dccd193-8f5b-4d0e-92d5-0985ac503c00`):** `VERDICT: PASS`
+  - Confirmed zero leaked secrets, intact auth/RBAC/proxy hardening, non-blocking async concurrency, and accurate cataloging of all pre-existing source-branch security/auth/contract defects (`MRG-DEF-01`..`MRG-DEF-09`).
+- **Ownership and Conflict Hunter (`993a5187-140e-4b46-8b23-7071a4b078dd`):** `VERDICT: PASS`
+  - Confirmed all modified files conform to `ALLOWED PATHS`, Policy P8 is preserved (`docs/TEAM_ROSTER.md` and `AI_USAGE.md` identical to `origin/Hoang`), zero conflict markers remain, and all 241 tracked files map cleanly in `scripts/ownership_map.py`.
+- **Fixes Applied After Round 1:**
+  - Updated Section 1.3 commit count to `24` (23 non-merge + 1 merge commit `aa9eab9`).
+  - Updated Sections 3 and 5 to accurately describe `docs/audit/07-alternatives/AI_USAGE-b-platform.patch` (Case Studies 4 & 5 and Section 4 Benchmark & Evaluation Summary from commit `70f7384`).
+  - Updated Section 8 to show both `git shortlog -sne origin/Hoang..ac2fc81` (`30 Bap`) and `git shortlog -sne origin/Hoang..integration/merge-all` (`32 Bap`).
+
+
