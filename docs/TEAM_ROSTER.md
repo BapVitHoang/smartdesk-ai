@@ -6,6 +6,6 @@
 
 | Full Name | MSSV | GitHub | Git Email | Role | verified_by_user |
 | :--- | :---: | :--- | :--- | :--- | :---: |
-| Ngô Việt Hoàng | 23110020 | [`@BapVitHoang`](https://github.com/BapVitHoang) | `23110020@student.hcmute.edu.vn` | Dev B & Integrator (Platform, Security & Release) | false |
-| Lê Nguyên | 23110043 | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | `lenguyensonghinh@gmail.com` | Dev A (AI Engine, RAG Pipeline & Evaluation) | false |
-| Tống Gia Khánh | 23110032 | [`@TKhanh`](https://github.com/TKhanh) | `khanhssaa77@gmail.com` | Dev C (Frontend UX, QA & Documentation) | false |
+| Ngô Việt Hoàng | 23110020 | [`@BapVitHoang`](https://github.com/BapVitHoang) | `23110020@student.hcmute.edu.vn` | Dev B & Integrator (Platform, Security & Release) | True |
+| Lê Nguyên | 23110043 | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | `lenguyensonghinh@gmail.com` | Dev A (AI Engine, RAG Pipeline & Evaluation) | True |
+| Tống Gia Khánh | 23110032 | [`@TKhanh`](https://github.com/TKhanh) | `khanhssaa77@gmail.com` | Dev C (Frontend UX, QA & Documentation) | True |
