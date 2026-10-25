@@ -68,13 +68,13 @@
    - Frontend SPA on port 3000 and reverse proxy `/api/v1/` verified functional.
    - SSE streaming through Nginx verified (`proxy_buffering off;` emitting metadata and token chunks without delay).
    - PostgreSQL container verified: `pg_extension` confirms `vector 0.8.6`; `knowledge_chunks.embedding` is `vector(768)`; 9 chunks seeded; native `<=>` cosine distance vector query executes successfully.
-   - Pytest suite executed against backend container: 94 passed in 5.94s.
+   - Pytest suite executed against backend container: 94 passed in 5.94s (Lưu ý: lần chạy này tại Prompt 2b sử dụng SQLite tạm thời do conftest.py hardcode session URL; các lần chạy PostgreSQL thực sự sử dụng TEST_DATABASE_URL tại Prompt 2c).
    - Clean-state smoke test `scripts/smoke_docker.ps1`: all 8 steps passed, clean teardown.
 
 ---
 
 ## 2. Decision Log
-- Date: 2026-10-20 — Configured dual-dialect `Vector(768).with_variant(JSON(), "sqlite")` in `models/knowledge.py` to ensure local tests pass without PostgreSQL.
+- Date: 2026-10-21 — Configured dual-dialect `Vector(768).with_variant(JSON(), "sqlite")` in `models/knowledge.py` to ensure local tests pass without PostgreSQL (confirmed by git commit b753b95).
 - Date: 2026-10-21 — Implemented HS256 JWT token generation and role-based data isolation on ticket endpoints (`admin` vs `user`), ensuring customers cannot access cross-tenant or other users' support tickets.
 - Date: 2026-10-21 — Added `X-Total-Count` header and server-side sorting to `GET /api/v1/tickets`, hooked up `ticket_copilot_service` into ticket creation, and guarded workspace deletion (`id=1` blocked).
 - Date: 2026-10-21 — Enabled native pgvector SQL cosine search with SQLite in-memory fallback, and masked PII before calling external embedding APIs.
@@ -82,7 +82,7 @@
 - Date: 2026-10-25 — Hardened demo authentication: demo users are only seeded and allowed to login when `DEMO_LOGIN_ENABLED=True`. If false, demo logins return generic HTTP 401 matching invalid credentials.
 - Date: 2026-10-25 — Implemented trusted proxy IP resolution (`get_trusted_client_ip`) behind Nginx, ignoring spoofed headers from untrusted sources, and integrated with login throttling.
 - Date: 2026-10-25 — Secured ticket submission: `POST /api/v1/tickets` requires authentication (`get_current_user`), binding customer email/name to JWT identity for regular users, while allowing admins to file on behalf of customers.
-- Date: 2026-10-25 — Verified full containerized stack under Docker Compose with real PostgreSQL 16 + pgvector (0.8.6), unbuffered Nginx SSE streaming, and 94/94 containerized pytest tests passing.
+- Date: 2026-10-25 — Verified full containerized stack under Docker Compose with real PostgreSQL 16 + pgvector (0.8.6), unbuffered Nginx SSE streaming (kết quả kiểm thử pytest container lúc đó chạy trên SQLite tạm thời; kiểm thử trên PostgreSQL thực sự được triển khai với TEST_DATABASE_URL trong Prompt 2c).
 
 ---
 
@@ -135,12 +135,13 @@
   - All verification commands green (10/10 verification gate in `verify_setup.ps1`, 83/83 pytest tests passing, 0 TypeScript errors, clean Vite production build).
   - Stop early condition satisfied after Round 2.
 
-### Round 3 (2026-10-25)
+### 2c round 1 (2026-10-25)
 - **Subagents Dispatched (4 in parallel):**
   1. Skeptical Verifier (`0ab0987e...`)
   2. Requirements Auditor (`f710aea4...`)
   3. Security Reviewer (`c8f91cbd...`)
   4. Ownership Hunter (`be696f11...`)
+- **Ghi chú quy trình Review Prompt 2c:** Ở giai đoạn lập kế hoạch Prompt 2c, subagent Plan Skeptic gặp sự cố timeout/không phản hồi nên đã được dừng sớm; các chỉnh sửa (sắp xếp priority qua case(), CORS header, port binding) đã được kiểm chứng trực tiếp bằng các bài kiểm thử tự động (tests only) mà không chạy vòng subagent thứ hai.
 - **Key Findings Identified:**
   - `FIND-SKEP-01` (High): `test_search_similar_chunks_sqlite_fallback` queried workspace 1 (which had no chunks), returning `[]` and skipping the assertion loop vacuously.
   - `FIND-SKEP-02` (High): `sort_by="priority"` in `tickets.py` sorted alphabetically (`"Urgent" -> "Medium" -> "Low" -> "High"`), placing High below Low.
@@ -165,7 +166,7 @@
 - **Stop Condition Evaluation:**
   - Zero unresolved Blocker or High findings.
   - All verification commands green (10/10 verification gate in `verify_setup.ps1`, 98 passed / 1 skipped offline, 99 passed in Docker PostgreSQL, clean Vite production build).
-  - Stop early condition satisfied after Round 3.
+  - Stop early condition satisfied after 2c round 1.
 
 
 
@@ -650,6 +651,16 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
 - **Kiểm chứng sạch sẽ:**
   - Lệnh: `git grep -n "postgrespassword"`
   - Kết quả: Chỉ xuất hiện duy nhất tại `docker-compose.yml` (mặc định demo được ghi chú) và `backend/.env.example` (hướng dẫn mẫu). Hoàn toàn không còn trong bất kỳ tài liệu hay ghi chú nào khác.
+
+#### Task 3 - Notes Truth on Test Database and Review Rounds
+- **Đính chính cơ sở dữ liệu kiểm thử (Test Database Truth):**
+  - Đã rà soát và đính chính các phát biểu trong `docs/notes/B.md` (tại mục 1 và 2): Lần chạy pytest trong container tại Prompt 2b (94 passed) thực tế chạy trên database SQLite tạm thời do cấu hình cũ của `conftest.py`.
+  - Việc kiểm thử trên PostgreSQL thực sự lần đầu tiên được triển khai tại Prompt 2c thông qua biến môi trường `TEST_DATABASE_URL` (99 passed trong 40.5s trên database PostgreSQL `smartdesk_test` có extension `pgvector`).
+- **Chuẩn hóa lịch sử đánh giá (Review Rounds Truth):**
+  - Đã đổi tên mục "Round 3 (2026-10-25)" thành "2c round 1 (2026-10-25)" để phản ánh đúng đây là vòng rà soát của Prompt 2c, không phải vòng 3 liên tục.
+  - Ghi nhận trung thực sự cố subagent: Ở giai đoạn lập kế hoạch Prompt 2c, subagent Plan Skeptic bị treo/timeout và được dừng sớm; các cải tiến (sắp xếp priority bằng `case()`, cấu hình CORS, binding IP) được kiểm chứng trực tiếp bằng automated tests mà không qua vòng subagent thứ hai.
+- **Chuẩn hóa ngày Decision Log:**
+  - Ngày cấu hình dual-dialect vector type `Vector(768).with_variant(JSON(), "sqlite")` đã được sửa từ `2026-10-20` thành `2026-10-21`, đồng bộ chuẩn xác với git log của commit `b753b95`.
 
 ---
 
