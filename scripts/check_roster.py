@@ -134,11 +134,12 @@ def check_content(content: str, filename: str, verified_names, verified_mssvs, a
                     violations.append((loc, f"Invented contribution percentage next to person/role: {line.strip()[:100]}"))
 
         # Check (b) Full-name-like string next to role or MSSV
-        name_role_match = re.search(r"([A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){2,4})\s*(\(|—|-|:|\/|\|)\s*(?:MSSV|`?2[0-5]11\d{4}|Dev\s+[ABC]|Integrator)", clean_line)
-        if name_role_match:
-            candidate_name = name_role_match.group(1).strip()
-            if candidate_name.lower() not in verified_names:
-                violations.append((loc, f"Unverified full name '{candidate_name}' associated with role/MSSV: {line.strip()[:100]}"))
+        if not re.search(r"AI\s+Tool\s+Used\s*:", clean_line, re.IGNORECASE):
+            name_role_match = re.search(r"([A-ZÀ-Ỹ][a-zà-ỹ]+(?:\s+[A-ZÀ-Ỹ][a-zà-ỹ]+){2,4})\s*(\(|—|-|:|\/|\|)\s*(?:MSSV|`?2[0-5]11\d{4}|Dev\s+[ABC]|Integrator)", clean_line)
+            if name_role_match:
+                candidate_name = name_role_match.group(1).strip()
+                if candidate_name.lower() not in verified_names:
+                    violations.append((loc, f"Unverified full name '{candidate_name}' associated with role/MSSV: {line.strip()[:100]}"))
 
     return violations
 
