@@ -493,7 +493,7 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   - Updated `create_engine_and_factory` in `backend/app/db/session.py` to accept `**custom_kwargs` and configured `poolclass=NullPool` for PostgreSQL test runs to eliminate asyncpg cross-event-loop future errors.
   - Created separate test database `smartdesk_test` in the PostgreSQL container (never using the demo `smartdesk` DB).
 - **PostgreSQL Pytest Run (Real Containerized Proof):**
-  - Command: `docker compose exec -T -e TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@postgres:5432/smartdesk_test backend pytest tests/ -q`
+  - Command: `docker compose exec -T -e TEST_DATABASE_URL=postgresql+asyncpg://postgres:<db-password>@postgres:5432/smartdesk_test backend pytest tests/ -q`
   - Target URL Host and DB: `postgres:5432/smartdesk_test`
   - Output: `94 passed in 7.84s`
   - Exit code: 0.
@@ -506,7 +506,7 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   `backend/tests/platform/test_pgvector_and_db.py`:
   * `test_search_similar_chunks_sqlite_fallback` PASSED.
   * `test_search_similar_chunks_postgresql_pgvector` PASSED (verifies native pgvector query on PostgreSQL without fallback warnings).
-  Command: `docker compose exec -T -e TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgrespassword@postgres:5432/smartdesk_test backend pytest tests/platform/test_pgvector_and_db.py -v` -> `4 passed in 0.56s`.
+  Command: `docker compose exec -T -e TEST_DATABASE_URL=postgresql+asyncpg://postgres:<db-password>@postgres:5432/smartdesk_test backend pytest tests/platform/test_pgvector_and_db.py -v` -> `4 passed in 0.56s`.
 - **Live Captured SQL Statement from PostgreSQL Logs (`log_statement='all'`):**
   Captured from `smartdesk-postgres` during `POST /api/v1/chat` query on Workspace 2 (SmileCare):
   ```sql
@@ -635,6 +635,21 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
     ```
   - Inspection of `/var/lib/postgresql/data/postgresql.auto.conf`: `log_statement` line completely removed.
   - Search across repository: `git grep -i "log_statement"` confirmed no script, compose file, or Dockerfile permanently enables statement logging.
+
+#### Task 2 - Credentials in Notes & Environment Override
+- **Thay thế mật khẩu tường minh trong tài liệu:**
+  - Toàn bộ chuỗi mật khẩu database cục bộ tường minh trong `docs/notes/B.md` (bao gồm câu lệnh kiểm thử Task 1 & 2 của Prompt 2c) đã được thay thế bằng placeholder `<db-password>`.
+- **Cấu hình biến môi trường có thể ghi đè trong docker-compose.yml:**
+  - `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}`
+  - `DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/smartdesk}`
+  - Trong `backend/.env.example`: Đã bổ sung tài liệu hướng dẫn cấu hình `POSTGRES_PASSWORD="postgrespassword"` với ghi chú rõ ràng chỉ dành riêng cho demo cục bộ.
+- **Lịch sử commit chứa chuỗi mật khẩu tường minh (không viết lại lịch sử git):**
+  - Commit `1ae0471` ("xóa các từ homework"): Khởi tạo file `docker-compose.yml` ban đầu.
+  - Commit `7de6641` ("test(platform): enable opt-in TEST_DATABASE_URL and verify postgres test run"): Ghi nhận lệnh chạy pytest PostgreSQL trong `docs/notes/B.md`.
+  - Commit `ef952b0` ("feat(db): verify pgvector cosine search and captured sql query on postgresql"): Ghi nhận lệnh chạy kiểm thử pgvector trong `docs/notes/B.md`.
+- **Kiểm chứng sạch sẽ:**
+  - Lệnh: `git grep -n "postgrespassword"`
+  - Kết quả: Chỉ xuất hiện duy nhất tại `docker-compose.yml` (mặc định demo được ghi chú) và `backend/.env.example` (hướng dẫn mẫu). Hoàn toàn không còn trong bất kỳ tài liệu hay ghi chú nào khác.
 
 ---
 
