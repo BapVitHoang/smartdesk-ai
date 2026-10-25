@@ -80,12 +80,16 @@ async def list_tickets(
     search: Optional[str] = Query(None, description="Search term in subject, description, customer name, or ticket code"),
     sort_by: str = Query("created_at", description="Sort field: created_at | priority | status | sla_hours"),
     sort_order: str = Query("desc", description="Sort direction: asc | desc"),
+    page: Optional[int] = Query(None, ge=1, description="Page number (1-based, overrides skip if provided)"),
     skip: int = Query(0, ge=0, description="Offset for pagination"),
     limit: int = Query(20, ge=1, le=100, description="Limit results"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> List[TicketResponse]:
     """Retrieve filtered and sorted ticket list with X-Total-Count header."""
+    if page is not None:
+        skip = (page - 1) * limit
+
     query = select(Ticket)
     count_query = select(func.count(Ticket.id))
 

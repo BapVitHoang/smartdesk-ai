@@ -34,6 +34,7 @@ from app.main import app
 from app.db.session import init_db, create_engine_and_factory
 import app.db.session as session_module
 from app.models.user import User
+from starlette.requests import Request
 from app.core.deps import get_current_user
 
 # Predefined test user objects for dependency injection
@@ -110,10 +111,17 @@ async def client():
     app.dependency_overrides.pop(get_current_user, None)
 
 
+def _resolve_test_user_from_request(request: Request) -> User:
+    auth_header = request.headers.get("authorization", "")
+    if "admin" in auth_header:
+        return _test_admin_user
+    return _test_regular_user
+
+
 @pytest_asyncio.fixture
 async def admin_client():
     """Authenticated Admin test client via dependency override."""
-    app.dependency_overrides[get_current_user] = lambda: _test_admin_user
+    app.dependency_overrides[get_current_user] = _resolve_test_user_from_request
     transport = ASGITransport(app=app)
     headers = {"Authorization": "Bearer demo_jwt_token_for_admin@smartdesk.ai"}
     async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
@@ -124,7 +132,7 @@ async def admin_client():
 @pytest_asyncio.fixture
 async def user_client():
     """Authenticated Customer test client (an.nguyen@company.vn) via dependency override."""
-    app.dependency_overrides[get_current_user] = lambda: _test_regular_user
+    app.dependency_overrides[get_current_user] = _resolve_test_user_from_request
     transport = ASGITransport(app=app)
     headers = {"Authorization": "Bearer demo_jwt_token_for_an.nguyen@company.vn"}
     async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:

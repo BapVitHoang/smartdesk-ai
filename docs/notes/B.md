@@ -497,6 +497,28 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
   - `python -m pytest backend/tests/platform/test_proxy_ip.py -v`: 9 passed in 1.33s.
   - `python -m pytest backend/tests/ -q`: 96 passed, 1 skipped in 10.51s.
 
+#### Task 4 - Deterministic Demo Tickets for Pagination and Sorting
+- **Vấn đề tồn đọng trước đây:**
+  Database seed trước đây chỉ có đúng 3 tickets ban đầu (`#TICK-1042`, `#TICK-1041`, `#TICK-1039`), khiến việc kiểm thử phân trang (`?page=2`) trong script smoke test không có dữ liệu để lật trang và sắp xếp chỉ kiểm thử được trên 3 bản ghi.
+- **Giải pháp triển khai:**
+  1. `backend/app/db/seed/seed_demo_tickets.py`: Bổ sung module sinh 40 tickets mẫu tĩnh, mang tính tất định (deterministic), đa dạng về danh mục (`Authentication`, `Billing`, `Bug Report`, `Feature Request`, `General`), độ ưu tiên (`Urgent`, `High`, `Medium`, `Low` tương ứng với SLA 2h, 4h, 8h, 24h), trạng thái (`open`, `in_progress`, `resolved`), phân bổ trên 3 workspaces và trải dài theo các mốc thời gian khác nhau.
+  2. Chỉ kích hoạt seed 40 tickets này khi `settings.DEMO_LOGIN_ENABLED` là True và số lượng ticket hiện tại trong bảng `<= 3`.
+  3. Phân bổ người dùng: 14 tickets cho `an.nguyen@company.vn` (kết hợp với ticket `#TICK-1042` ban đầu tạo thành tập dữ liệu riêng biệt cho kiểm thử cách ly người dùng), 5 tickets cho `admin@smartdesk.ai`, và 21 tickets cho các khách hàng hư cấu độc lập khác.
+  4. `backend/app/api/v1/endpoints/tickets.py`: Hỗ trợ tham số truy vấn `page: Optional[int] = Query(None, ge=1)` tự động quy đổi thành `skip = (page - 1) * limit`.
+  5. `docs/requests/devB.md`: Gửi `CR-DEVC-02` thông báo cho Dev C về 40+ demo tickets trong Docker và hướng dẫn cách reset dữ liệu demo khi cần (`docker compose down -v` rồi `docker compose up -d`).
+- **Bằng chứng xác minh thực tế qua Docker API (PostgreSQL DB qua Nginx):**
+  - Số lượng bản ghi trong Docker PostgreSQL: `SELECT count(*) FROM tickets;` $\to$ **43** rows.
+  - Đăng nhập Admin $\to$ `GET /api/v1/tickets?sort_by=created_at&sort_order=desc&limit=10&page=1`:
+    - `X-Total-Count`: **43** ($\ge 40$: True).
+    - Page 1 (10 codes): `['#TICK-1039', '#TICK-1041', '#TICK-1042', '#TICK-1139', '#TICK-1138', '#TICK-1137', '#TICK-1136', '#TICK-1135', '#TICK-1134', '#TICK-1133']`.
+  - Admin $\to$ `GET /api/v1/tickets?sort_by=created_at&sort_order=desc&limit=10&page=2`:
+    - Page 2 (10 codes): `['#TICK-1132', '#TICK-1131', '#TICK-1130', '#TICK-1129', '#TICK-1128', '#TICK-1127', '#TICK-1126', '#TICK-1125', '#TICK-1124', '#TICK-1123']`.
+    - Giao giữa Page 1 và Page 2: `set()` (tập rỗng, không trùng lặp bất kỳ bản ghi nào!).
+  - Đăng nhập Khách hàng (`an.nguyen@company.vn`) $\to$ `GET /api/v1/tickets?limit=100`:
+    - `X-Total-Count`: **26** (toàn bộ 100% email là `an.nguyen@company.vn`, cách ly dữ liệu tuyệt đối so với 43 tickets của toàn hệ thống).
+- **Kiểm thử tự động:**
+  - `python -m pytest backend/tests/test_tickets_module.py -v`: 7 passed in 0.65s (bao gồm `test_demo_tickets_pagination_and_sorting` và `test_demo_tickets_user_isolation`).
+
 ---
 
 ## 4. Giải thích code (Platform, Data & Security)
