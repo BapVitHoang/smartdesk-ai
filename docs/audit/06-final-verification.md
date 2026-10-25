@@ -416,7 +416,7 @@ Conducted on 2026-10-26 by 4 parallel read-only review subagents against base `o
 4. **Ownership & Conflict Hunter Subagent:**
    - **Boundary Conformance:** Diff against `origin/Hoang` contains 25 files, all within authorized paths for the Integrator (Hoang / devB with Integrator hat). Zero source code files of Dev A or Dev C were touched.
    - **Governance Consistency:** `python scripts/check_ownership.py --verify-consistency` passed with 100% coverage: all 256 tracked files mapped, 0 overlaps between devA, devB, and devC. `.github/CODEOWNERS` verified.
-   - **Anti-Fabrication Gate:** Identified regex false positive on heading in `docs/notes/B.md:379` (`Final Verification Notes (Integrator...`), which was resolved in commit `4606863`. Remaining 12 violations in `check_roster.py` belong strictly to pre-existing slide binaries (`MRG-DEF-01`), scheduled for regeneration by Dev C in Prompt 5.
+   - **Anti-Fabrication Gate:** Identified regex false positive on heading in `docs/notes/B.md:379` due to title-cased words adjacent to role tag, which was resolved in commit `4606863`. Remaining 12 violations in `check_roster.py` belong strictly to pre-existing slide binaries (`MRG-DEF-01`), scheduled for regeneration by Dev C in Prompt 5.
    - **Verdict:** **PASS**.
 
 ### 6.2 Review Actions Applied
