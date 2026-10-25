@@ -444,7 +444,7 @@ When `sort_by="priority"`, sorting evaluates a semantic SQL `case()` rank:
 - **Tie-Breaker:** Secondary sorting is always `Ticket.id.desc()` for stable pagination.
 
 **Response Headers:**
-- `X-Total-Count: 42` (total matching tickets before pagination). Exposed to frontend browsers via CORS `Access-Control-Expose-Headers: X-Total-Count`.
+- `X-Total-Count: 43` (total matching tickets before pagination). Exposed to frontend browsers via CORS `Access-Control-Expose-Headers: X-Total-Count`.
 
 **Response Body (HTTP 200 OK):**
 ```json
@@ -478,7 +478,7 @@ When `sort_by="priority"`, sorting evaluates a semantic SQL `case()` rank:
 ### 8.10a `GET /api/v1/tickets/{ticket_id}` (Ticket Detail with Customer Ownership)
 **Request Headers:** `Authorization: Bearer <token>`  
 **Description:** Retrieve single ticket by integer ID or formatted code (`#TICK-XXXX`). Regular users (`role == "user"`) can only access tickets belonging to their own email (`ticket.customer_email == current_user.email`). Support staff (`role == "admin"`) can inspect any ticket.  
-**Path Parameters:** `ticket_id: str` (e.g. `1042` or `#TICK-1042`).  
+**Path Parameters:** `ticket_id: str` (e.g. integer ID `1` or formatted code `#TICK-1042`).  
 **Response Body (HTTP 200 OK):** `TicketResponse` object.  
 **Exact Error Codes:**
 - `401 Unauthorized`: Missing, invalid, or expired JWT bearer token.
@@ -491,7 +491,7 @@ When `sort_by="priority"`, sorting evaluates a semantic SQL `case()` rank:
 ### 8.10b `PATCH /api/v1/tickets/{ticket_id}` (Update Status & AI Draft)
 **Request Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`  
 **Description:** Update ticket properties (`status`, `category`, `priority` with SLA recalculation, `ai_draft_reply`). Restricted to admin role (`require_role("admin")`).  
-**Path Parameters:** `ticket_id: str` (e.g. `1042` or `#TICK-1042`).  
+**Path Parameters:** `ticket_id: str` (e.g. integer ID `1` or formatted code `#TICK-1042`).  
 **Response Body (HTTP 200 OK):** Updated `TicketResponse` object.  
 **Exact Error Codes:**
 - `401 Unauthorized`: Missing, invalid, or expired JWT bearer token.
@@ -504,6 +504,7 @@ When `sort_by="priority"`, sorting evaluates a semantic SQL `case()` rank:
 ### 8.11 `DELETE /api/v1/tickets/{ticket_id}` & `DELETE /api/v1/workspaces/{workspace_id}`
 **Request Headers:** `Authorization: Bearer <token>`  
 **Description:** Delete ticket or workspace permanently (workspace 1 is protected from deletion). Restricted to admin role (`require_role("admin")`).  
+**Path Parameters:** `ticket_id: str` (e.g. integer ID `1` or formatted code `#TICK-1042`).  
 **Response:** `HTTP 204 No Content` (empty body).  
 **Exact Error Codes for `DELETE /tickets/{ticket_id}`:**
 - `401 Unauthorized`: Missing, invalid, or expired JWT bearer token.

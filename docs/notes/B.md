@@ -168,6 +168,26 @@
   - All verification commands green (10/10 verification gate in `verify_setup.ps1`, 98 passed / 1 skipped offline, 99 passed in Docker PostgreSQL, clean Vite production build).
   - Stop early condition satisfied after 2c round 1.
 
+### 2d round 1 (2026-10-25)
+- **Subagents Dispatched (4 in parallel):**
+  1. Skeptical Verifier (`b09f1d0f-446a-4b08-aa6e-f9cfcd1e93b8`)
+  2. Requirements Auditor (`3ae06471-72f9-4521-9faa-8f7ac090564f`)
+  3. Security Reviewer (`09d53dae-a7ca-48b3-b26c-c0fbb1d61756`)
+  4. Ownership Hunter (`ef8c057c-cb0d-4073-8bd9-8dc6cef55c37`)
+- **Findings Summary:**
+  - **Blocker:** **0**
+  - **High:** **0**
+  - **Medium:** 1 (`FIND-MED-01`: Chuẩn hóa alias danh mục `"Technical Bug"` trong `list_tickets()`, tuân thủ Scope Lock Rule 1 đã được ghi nhận vào `docs/requests/devB.md:REQ-SEC-04` thay vì tự ý sửa file Python ngoài nhiệm vụ).
+  - **Low / Informational:**
+    - Đã đồng bộ `X-Total-Count: 43` trong `docs/spec/CONTRACTS.md:447` khớp với số lượng thực tế 43 vé.
+    - Đã làm rõ ví dụ `ticket_id` trong `docs/API_CONTRACT.md` và `docs/spec/CONTRACTS.md` (ID số nguyên tự tăng `1` hoặc mã định dạng `#TICK-1042`).
+    - Đã ghi nhận yêu cầu bổ sung hướng dẫn chạy Docker Compose cho Dev C vào `docs/requests/devB.md:CR-DEVC-03` theo `REQ-39`.
+    - Ghi nhận kiến trúc rate limit in-memory (OWASP/an toàn cho Docker/Local hiện tại; mở rộng Redis khi triển khai multi-worker phân tán).
+- **Stop Condition Evaluation:**
+  - Hoàn toàn **không có bất kỳ Blocker hay High finding nào** (0 Blocker, 0 High).
+  - Tất cả các cổng kiểm tra kỹ thuật đạt màu xanh tuyệt đối: `verify_setup.ps1` 10/10 PASS, backend pytest 98 passed / 1 skipped, 0 lỗi TypeScript, clean Vite build, `check_ownership.py` 100% compliant với ranh giới module.
+  - Điều kiện dừng sớm được thỏa mãn sau vòng Review 1 của Prompt 2d.
+
 
 
 

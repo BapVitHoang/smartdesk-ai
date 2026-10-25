@@ -288,7 +288,7 @@ Retrieve a single ticket by integer ID or formatted code (`#TICK-XXXX`). **Requi
 - Support staff (`role == "admin"`) can view any ticket.
 
 #### Path Parameters
-- `ticket_id`: Ticket integer ID (`1042`) or formatted ticket code (`#TICK-1042`).
+- `ticket_id`: Ticket integer ID (e.g. `1`) or formatted ticket code (`#TICK-1042`).
 
 #### Response Body (HTTP 200 OK)
 Single `BackendTicketResponse` object.
@@ -305,7 +305,7 @@ Single `BackendTicketResponse` object.
 Update ticket status, category, priority (recalculating SLA hours), or customize the pre-populated AI draft reply. **Restricted to Admin/Agent Role (`require_role("admin")`)**.
 
 #### Path Parameters
-- `ticket_id`: Ticket integer ID (`1042`) or formatted ticket code (`#TICK-1042`).
+- `ticket_id`: Ticket integer ID (e.g. `1`) or formatted ticket code (`#TICK-1042`).
 
 #### Request Body
 ```json
@@ -332,7 +332,7 @@ Single `BackendTicketResponse` object with updated fields.
 Delete a support ticket permanently. **Restricted to Admin Role (`require_role("admin")`)**.
 
 #### Path Parameters
-- `ticket_id`: Ticket integer ID (`1042`) or formatted ticket code (`#TICK-1042`).
+- `ticket_id`: Ticket integer ID (e.g. `1`) or formatted ticket code (`#TICK-1042`).
 
 #### Response: `HTTP 204 No Content` (empty body).
 
