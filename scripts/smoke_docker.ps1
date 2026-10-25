@@ -191,6 +191,9 @@ try {
         -UseBasicParsing `
         -TimeoutSec 5
     $p2Obj = $ticketPage2.Content | ConvertFrom-Json
+    if ($null -eq $p2Obj -or $p2Obj.Count -lt 1) {
+        throw "Pagination check failed: page 2 returned no tickets!"
+    }
     Write-Host "Pagination verified: page=2 returned $($p2Obj.Count) tickets (X-Total-Count=$($ticketPage2.Headers['X-Total-Count']))." -ForegroundColor Green
 
     # Step 6: Verify PostgreSQL pgvector extension in container

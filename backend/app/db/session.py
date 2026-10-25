@@ -82,6 +82,8 @@ async def init_db() -> None:
     from app.models.workspace import Workspace  # noqa: F401
     from app.models.document import Document  # noqa: F401
     from app.models.verification import VerificationReport, VerificationItem  # noqa: F401
+    from app.models.user import User  # noqa: F401
+    from app.models.ai_usage import AIUsageLog  # noqa: F401
 
     def _migrate_sqlite_columns(sync_conn):
         try:

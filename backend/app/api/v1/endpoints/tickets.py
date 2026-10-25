@@ -3,7 +3,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Path, Response, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, desc, asc, func
+from sqlalchemy import select, or_, desc, asc, func, case
 import logging
 
 from app.schemas.ticket import TicketCreate, TicketUpdate, TicketResponse
@@ -129,7 +129,14 @@ async def list_tickets(
     # 2. Server-side sorting
     sort_col = Ticket.created_at
     if sort_by == "priority":
-        sort_col = Ticket.priority
+        # Semantic priority hierarchy: Urgent (1) -> High (2) -> Medium (3) -> Low (4)
+        sort_col = case(
+            (Ticket.priority == "Urgent", 1),
+            (Ticket.priority == "High", 2),
+            (Ticket.priority == "Medium", 3),
+            (Ticket.priority == "Low", 4),
+            else_=5
+        )
     elif sort_by == "status":
         sort_col = Ticket.status
     elif sort_by in {"sla_hours", "sla_due_date"}:
@@ -138,7 +145,8 @@ async def list_tickets(
         sort_col = Ticket.created_at
 
     order_fn = asc if sort_order.lower() == "asc" else desc
-    query = query.order_by(order_fn(sort_col)).offset(skip).limit(limit)
+    # Include Ticket.id.desc() as deterministic tie-breaker for pagination
+    query = query.order_by(order_fn(sort_col), Ticket.id.desc()).offset(skip).limit(limit)
 
     result = await db.execute(query)
     tickets = result.scalars().all()

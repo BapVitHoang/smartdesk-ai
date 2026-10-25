@@ -129,13 +129,20 @@ async def test_demo_tickets_pagination_and_sorting(admin_client: AsyncClient) ->
     # Verify page 2 returns distinct rows from page 1
     assert set(p1_codes).isdisjoint(set(p2_codes)), "Page 1 and Page 2 rows must not overlap!"
 
-    # 2. Verify sorting by priority
+    # 2. Verify sorting by priority (Urgent=1 -> High=2 -> Medium=3 -> Low=4)
     res_prio_asc = await admin_client.get("/api/v1/tickets?sort_by=priority&sort_order=asc&limit=10&page=1")
     assert res_prio_asc.status_code == 200
+    prio_asc_tickets = res_prio_asc.json()
+    assert len(prio_asc_tickets) == 10
+    # First items in asc must be Urgent
+    assert prio_asc_tickets[0]["priority"] == "Urgent"
+
     res_prio_desc = await admin_client.get("/api/v1/tickets?sort_by=priority&sort_order=desc&limit=10&page=1")
     assert res_prio_desc.status_code == 200
-    assert len(res_prio_asc.json()) == 10
-    assert len(res_prio_desc.json()) == 10
+    prio_desc_tickets = res_prio_desc.json()
+    assert len(prio_desc_tickets) == 10
+    # First items in desc must be Low
+    assert prio_desc_tickets[0]["priority"] == "Low"
 
 
 @pytest.mark.asyncio

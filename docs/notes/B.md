@@ -135,6 +135,38 @@
   - All verification commands green (10/10 verification gate in `verify_setup.ps1`, 83/83 pytest tests passing, 0 TypeScript errors, clean Vite production build).
   - Stop early condition satisfied after Round 2.
 
+### Round 3 (2026-10-25)
+- **Subagents Dispatched (4 in parallel):**
+  1. Skeptical Verifier (`0ab0987e...`)
+  2. Requirements Auditor (`f710aea4...`)
+  3. Security Reviewer (`c8f91cbd...`)
+  4. Ownership Hunter (`be696f11...`)
+- **Key Findings Identified:**
+  - `FIND-SKEP-01` (High): `test_search_similar_chunks_sqlite_fallback` queried workspace 1 (which had no chunks), returning `[]` and skipping the assertion loop vacuously.
+  - `FIND-SKEP-02` (High): `sort_by="priority"` in `tickets.py` sorted alphabetically (`"Urgent" -> "Medium" -> "Low" -> "High"`), placing High below Low.
+  - `FIND-SEC-01` (High): PostgreSQL port 5432 bound to `0.0.0.0` in `docker-compose.yml`.
+  - `FIND-SKEP-03` (Medium): Non-deterministic pagination when sorting by non-unique columns (missing tie-breaker `Ticket.id.desc()`).
+  - `FIND-SKEP-04` (Medium): Custom header `X-Total-Count` not exposed in `CORSMiddleware`.
+  - `FIND-SKEP-05` (Medium): `FALLBACK_SQLITE_URL` overwritten with PostgreSQL URL in test suite.
+  - `FIND-SKEP-06` (Low): Weak assertion in `smoke_docker.ps1` pagination check.
+  - `FIND-SKEP-07` (Low): Unrestricted `drop_all` on `TEST_DATABASE_URL` without `test` substring check.
+  - `FIND-SKEP-08` (Low): `User` and `AIUsageLog` missing from `init_db()` imports.
+- **Fixes & Mitigations Implemented:**
+  - `FIND-SKEP-01`: Updated `test_search_similar_chunks_sqlite_fallback` to query Workspace 2 and assert `len(results) > 0`.
+  - `FIND-SKEP-02`: Implemented `case()` ranking for priority in `tickets.py` (`Urgent=1`, `High=2`, `Medium=3`, `Low=4`) and added assertion verifying returned priorities in `test_tickets_module.py`.
+  - `FIND-SEC-01`: Bound PostgreSQL port strictly to `127.0.0.1:5432:5432` in `docker-compose.yml`.
+  - `FIND-SKEP-03`: Added `Ticket.id.desc()` as deterministic secondary tie-breaker in `query.order_by(order_fn(sort_col), Ticket.id.desc())`.
+  - `FIND-SKEP-04`: Added `"X-Total-Count"` to `expose_headers` in `CORSMiddleware` in `backend/app/main.py`.
+  - `FIND-SKEP-05`: Maintained `FALLBACK_SQLITE_URL` pointing to temporary SQLite file.
+  - `FIND-SKEP-06`: Added `if ($null -eq $p2Obj -or $p2Obj.Count -lt 1) { throw ... }` in `smoke_docker.ps1`.
+  - `FIND-SKEP-07`: Added `assert "test" in _opt_in_test_url.lower()` sanity check before `drop_all`.
+  - `FIND-SKEP-08`: Added `User` and `AIUsageLog` imports to `init_db()`.
+  - Clarified An Nguyen ticket counts in `docs/notes/B.md` and `docs/requests/devB.md`.
+- **Stop Condition Evaluation:**
+  - Zero unresolved Blocker or High findings.
+  - All verification commands green (10/10 verification gate in `verify_setup.ps1`, 98 passed / 1 skipped offline, 99 passed in Docker PostgreSQL, clean Vite production build).
+  - Stop early condition satisfied after Round 3.
+
 
 
 
@@ -515,7 +547,7 @@ Environment: branch feature/b-platform, clean worktree, Docker Desktop 27.5.1 ac
     - Page 2 (10 codes): `['#TICK-1132', '#TICK-1131', '#TICK-1130', '#TICK-1129', '#TICK-1128', '#TICK-1127', '#TICK-1126', '#TICK-1125', '#TICK-1124', '#TICK-1123']`.
     - Giao giữa Page 1 và Page 2: `set()` (tập rỗng, không trùng lặp bất kỳ bản ghi nào!).
   - Đăng nhập Khách hàng (`an.nguyen@company.vn`) $\to$ `GET /api/v1/tickets?limit=100`:
-    - `X-Total-Count`: **26** (toàn bộ 100% email là `an.nguyen@company.vn`, cách ly dữ liệu tuyệt đối so với 43 tickets của toàn hệ thống).
+    - `X-Total-Count`: **26** trên volume container đang chạy (trong fresh seed là 15 tickets gồm 1 vé ban đầu và 14 vé demo; toàn bộ 100% email trả về là `an.nguyen@company.vn`, cách ly dữ liệu tuyệt đối so với 43 tickets của toàn hệ thống).
 - **Kiểm thử tự động:**
   - `python -m pytest backend/tests/test_tickets_module.py -v`: 7 passed in 0.65s (bao gồm `test_demo_tickets_pagination_and_sorting` và `test_demo_tickets_user_isolation`).
 

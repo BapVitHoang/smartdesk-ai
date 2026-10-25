@@ -16,16 +16,18 @@ if str(backend_dir) not in sys.path:
 
 # 1. Configure isolated test database environment BEFORE importing application
 _opt_in_test_url = os.getenv("TEST_DATABASE_URL", "").strip()
-_temp_db_path = None
+_temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_temp_db_path = Path(_temp_db.name).resolve().as_posix()
+_temp_db.close()
 
 if _opt_in_test_url:
+    assert "test" in _opt_in_test_url.lower(), (
+        f"TEST_DATABASE_URL '{_opt_in_test_url}' must contain 'test' to prevent dropping non-test databases!"
+    )
     _active_test_db_url = _opt_in_test_url
     os.environ["DATABASE_URL"] = _opt_in_test_url
-    os.environ["FALLBACK_SQLITE_URL"] = _opt_in_test_url
+    os.environ["FALLBACK_SQLITE_URL"] = f"sqlite+aiosqlite:///{_temp_db_path}"
 else:
-    _temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    _temp_db_path = Path(_temp_db.name).resolve().as_posix()
-    _temp_db.close()
     _active_test_db_url = f"sqlite+aiosqlite:///{_temp_db_path}"
     os.environ["DATABASE_URL"] = _active_test_db_url
     os.environ["FALLBACK_SQLITE_URL"] = _active_test_db_url
