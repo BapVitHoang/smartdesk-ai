@@ -69,9 +69,12 @@ export interface TicketQueryParams {
   category?: string;
   priority?: string;
   workspace_id?: number;
+  search?: string;
   sort_by?: 'created_at' | 'priority' | 'status' | 'sla_hours';
   sort_order?: 'asc' | 'desc';
   page?: number;
+  skip?: number;
+  limit?: number;
   page_size?: number;
 }
 
