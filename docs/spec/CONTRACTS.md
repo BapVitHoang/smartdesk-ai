@@ -52,7 +52,7 @@ async def log_ai_call(
     output_tokens: int = 0,
     cost_usd: float = 0.0,
     latency_ms: float = 0.0,
-    status: Literal["success", "fallback", "refused"] = "success",
+    status: Literal["success", "fallback", "refused", "config_error"] = "success",
     workspace_id: int = 1,
     session: Optional[AsyncSession] = None,
 ) -> None:
@@ -63,6 +63,7 @@ async def log_ai_call(
       - 'success': Normal successful LLM call.
       - 'fallback': Circuit breaker tripped, timeout, or rate limit fallback.
       - 'refused': Guardrail triggered (prompt injection or out-of-scope query).
+      - 'config_error': Non-retriable client/config error (HTTP 400/401/403/404) served via deterministic fallback without cooldown.
     """
 ```
 
