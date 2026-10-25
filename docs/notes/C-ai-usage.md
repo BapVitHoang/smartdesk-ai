@@ -61,3 +61,29 @@
   - Verified 15 slides outline, 8-minute demo step-by-step breakdown, and 4 instructor live change scenarios in `PRESENTATION_AND_DEMO.md`.
   - Verified test accounts table and Data Privacy & PII Masking policy in `README.md`.
   - Executed all 55 Pytest backend tests (100% passed) and verified Vite production build.
+
+---
+
+## Session 5: Cross-Feature Offline Tests & Real AI Failure Audit (Task C5 / REQ-28)
+- **Date:** 2026-10-22
+- **AI Tool Used:** Antigravity / Claude 3.7 Sonnet & Gemini 3.5 Flash
+- **Key Prompt:** "Write offline cross-feature integration tests in backend/tests/common/ covering the full customer journey: login -> list tickets -> submit ticket form -> chat assistant -> tool call escalation -> two-phase action confirmation, using existing conftest fixtures."
+- **Manual Verification & Changes:**
+  - Implemented `test_cross_feature_flows.py` with 4 comprehensive test scenarios:
+    1. `test_customer_flow_login_list_create_chat_confirm`: Validates complete customer flow with real JWT token, ticket form submission, chat assistance, mutating action confirmation, and agent queue reflection.
+    2. `test_cancelled_confirmation_does_not_create_ticket`: Verifies two-phase cancel logic.
+    3. `test_customer_cannot_use_agent_only_routes_after_login`: Verifies RBAC data/route isolation (403 Forbidden).
+    4. `test_protected_flow_rejects_missing_token`: Verifies 401 Unauthorized barrier.
+  - Executed `python -m pytest backend/tests/test_api.py backend/tests/common -v` -> 14 passed in 3.91s.
+- **Audited Real AI Failures in Codebase (Evidence & Fix Commits):**
+  1. *Real Failure 1 (Auth Bypass & Unverified JWT):*
+     - *Observed Issue:* In the initial AI-generated auth implementation (`app/api/v1/endpoints/auth.py`), password validation was completely bypassed—any password was accepted for any seeded user! In addition, Google OAuth credential decoding turned off signature verification (`options={"verify_signature": False}`), allowing arbitrary token forgery.
+     - *Why It Happened:* The AI assistant prioritized "making tests pass quickly without external Google network dependencies" by omitting cryptographic signature checks.
+     - *Commit Hash & Author:* Fixed by Dev B (`@BapVitHoang`) in commit `eef0af827d1904bf24d86c0cbfbc6508cc04a290` (`feat(auth): implement real JWT auth, bcrypt hashing, and RBAC endpoint guards`).
+     - *Fix Applied:* Enforced bcrypt password hashing verification via `passlib`, real HS256 JWT tokens with expiry, and secure token validation.
+  2. *Real Failure 2 (Gemini Live Call HTTP 400 Client Error):*
+     - *Observed Issue:* Live Gemini API calls returned `HTTP 400 Bad Request` during structured output extraction because the AI assistant generated unsupported request parameters for the GenAI SDK client.
+     - *Why It Happened:* The assistant mixed parameter conventions between the deprecated `google-generativeai` SDK and the new `google-genai` SDK (`GenerateContentConfig`), passing incompatible parameter structures.
+     - *Commit Hash & Author:* Fixed by Dev A (`@TheOrijinnn`) in commits `192fecc` and `afbb08d`.
+     - *Fix Applied:* Re-aligned request payload configuration to match Google GenAI SDK v1beta specifications and added fail-safe fallbacks.
+
