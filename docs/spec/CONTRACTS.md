@@ -516,7 +516,7 @@ When `sort_by="priority"`, sorting evaluates a semantic SQL `case()` rank:
 ---
 
 ### 8.12 Document Verification Report with Multi-Agent Trace
-`GET /api/v1/documents/{document_id}/verify` or `POST /api/v1/documents/{document_id}/verify`
+`GET /api/v1/documents/{document_id}/verification-report` or `POST /api/v1/documents/{document_id}/verify`
 **Response (HTTP 200 OK):**
 ```json
 {

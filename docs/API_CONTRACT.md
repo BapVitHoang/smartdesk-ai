@@ -457,8 +457,8 @@ Upload a `.pdf`, `.txt`, or `.md` file for text extraction, recursive chunking (
 ### `GET /api/v1/documents/{document_id}/chunks`
 Inspect extracted chunks and page locations of a document.
 
-### `POST /api/v1/documents/{document_id}/verify`
-Execute the 3-step Active Verification Engine: Synthetic QA Generation $\to$ Parallel RAG Self-Test $\to$ AI Judge Faithfulness Evaluation.
+### `POST /api/v1/documents/{document_id}/verify` & `GET /api/v1/documents/{document_id}/verification-report`
+Execute (`POST /verify`) or retrieve (`GET /verification-report`) the 3-step Active Verification Engine: Synthetic QA Generation $\to$ Parallel RAG Self-Test $\to$ AI Judge Faithfulness Evaluation.
 
 #### Response (HTTP 200 OK)
 ```json
