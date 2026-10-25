@@ -1,0 +1,105 @@
+﻿=== TASK 0: PRECONDITIONS ===
+1. Branch & Merge Topology:
+Active branch: verify/final-verification
+HEAD SHA: 9d004fb7ca6a3598d2b89e51e45bfdbaa64f93a8
+origin/Hoang SHA: 9d004fb7ca6a3598d2b89e51e45bfdbaa64f93a8
+origin/integration/merge-all SHA: 86ab75c96093fa56f49181702201b8ba34658589
+merge-base --is-ancestor origin/integration/merge-all origin/Hoang exit code: 0
+
+git log --merges --oneline -15:
+ac2fc81 merge: origin/TKhanh into integration
+141cb6d merge: origin/feature/c-frontend-docs into integration
+769f347 merge: origin/Nguyen2 into integration
+306dec9 merge: feature/b-platform into integration
+aa9eab9 Merge remote-tracking branch 'origin/Hoang' into feature/b-platform
+62c7e5a Merge remote-tracking branch 'origin/feature/a-ai-engine' into Nguyen2
+c5c84cb Merge remote-tracking branch 'origin/Hoang' into Nguyen2
+
+2. Git Identity & Team Roster:
+git config user.name: Bap
+git config user.email: 23110020@student.hcmute.edu.vn
+docs/TEAM_ROSTER.md:
+# SmartDesk AI â€” Team Roster & Author Identity (Single Source of Truth)
+
+> **Status:** OFFICIAL SINGLE SOURCE OF TRUTH (SSOT) FOR PERSONAL DATA  
+> **Rule:** Developers and AI assistants MUST NOT invent, infer, or complete names or student IDs.  
+> If `verified_by_user` is `false`, the cells MUST remain `CHÆ¯A CÃ“ Dá»® LIá»†U`.
+
+| Full Name | MSSV | GitHub | Git Email | Role | verified_by_user |
+| :--- | :---: | :--- | :--- | :--- | :---: |
+| NgÃ´ Viá»‡t HoÃ ng | 23110020 | [`@BapVitHoang`](https://github.com/BapVitHoang) | `23110020@student.hcmute.edu.vn` | Dev B & Integrator (Platform, Security & Release) | True |
+| LÃª NguyÃªn | 23110043 | [`@TheOrijinnn`](https://github.com/TheOrijinnn) | `lenguyensonghinh@gmail.com` | Dev A (AI Engine, RAG Pipeline & Evaluation) | True |
+| Tá»‘ng Gia KhÃ¡nh | 23110032 | [`@TKhanh`](https://github.com/TKhanh) | `khanhssaa77@gmail.com` | Dev C (Frontend UX, QA & Documentation) | True |
+
+3. Environment, Docker & Ports (3000, 8000, 5432):
+backend/.env GEMINI_API_KEY: set
+docker version --format '{{.Server.Version}}': 27.5.1
+Port 3000: FREE
+Port 8000: FREE
+Port 5432: FREE
+
+4A. python scripts/check_ownership.py --verify-consistency:
+=== Checking Ownership & Governance Consistency ===
+[PASS] All 241 tracked files are mapped to an owner.
+[PASS] Zero overlaps between devA, devB, and devC.
+[PASS] .github/CODEOWNERS exists.
+Exit code: 0
+
+4B. python scripts/check_roster.py:
+check_roster.py exit code: 1 (16 pre-existing hits: 15 in binary docs/SLIDES.pdf & docs/SLIDES.pptx [MRG-DEF-01] + 1 in docs/notes/A-ai-usage.md:51 [MRG-DEF-02])
+
+4C. Offline Pytest (SQLite, empty GEMINI_API_KEY):
+...........................................................s............ [ 59%]
+.................................................                        [100%]
+120 passed, 1 skipped in 62.44s (0:01:02)
+Exit code: 0
+
+4D. npm run lint --prefix frontend:
+
+> smartdesk-ai@1.0.0 lint
+> tsc --noEmit
+
+Exit code: 0
+
+4E. npm run build --prefix frontend:
+
+> smartdesk-ai@1.0.0 build
+> vite build
+
+[36mvite v6.4.3 [32mbuilding for production...[36m[39m
+transforming...
+[32mΓ£ô[39m 1699 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  1.53 kB[22m[1m[22m[2m Γöé gzip:   0.69 kB[22m
+[2mdist/[22m[35massets/index-BLQ3G5ry.css  [39m[1m[2m 53.77 kB[22m[1m[22m[2m Γöé gzip:   9.37 kB[22m
+[2mdist/[22m[36massets/index-CdHJ6uG1.js   [39m[1m[2m414.79 kB[22m[1m[22m[2m Γöé gzip: 116.55 kB[22m
+[32mΓ£ô built in 12.07s[39m
+Exit code: 0
+
+4F. powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1:
+=================================================================
+  SmartDesk AI - Environment & Toolchain Verification Gate
+=================================================================
+[1/10] PASS - Git Repository & Active Branch
+       Current branch: verify/final-verification
+[2/10] PASS - Local Environment File (backend/.env)
+       backend/.env exists and is safely untracked
+[3/10] PASS - Python & Backend Dependencies
+       Python 3.13 with FastAPI, SQLAlchemy, Pydantic verified
+[4/10] PASS - Frontend Dependencies (node_modules)
+       node_modules installed
+[5/10] PASS - Backend Pytest Suite (Offline/Zero-Key Mode)
+       All backend tests passed (...........................................................s............ [ 59%] .................................................                        [100%] 120 passed, 1 skipped in 48.84s)
+[6/10] PASS - Frontend TypeScript Strict Check (npm run lint)
+       0 TypeScript errors
+[7/10] PASS - Frontend Production Build (npm run build)
+       Vite build successful
+[8/10] PASS - Docker Compose Configuration
+       docker-compose.yml is valid
+[9/10] PASS - Ownership & Governance Consistency
+       Zero overlaps, all tracked files mapped in OWNERSHIP_MAP & CODEOWNERS
+[10/10] FAIL - Roster & Anti-Fabrication Verification
+=================================================================
+  RESULT: 9/10 CHECKS PASSED. PLEASE FIX FAILED STEPS ABOVE.
+Exit code: 1

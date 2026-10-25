@@ -1,0 +1,22 @@
+﻿=== ITEM E: SSE REAL-TIME TOKEN STREAMING VERIFICATION ===
+E1 Direct SSE (http://localhost:8000/api/v1/chat/stream):
+  - Content-Type: text/event-stream; charset=utf-8
+  - Has 'event: metadata': PASS
+  - Has 'event: token': PASS
+  - Has 'event: done': PASS
+  - Raw sample snippet:
+    event: metadata
+    data: {"type": "metadata", "session_id": "sse-direct", "model": "seed_faq_bm25", "prompt_version": "v1.0.0", "citations": [], "confidence": 0.3, "is_fallback": true, "escalation_recommended": true, "tools_called": [], "pending_action": null}
+    
+    event: token
+    data: {"type": "token", "token": "Hệ ", "delta": "Hệ "}
+    
+    event: token
+    data: {"type": "token", "token": "thống ", "delta": "thống "}
+
+E2 Reverse Proxy SSE through Nginx (http://localhost:3000/api/v1/chat/stream):
+  - Content-Type: text/event-stream; charset=utf-8
+  - Has 'event: metadata': PASS
+  - Has 'event: token': PASS
+  - Has 'event: done': PASS
+  - Nginx unbuffered streaming verified: 'proxy_buffering off;' directive in default.conf allows real-time token delivery.

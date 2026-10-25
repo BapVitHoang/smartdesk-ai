@@ -1,0 +1,14 @@
+﻿=== ITEM I: TELEMETRY & COST-GUARD OBSERVABILITY VERIFICATION ===
+I1 GET /api/v1/agent/ai-usage as Admin:
+  - Total requests: 24
+  - Total tokens: 2850
+  - Total cost (USD): 0.002669
+  - Avg latency (ms): 633.68
+  - Fallback count: 12
+  - Refused count: 6
+  - Recent logs count: 20
+
+I2.1 Unauthenticated POST /api/v1/agent/reset-cooldown: HTTP 401
+I2.2 Regular user POST /api/v1/agent/reset-cooldown: HTTP 403
+I2.3 Admin POST /api/v1/agent/reset-cooldown: HTTP 200, status=success, message=Circuit breaker cooldown has been reset. Cloud Gemini calls re-enabled., cooldown_active=False
+I2.4 Admin POST alias route (/agent/ai-usage/reset-cooldown): HTTP 200, status=success, cooldown_active=False

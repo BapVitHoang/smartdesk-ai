@@ -1,0 +1,33 @@
+﻿=== ITEM K: MOBILE & UI ACCEPTANCE AUDIT ===
+Evidence Directory: docs/evidence/
+
+1. Viewport Screenshots Analysis (docs/TEST_ACCEPTANCE.md §3.1):
+  - agent-dashboard-desktop-1440x900.png: Desktop (1440x900)
+  - agent-dashboard-mobile-375x812.png: Mobile (375x812)
+  - agent-ticket-delete-confirm.png: Desktop Modal/Interactive
+  - chat-desktop-1440x900.png: Desktop (1440x900)
+  - chat-mobile-375x812.png: Mobile (375x812)
+  - chat-tool-confirmation-card.png: Desktop Modal/Interactive
+  - knowledge-manager-desktop.png: Desktop (1440x900)
+  - knowledge-verification-trace-modal.png: Desktop Modal/Interactive
+  - rbac-user-mode-locked.png: Desktop Modal/Interactive
+  - telemetry-panel-desktop.png: Desktop (1440x900)
+  - telemetry-panel-mobile.png: Mobile (375x812)
+  - ticket-form-desktop.png: Desktop (1440x900)
+  - ticket-form-mobile.png: Mobile (375x812)
+
+2. Mobile Viewport (375x812) Coverage:
+  - Customer AI Chat: docs/evidence/chat-mobile-375x812.png
+  - Ticket Submission Form: docs/evidence/ticket-form-mobile.png
+  - Agent Triage Dashboard: docs/evidence/agent-dashboard-mobile-375x812.png
+  - Admin Telemetry Panel: docs/evidence/telemetry-panel-mobile.png
+
+3. Real Backend vs Mock Environment Determination:
+  - Evaluated based on docs/TEST_ACCEPTANCE.md §3.1 & Dev C Session 5 notes:
+  - Screenshots in docs/evidence/ were captured during E2E acceptance testing on feature/c-frontend-docs and merged onto origin/Hoang.
+  - Agent Dashboard displays real ticket data matching PostgreSQL seed data (#TICK-1042..).
+  - Telemetry panel displays live KPI metrics (gemini-3.5-flash-lite, cost-guard alert).
+
+4. Dev C Frontend Code Verification (CR-DEVC-01 & CR-DEVC-02):
+  - CR-DEVC-01 (getAuthHeaders attached to createTicket at line 119): PASS (Verified in code)
+  - CR-DEVC-02 (getTickets supports ?page=2, ?skip, and default limit: 50 at line 231): PASS (Verified in code)

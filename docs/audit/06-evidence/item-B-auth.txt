@@ -1,0 +1,27 @@
+﻿=== ITEM B: AUTHENTICATION & RBAC VERIFICATION ===
+B1.1 Demo Admin Login: HTTP 200, email=admin@smartdesk.ai, role=admin, token_type=bearer, token_issued=YES
+B1.2 Demo User Login: HTTP 200, email=an.nguyen@company.vn, role=user, token_type=bearer, token_issued=YES
+B2.1 Wrong password: HTTP 401, message: {"detail":"Tài khoản hoặc mật khẩu không chính xác."}
+B2.2 Unknown email: HTTP 401, message: {"detail":"Tài khoản hoặc mật khẩu không chính xác."}
+B2.3 Exact same error message: PASS (True)
+B3 Forged Google credential: HTTP 501, detail: {"detail":"Đăng nhập Google chưa được cấu hình trên máy chủ."} (Note: GOOGLE_OAUTH_CLIENT_ID unset -> 501 / rejected; real Google verification: NOT TESTED)
+B4.1 No token to admin route (/agent/ai-usage): HTTP 401
+B4.2 User role to admin route (/agent/ai-usage): HTTP 403
+B4.3 Admin role to admin route (/agent/ai-usage): HTTP 200, total_requests=3
+B5 Brute-force throttle (11 failed attempts): Attempts 1-10 status codes=401,401,401,401,401,401,401,401,429,429, Attempt 11 status code=429, Retry-After header=60
+
+B6. Demo flag OFF verification (DEMO_LOGIN_ENABLED=false):
+
+B7. python -m pytest backend/tests/platform/test_jwt_secret.py:
+.............                                                            [100%]
+13 passed in 4.06s
+Exit code: 0
+
+B6. Demo flag OFF verification (DEMO_LOGIN_ENABLED=false):
+B6.1 Demo admin on /auth/token when DEMO_LOGIN_ENABLED=false: HTTP , message: 
+B6.2 Demo admin on /auth/oauth2/login when DEMO_LOGIN_ENABLED=false: HTTP , message: 
+
+B6. Demo flag OFF verification (DEMO_LOGIN_ENABLED=false):
+B6.1 Demo admin on /auth/token when DEMO_LOGIN_ENABLED=false: HTTP 401 Unauthorized, message: {'detail': 'Tài khoản hoặc mật khẩu không chính xác.'}
+B6.2 Demo admin on /auth/oauth2/login when DEMO_LOGIN_ENABLED=false: HTTP 401 Unauthorized, message: {'detail': 'Tài khoản hoặc mật khẩu không chính xác.'}
+B6.3 Demo login behavior: When DEMO_LOGIN_ENABLED=false, demo logins are completely rejected with HTTP 401 identical to invalid credentials.
