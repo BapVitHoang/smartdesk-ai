@@ -9,7 +9,7 @@
 
 **Author / Developer:** Dev C (Frontend UX, QA & Capstone Documentation)  
 **Date:** 2026-10-22  
-**Status:** Approved by Integrator  
+**Status:** DONE (`scripts/ownership_map.py` mapped on `Hoang`; `AI_USAGE.md` composed in Prompt 4 Task 4)  
 **Target Frozen File(s):**
 - `AI_USAGE.md` (Integrator-owned)
 - `scripts/ownership_map.py` (Integrator-owned)
@@ -64,7 +64,7 @@ Incorporate Case Studies 4 and 5:
 **Originator:** Integrator (`@BapVitHoang`)  
 **Assignee:** Dev C (`@TKhanh`)  
 **Date:** 2026-10-23  
-**Status:** **Action Required upon Roster Completion**  
+**Status:** **LEFT FOR OWNER (`docs/TEAM_ROSTER.md` now has `verified_by_user = True`; regenerate binaries in Prompt 5)**  
 **Target Deliverables (Owned by Dev C):**
 - `docs/REPORT.pdf`
 - `docs/SLIDES.pdf`
