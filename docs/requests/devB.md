@@ -24,5 +24,6 @@ MRG-DEF-06 | backend/app/services/agent_tools.py | handle_prepare_ticket_update(
 MRG-DEF-07 | backend/app/services/rag_service.py, backend/app/services/ticket_copilot_service.py | log_ai_call() is invoked with status="config_error" (rag_service.py:448, ticket_copilot_service.py:186), whereas CONTRACTS.md §2 specifies Literal["success", "fallback", "refused"] | devA / integrator | DONE: chore(requests): apply MRG-DEF-07
 MRG-DEF-08 | frontend/src/services/api/documents.ts, docs/spec/CONTRACTS.md | getVerificationReport() (documents.ts:265) calls GET /api/v1/documents/{id}/verification-report (matching endpoints/documents.py:181), whereas CONTRACTS.md §8.12 header lists GET /api/v1/documents/{id}/verify | integrator | DONE: chore(requests): apply MRG-DEF-08
 MRG-DEF-09 | frontend/src/services/api/tickets.ts | getTickets() (line 231) defaults limit to 50 instead of CONTRACTS.md §8.10 default 20 and does not expose X-Total-Count response header to caller | devC | LEFT FOR OWNER
+MRG-DEF-10 | backend/app/services/embedding_service.py:102, backend/app/models/knowledge.py:46 | Live Gemini embedding API (gemini-embedding-001) returns 3072 dimensions while knowledge_chunks.embedding is vector(768) on PostgreSQL, causing asyncpg dimension mismatch on live RAG retrieval | devB | LEFT FOR OWNER
 
 
