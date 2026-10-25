@@ -96,3 +96,5 @@
 - Date: 2026-10-21 — Embedded AI Telemetry & Cost-Guard Cooldown reset panel in `AgentDashboardView.tsx`.
 - Date: 2026-10-21 — Implemented 1-click RBAC switcher, ticket sorting, pagination, delete, and 3-agent verification trace.
 - Date: 2026-10-21 — Created comprehensive Capstone documentation suite (`REPORT.md`, `PRESENTATION_AND_DEMO.md`, `C-ai-usage.md`).
+- Date: 2026-10-25 — Implemented CR-DEVC-01: Attached `getAuthHeaders()` to `createTicket()` per REQ-SEC-03, added unauthenticated visitor warning banner & toast prompt in `TicketFormView.tsx`.
+- Date: 2026-10-25 — Implemented CR-DEVC-02: Added `page` query param & default `limit: 50` to `getTickets()` supporting Docker PostgreSQL 43 seeded tickets and RBAC tenant isolation (Admin sees 43, An Nguyen sees isolated tickets).

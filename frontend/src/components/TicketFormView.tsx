@@ -25,6 +25,7 @@ import {
   DemoState
 } from '../types';
 import { createTicket, getWorkspaces } from '../services/api';
+import { getAuthToken, ApiError } from '../services/api/client';
 
 interface TicketFormViewProps {
   onTicketCreated: (newTicket: Ticket) => void;
@@ -214,6 +215,12 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
       return;
     }
 
+    // Prompt unauthenticated visitors to log in (CR-DEVC-01, REQ-SEC-03)
+    if (!getAuthToken()) {
+      onToast('Vui lòng đăng nhập bằng tài khoản Demo hoặc Google trước khi gửi phiếu hỗ trợ!', 'warning');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -236,7 +243,11 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
       setFormTouched({});
       setFormErrors({});
     } catch (err: any) {
-      onToast('Không thể tạo ticket. Vui lòng kiểm tra kết nối!', 'error');
+      if (err instanceof ApiError && err.statusCode === 401) {
+        // Warning toast already shown by createTicket
+        return;
+      }
+      onToast(err?.detail || 'Không thể tạo ticket. Vui lòng kiểm tra kết nối!', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -268,6 +279,24 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Banner cảnh báo chưa đăng nhập (REQ-SEC-03, CR-DEVC-01) */}
+        {!getAuthToken() && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 shadow-xs flex items-center justify-between gap-3 text-xs text-amber-900">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-amber-100 text-amber-700 shrink-0">
+                <AlertCircle className="w-4 h-4 text-amber-600" />
+              </span>
+              <div>
+                <span className="font-bold">Yêu cầu xác thực tài khoản (REQ-SEC-03): </span>
+                <span>Hệ thống yêu cầu đăng nhập trước khi gửi phiếu hỗ trợ. Vui lòng chọn tài khoản ở góc trên bên phải (Demo User / Demo Admin) để tiếp tục.</span>
+              </div>
+            </div>
+            <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-amber-200/80 text-amber-900 text-[11px] font-semibold shrink-0">
+              Chưa đăng nhập
+            </span>
+          </div>
+        )}
 
         {/* Banner thông báo One-Click Escalation Pre-fill */}
         {initialData && (initialData.subject || initialData.message) && (

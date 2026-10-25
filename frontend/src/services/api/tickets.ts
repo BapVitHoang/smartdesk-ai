@@ -19,6 +19,7 @@ import {
   notifyFallback,
   fetchWithTimeout,
   getAuthHeaders,
+  getAuthToken,
 } from './client';
 
 // Status Mapping Helpers
@@ -98,6 +99,7 @@ let localFallbackTickets: Ticket[] = [...INITIAL_TICKETS];
 /**
  * Create Support Ticket
  * Endpoint: POST /api/v1/tickets
+ * Requires Bearer auth per REQ-SEC-03 (CR-DEVC-01).
  */
 export async function createTicket(
   formData: TicketFormData,
@@ -105,12 +107,21 @@ export async function createTicket(
 ): Promise<Ticket> {
   const toastFn = onToast || notifyFallback;
 
+  // REQ-SEC-03 / CR-DEVC-01: Authenticated ticket creation & prompt unauthenticated visitors
+  const token = getAuthToken();
+  if (!token) {
+    const authRequiredMsg = 'Vui lòng đăng nhập để gửi phiếu hỗ trợ kỹ thuật (yêu cầu Bearer auth).';
+    toastFn(authRequiredMsg, 'warning');
+    throw new ApiError(401, authRequiredMsg);
+  }
+
   try {
+    const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/tickets`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           workspace_id: formData.workspace_id || 1,
           customer_name: formData.fullName,
@@ -125,6 +136,11 @@ export async function createTicket(
     );
 
     if (!res.ok) {
+      if (res.status === 401) {
+        const unauthMsg = 'Phiên làm việc đã hết hạn hoặc chưa đăng nhập. Vui lòng đăng nhập lại.';
+        toastFn(unauthMsg, 'warning');
+        throw new ApiError(401, unauthMsg);
+      }
       const errData = await res.json().catch(() => ({}));
       throw new ApiError(res.status, errData.detail || `Lỗi tạo ticket: HTTP ${res.status}`);
     }
@@ -136,7 +152,9 @@ export async function createTicket(
     return mappedTicket;
   } catch (error: any) {
     if (error instanceof ApiError) {
-      toastFn(error.detail || `Lỗi tạo ticket: HTTP ${error.statusCode}`, 'warning');
+      if (error.statusCode !== 401) {
+        toastFn(error.detail || `Lỗi tạo ticket: HTTP ${error.statusCode}`, 'warning');
+      }
       throw error;
     }
 
@@ -181,6 +199,7 @@ export async function createTicket(
 /**
  * List and Filter Tickets
  * Endpoint: GET /api/v1/tickets
+ * Supports server-side filtering, sorting, and pagination (CR-DEVC-02, REQ-30, REQ-31).
  */
 export async function getTickets(
   filters?: {
@@ -189,6 +208,7 @@ export async function getTickets(
     category?: string;
     priority?: string;
     search?: string;
+    page?: number;
     skip?: number;
     limit?: number;
     sort_by?: string;
@@ -205,8 +225,20 @@ export async function getTickets(
     if (filters?.category) params.append('category', filters.category);
     if (filters?.priority) params.append('priority', filters.priority);
     if (filters?.search) params.append('search', filters.search);
-    if (filters?.skip !== undefined) params.append('skip', String(filters.skip));
-    if (filters?.limit !== undefined) params.append('limit', String(filters.limit));
+
+    // CR-DEVC-02: Support pagination (?page=2, ?skip, ?limit)
+    // Default limit to 50 so all 43 seeded demo tickets are retrieved for Admin
+    const limit = filters?.limit !== undefined ? filters.limit : 50;
+    params.append('limit', String(limit));
+
+    if (filters?.page !== undefined) {
+      params.append('page', String(filters.page));
+      const calculatedSkip = filters.skip !== undefined ? filters.skip : Math.max(0, (filters.page - 1) * limit);
+      params.append('skip', String(calculatedSkip));
+    } else if (filters?.skip !== undefined) {
+      params.append('skip', String(filters.skip));
+    }
+
     if (filters?.sort_by) params.append('sort_by', filters.sort_by);
     if (filters?.sort_order) params.append('sort_order', filters.sort_order);
 

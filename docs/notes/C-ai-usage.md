@@ -87,3 +87,18 @@
      - *Commit Hash & Author:* Fixed by Dev A (`@TheOrijinnn`) in commits `192fecc` and `afbb08d`.
      - *Fix Applied:* Re-aligned request payload configuration to match Google GenAI SDK v1beta specifications and added fail-safe fallbacks.
 
+---
+
+## Session 6: CR-DEVC-01 & CR-DEVC-02 Authenticated Tickets & Pagination (Change Requests)
+- **Date:** 2026-10-25
+- **AI Tool Used:** Antigravity / Gemini 3.8 Flash
+- **Key Prompt:** "In createTicket(), attach getAuthHeaders() to headers to support authenticated ticket creation (POST /api/v1/tickets now requires Bearer auth per REQ-SEC-03) and prompt unauthenticated visitors to log in. In getTickets(), support pagination (?page=2) and sorting with 43 seeded tickets in Docker PostgreSQL."
+- **Manual Verification & Changes:**
+  - Attached `getAuthHeaders({ 'Content-Type': 'application/json' })` to `POST /api/v1/tickets` in `frontend/src/services/api/tickets.ts`.
+  - Added pre-check and unauthenticated visitor prompt in `frontend/src/components/TicketFormView.tsx` with warning banner and toast notification.
+  - Added `page?: number` filter, calculated `skip`, and default `limit: 50` in `getTickets()` to fetch all 43 seeded tickets for Admin while respecting RBAC isolation for An Nguyen.
+  - Verified `npm run lint` and `npm run build` completed with zero errors.
+- **AI Mistakes & Corrections:**
+  - *Observed Issue:* In `createTicket`, calling `toastFn` for 401 was initially overridden by the generic `catch (err)` block in `TicketFormView.tsx` displaying "Không thể tạo ticket. Vui lòng kiểm tra kết nối!".
+  - *Commit Hash / File:* `frontend/src/components/TicketFormView.tsx`
+  - *Fix Applied:* Updated `handleSubmit` in `TicketFormView.tsx` to handle `err.statusCode === 401` gracefully without displaying the generic network error message, and pre-checked `getAuthToken()` before invoking submission.
