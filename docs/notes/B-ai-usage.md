@@ -81,4 +81,24 @@
   - *Commit Subject:* `chore(docker): add smoke_docker.ps1 script and record daemon blocker`
   - *Fix Applied:* Added both paths to `integrator` in `scripts/ownership_map.py` and regenerated `.github/CODEOWNERS` via `scripts/gen_codeowners.py`.
 
+---
+
+### Session 6: Frontend Auth Headers & Server-Side Pagination Takeover (MRG-DEF-03, 04, 05, 09)
+- **Date:** 2026-10-26
+- **AI Tool Used:** Antigravity AI Assistant
+- **Key Prompt:** "Tiếp quản sửa lỗi Dev C từ Merge Report: gắn getAuthHeaders cho các hàm dịch vụ tickets.ts, documents.ts, workspaces.ts; xử lý triệt để lỗi 401/403 không nuốt lỗi giả lập; điều chỉnh limit=20 và lấy X-Total-Count cho pagination."
+- **Manual Verification & Changes:**
+  - Verified `test_frontend_auth_headers.py` (8 passed).
+  - Verified `npm run lint` (0 errors) and `npm run build` (successful Vite build).
+  - Verified real backend Docker response with token vs without token.
+  - Verified page 2 screenshot via Playwright Edge.
+- **AI Mistakes & Corrections (if encountered):**
+  - *Observed Issue 1:* Generated service functions previously caught 401/403 errors and returned fake fallback data (`mockDoc`, `newWs`, local draft) or updated UI optimistically in `AgentDashboardView.tsx:159`, masking authorization failures.
+  - *Commit Subject:* `fix(frontend): send auth headers on ticket, document and workspace requests`
+  - *Fix Applied:* Propagated `ApiError(401/403)` with Vietnamese error message, prevented swallow into mock data, and removed optimistic UI status update in `AgentDashboardView.tsx`.
+  - *Observed Issue 2:* `getTickets()` defaulted `limit` to 50 and did not expose `X-Total-Count`, causing UI pagination to slice from memory instead of reflecting total server records.
+  - *Commit Subject:* `fix(frontend): support server-side pagination and X-Total-Count`
+  - *Fix Applied:* Set default limit to 20 per `CONTRACTS.md §8.10`, extracted `X-Total-Count` header, and exposed `getTicketsWithCount` wrapper.
+
+
 

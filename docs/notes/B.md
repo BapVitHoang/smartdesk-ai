@@ -830,11 +830,85 @@ Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
   3. Đối với nhân viên hỗ trợ / Quản trị viên (`role == "admin"`):
      - Cho phép giữ nguyên `customer_email` và `customer_name` từ payload để hỗ trợ viên có thể tiếp nhận và ghi nhận ticket thay cho khách hàng qua điện thoại/kênh khác.
 
-### 4.8 Cấu hình Nginx SSE Streaming không bộ đệm (`proxy_buffering off;`)
-- **Tối ưu truyền phát thời gian thực:**
-  - Nginx mặc định kích hoạt bộ đệm (`proxy_buffering on;`), gom các gói tin nhỏ lại trước khi gửi về client, khiến tính năng truyền token từng chữ (Token-by-Token Streaming) của AI Chat bị giật hoặc hiển thị cả đoạn văn bản cùng lúc.
-  - Trong `frontend/nginx.conf`, khối `location /api/v1/` đã được bổ sung chỉ thị `proxy_buffering off;`, cùng với `proxy_read_timeout 300s;` và `proxy_send_timeout 300s;`.
-  - Kết quả kiểm thử thực tế qua container chứng minh gói tin đầu tiên (`event: metadata`) phản hồi chỉ trong 0.096 giây và các gói tin `event: token` liên tục truyền trực tiếp đến trình duyệt mà không hề bị giữ lại.
+
+## Takeover: MRG-DEF-03, MRG-DEF-04, MRG-DEF-05, MRG-DEF-09, reason: Hoang taking over Dev C defect fixes per team agreement, date from git log: 2026-10-26
+
+## Plan: S-C Frontend Auth Headers & Pagination (MRG-DEF-03, 04, 05, 09)
+1. Task 0: Verify clean tree, branch fix/c-auth-headers from origin/Hoang, verify git identity (Hoang), run verify_setup.ps1.
+2. Task 1: Reproduce missing token & fake fallback behavior for 8 functions in tickets.ts, documents.ts, workspaces.ts. Record HTTP status & UI result table.
+3. Task 2: Attach explicit getAuthHeaders() to 8 functions and fix error propagation:
+   - JSON: headers = getAuthHeaders({ 'Content-Type': 'application/json' }) in updateTicketStatus, regenerateAiDraft, createWorkspace, updateWorkspace.
+   - Multipart: headers = getAuthHeaders() in uploadDocument (NEVER set Content-Type manually to let browser set boundary).
+   - Delete/verify/publish: headers = getAuthHeaders() in deleteDocument, verifyDocument, publishDocument.
+   - Error handling: ensure 401/403 throw ApiError and show Vietnamese toast, never swallow to fake success; fix AgentDashboardView.tsx catch block that optimistically updated status on error.
+   - Offline guard test: create backend/tests/common/test_frontend_auth_headers.py asserting each function calls getAuthHeaders, multipart has no Content-Type, and 401/403 throw ApiError. Verify it FAILS on baseline and PASSES after fix.
+   - Verify real backend: admin succeeds, user gets 403 with Vietnamese message, unauthenticated gets 401 with Vietnamese message.
+4. Task 3: Fix MRG-DEF-09 in tickets.ts and AgentDashboardView.tsx:
+   - In tickets.ts: change default limit from 50 to 20 in getTickets(); extract res.headers.get('X-Total-Count'); export getTicketsWithCount() wrapper preserving getTickets() backward compatibility.
+   - In AgentDashboardView.tsx: compute totalPages from X-Total-Count when available; support server pagination.
+   - Capture screenshot in docs/evidence/ticket-pagination-page2.png.
+
+## Evidence: Task 0 (Setup Check)
+- Branch: `fix/c-auth-headers` created from `origin/Hoang` (`9d004fb`).
+- Ancestry verification: `git merge-base --is-ancestor origin/Hoang HEAD` exit code 0.
+- Committer Identity: `Bap <23110020@student.hcmute.edu.vn>` (matches row in `docs/TEAM_ROSTER.md`).
+- `scripts/verify_setup.ps1`: 9/10 passed (12 known slide hits + 1 line in `docs/notes/A-ai-usage.md:51` tracked in MRG-DEF-02).
+
+## Evidence: Task 1 (Reproduce Missing Token & Fake Fallbacks)
+Bảng tái hiện trạng thái lỗi HTTP trước khi gắn auth headers và cách xử lý lỗi của API layer:
+
+| Hàm (`service`) | Tuyến đường API | HTTP trước (Không token / User) | Phản ứng UI trước khi sửa (Lỗi nuốt / Fake Success) |
+| :--- | :--- | :---: | :--- |
+| `updateTicketStatus` (`tickets.ts`) | `PATCH /api/v1/tickets/{id}` | 401 / 403 | Quăng `ApiError`, nhưng `AgentDashboardView.tsx:159` vẫn gọi `onUpdateTicketStatus` trong `catch` (Fake UI Success) |
+| `regenerateAiDraft` (`tickets.ts`) | `POST /api/v1/agent/tickets/{id}/generate-draft` | 401 / 403 | Nuốt lỗi, toast "Máy chủ ngoại tuyến", tự sinh bản thảo giả cục bộ (Fake Success) |
+| `uploadDocument` (`documents.ts`) | `POST /api/v1/workspaces/{id}/documents/upload` | 401 / 403 | Nuốt lỗi, toast "Ngoại tuyến: Lưu tạm tệp", tự thêm mockDoc cục bộ (Fake Success) |
+| `deleteDocument` (`documents.ts`) | `DELETE /api/v1/documents/{id}` | 401 / 403 | Quăng `ApiError(401/403)`, toast báo lỗi; thiếu `getAuthHeaders()` rõ ràng |
+| `verifyDocument` (`documents.ts`) | `POST /api/v1/documents/{id}/verify` | 401 / 403 | Quăng `ApiError(401/403)`, toast báo lỗi; thiếu `getAuthHeaders()` rõ ràng |
+| `publishDocument` (`documents.ts`) | `POST /api/v1/documents/{id}/publish` | 401 / 403 | Quăng `ApiError(401/403)`, toast báo lỗi; thiếu `getAuthHeaders()` rõ ràng |
+| `createWorkspace` (`workspaces.ts`) | `POST /api/v1/workspaces` | 401 / 403 | Nuốt lỗi, toast "Tạo doanh nghiệp cục bộ", sinh mock workspace cục bộ (Fake Success) |
+| `updateWorkspace` (`workspaces.ts`) | `PUT /api/v1/workspaces/{id}` | 401 / 403 | Nuốt lỗi, toast "Chế độ ngoại tuyến", cập nhật mảng bộ nhớ (Fake Success) |
+
+## Evidence: Task 2 (Fix and Guard Authentication Headers)
+1. **Gắn `getAuthHeaders` & Ngăn chặn Fake Fallback:**
+   - Trong `tickets.ts`: `updateTicketStatus` dùng `getAuthHeaders({ 'Content-Type': 'application/json' })`, `regenerateAiDraft` dùng `getAuthHeaders()`. Quăng `ApiError` với thông báo tiếng Việt khi gặp mã lỗi 401/403.
+   - Trong `documents.ts`: `uploadDocument` dùng `getAuthHeaders()` (giữ nguyên boundary của trình duyệt, không gán thủ công `Content-Type`), `deleteDocument`, `verifyDocument`, `publishDocument` đều truyền `headers: getAuthHeaders()`.
+   - Trong `workspaces.ts`: `createWorkspace` và `updateWorkspace` gắn `getAuthHeaders({ 'Content-Type': 'application/json' })`. Quăng `ApiError` và chặn fallback tạo workspace giả lập.
+   - Trong `AgentDashboardView.tsx`: Loại bỏ lời gọi `onUpdateTicketStatus` trong khối `catch` khi API cập nhật thất bại, bảo đảm tính toàn vẹn trạng thái UI.
+2. **Offline Guard Test (`backend/tests/common/test_frontend_auth_headers.py`):**
+   - Trước khi sửa: **8 failed in 2.69s** (cả 8 hàm đều vi phạm kiểm tra).
+   - Sau khi sửa: **8 passed in 2.66s**.
+3. **Kiểm thử trên Backend Docker thực tế:**
+   - Khi không có token: `401 Unauthorized` với thông báo tiếng Việt.
+   - Khi có token user (`an.nguyen@company.vn`): `403 Forbidden` với thông báo từ chối quyền.
+   - Khi có token admin (`admin@smartdesk.ai`): Các thao tác thành công HTTP 200 / 201.
+
+## Evidence: Task 3 (MRG-DEF-09: Server-Side Pagination & X-Total-Count)
+1. **Cập nhật `getTickets` & Bổ sung `getTicketsWithCount`:**
+   - Mặc định tham số `limit = 20` theo đúng đặc tả `CONTRACTS.md §8.10` (thay vì 50).
+   - Đọc header phản hồi `res.headers.get('X-Total-Count')`, cập nhật vào biến `lastTotalTicketCount`.
+   - Export wrapper `getTicketsWithCount(filters)` trả về `{ tickets, totalCount }`.
+2. **Đồng bộ phân trang trên Giao diện (`AgentDashboardView.tsx`):**
+   - Tính toán `totalPages = Math.ceil(effectiveTotal / pageSize)` dựa trên giá trị `X-Total-Count` do backend trả về thay vì cắt mảng cục bộ trong bộ nhớ.
+   - Hiển thị nhãn phân trang: `Trang {currentPage} / {totalPages} (Tổng cộng {effectiveTotal} tickets từ X-Total-Count)`.
+3. **Ảnh chụp Bằng chứng Trang 2:**
+   - Đã chụp ảnh màn hình trang 2 thực tế từ container frontend và backend qua Playwright Headless Edge:
+   - Lưu tại: [`docs/evidence/ticket-pagination-page2.png`](file:///d:/SPKT_2023/year_4/newtech/smartdesk-ai/docs/evidence/ticket-pagination-page2.png) (kích thước 255.7 KB).
+
+## Giải thích code: Luồng truyền Auth Header và Xử lý Lỗi từ UI đến API
+1. **Lưu trữ & Trích xuất Token (`client.ts`):**
+   - Khi người dùng đăng nhập qua form hoặc chọn tài khoản demo (`admin@smartdesk.ai` / `an.nguyen@company.vn`), access token JWT (HS256) được lưu trữ an toàn trong `localStorage` dưới khóa `smartdesk_access_token`.
+   - Hàm `getAuthHeaders(customHeaders)` đọc token này và tự động bổ sung cặp header `Authorization: Bearer <token>` vào request.
+2. **Gửi Request từ Service Layer:**
+   - Các hàm nghiệp vụ (`tickets.ts`, `documents.ts`, `workspaces.ts`) tạo header qua `getAuthHeaders(...)`.
+   - Đối với tải lên tệp (`uploadDocument`): chỉ truyền `Authorization`, trình duyệt tự động bổ sung `Content-Type: multipart/form-data; boundary=...` để tránh lỗi hỏng định dạng multipart.
+   - Đối với body JSON (`updateTicketStatus`, `createWorkspace`, v.v.): truyền kèm `'Content-Type': 'application/json'`.
+3. **Bắt và Lan truyền Lỗi (Error Propagation):**
+   - Khi backend phản hồi mã lỗi không thành công (`!res.ok`), lớp client đọc JSON payload và ném ngoại lệ `ApiError(status, detail)`.
+   - Nếu mã lỗi là `401 Unauthorized` hoặc `403 Forbidden`, khối `catch` tại service layer hiển thị toast cảnh báo bằng tiếng Việt và tái ném ngoại lệ (`throw error`), tuyệt đối không nuốt lỗi để chuyển sang fallback dữ liệu giả (fake success).
+   - Component UI (`AgentDashboardView`, `KnowledgeManagerView`) nhận ngoại lệ và giữ nguyên trạng thái hiển thị hiện tại, tránh cập nhật lạc quan sai lệch với cơ sở dữ liệu.
+
+
+
 
 
 
