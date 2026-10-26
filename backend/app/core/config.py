@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     LLM_FALLBACK_MODEL: str = ""
     LLM_FALLBACK_MODEL_NAME: str = "gemini-2.5-flash-lite"
     EMBEDDING_MODEL_NAME: str = "gemini-embedding-001"
+    EMBEDDING_DIMENSIONS: int = 768
 
     # Token Pricing for REQ-22 Observability (GA Gemini 3.5 Flash Lite rates per 1M tokens)
     LLM_INPUT_COST_PER_MILLION: float = 0.30

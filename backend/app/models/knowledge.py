@@ -6,6 +6,7 @@ from sqlalchemy import String, Text, Integer, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 
+from app.core.config import settings
 from app.db.base import Base
 
 if TYPE_CHECKING:
@@ -28,7 +29,7 @@ class FAQItem(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source_url: Mapped[str] = mapped_column(String(255), nullable=False)
-    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(768).with_variant(JSON(), "sqlite"), nullable=True)
+    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(settings.EMBEDDING_DIMENSIONS).with_variant(JSON(), "sqlite"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -55,7 +56,7 @@ class KnowledgeChunk(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source_url: Mapped[str] = mapped_column(String(255), nullable=False)
-    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(768).with_variant(JSON(), "sqlite"), nullable=True)
+    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(settings.EMBEDDING_DIMENSIONS).with_variant(JSON(), "sqlite"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False

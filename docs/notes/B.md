@@ -854,5 +854,106 @@ Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
   - Trong `frontend/nginx.conf`, khối `location /api/v1/` đã được bổ sung chỉ thị `proxy_buffering off;`, cùng với `proxy_read_timeout 300s;` và `proxy_send_timeout 300s;`.
   - Kết quả kiểm thử thực tế qua container chứng minh gói tin đầu tiên (`event: metadata`) phản hồi chỉ trong 0.096 giây và các gói tin `event: token` liên tục truyền trực tiếp đến trình duyệt mà không hề bị giữ lại.
 
+---
+
+## 2e — Embedding Dimension Mismatch (MRG-DEF-10)
+
+### Plan (Hardened after Challenge Round)
+1. Task 0 (Setup Check):
+   - Files: `scripts/verify_setup.ps1`, `docs/TEAM_ROSTER.md` (read-only)
+   - Approach: Verify clean tree, ancestry from origin/Hoang, identity (Hoang/23110020), run verify_setup.ps1.
+   - Proof: Exit code of merge-base (0), git config check, and verify_setup.ps1 recorded.
+   - Risk: Pre-existing slide deck roster violations.
+2. Task 1 (Reproduce):
+   - Files: Scratch script (uncommitted), Docker PostgreSQL container
+   - Approach: Call live embedding API directly to observe vector length for doc/query text (expect 3072); reproduce upload failure on Docker PostgreSQL; check chat question behavior on vector mismatch (silent fallback, 500, or log).
+   - Proof: Scratch script output lengths, Docker upload error log, chat response payload recorded.
+   - Risk: Live Gemini quota (budget max 6 calls, spaced >= 4.5s).
+3. Task 2 (Fix):
+   - Files: `backend/app/core/config.py`, `backend/.env.example`, `backend/app/models/knowledge.py`, `backend/app/services/embedding_service.py`, `backend/tests/platform/test_embedding_dimension.py`
+   - Approach: Add `EMBEDDING_DIMENSIONS: int = 768` to config; branch SDK param: `config=types.EmbedContentConfig(output_dimensionality=settings.EMBEDDING_DIMENSIONS)` for `google.genai` vs top-level `output_dimensionality` for `gai`; perform epsilon-safe L2 normalization if client-side truncation occurs; validate vector length == EMBEDDING_DIMENSIONS before returning to prevent SQL transaction poisoning; preserve SQLite JSON variant; add offline unit test with mocked 3072 response failing on old code and passing on new code, plus PostgreSQL test with TEST_DATABASE_URL.
+   - Proof: New unit tests fail on old code, pass on fixed code; full offline pytest green.
+   - Risk: SDK type branching differences.
+4. Task 3 (Existing Data & Live Proof):
+   - Files: `backend/scripts/reembed_chunks.py`, `docs/audit/06-evidence/item-G2-live-embedding.txt`
+   - Approach: Inspect stored vectors in Docker DB (seed pseudo-vectors vs real); test reembed_chunks.py dry run / budget check; live upload doc -> verify -> publish -> chat question answering from doc; verify SQL `<=>` in statement and `SHOW log_statement` reset.
+   - Proof: Save redacted outputs in `item-G2-live-embedding.txt`.
+   - Risk: Exceeding 6 live Gemini calls.
+5. Task 4 (Notes & Publish):
+   - Files: `docs/notes/B.md`, `docs/requests/devB.md`
+   - Approach: Record evidence, mark MRG-DEF-10 DONE, commit, push branch `fix/b-embedding-dimension`, verify remote head.
+   - Proof: `git ls-remote --heads origin fix/b-embedding-dimension`.
+   - Risk: Ownership boundary checks.
+
+### Evidence
+
+#### Task 0 — Setup Check
+- Active Branch: `fix/b-embedding-dimension` created from latest `origin/Hoang`.
+- Ancestry Check: `git merge-base --is-ancestor origin/Hoang HEAD` exit code `0`.
+- Git Config Identity: `git config user.name` = `Bap`, `git config user.email` = `23110020@student.hcmute.edu.vn` matching `docs/TEAM_ROSTER.md` row.
+- Environment check: `backend/.env` `GEMINI_API_KEY`: set.
+- Docker Engine: `27.5.1` active.
+- Verification Gate: `scripts/verify_setup.ps1` -> `9/10 CHECKS PASSED` (Step 10 reports only the known 12 violations in pre-existing binary slides `docs/SLIDES.*` scheduled for Dev C in Prompt 5).
+
+#### Task 1 — Reproduction of MRG-DEF-10
+1. Live Embedding Dimensions:
+   - Call 1 (Document text): `DOC_VEC_LEN: 3072`.
+   - Call 2 (Query text): `QUERY_VEC_LEN: 3072`.
+2. Reproduction of Document Upload Failure on PostgreSQL in Docker:
+   - Command: Uploaded document to `POST /api/v1/workspaces/1/documents/upload`.
+   - Error Class: `sqlalchemy.exc.DBAPIError` wrapping `(sqlalchemy.dialects.postgresql.asyncpg.Error)`
+   - Error Message: `expected 768 dimensions, not 3072`
+   - SQL: `INSERT INTO knowledge_chunks (chunk_id, parent_doc_id, ..., embedding, ...) VALUES (...) RETURNING knowledge_chunks.id`
+   - HTTP Status: `500 Internal Server Error`.
+3. Reproduction of Query Mismatch Behavior on Chat:
+   - Command: Sent chat question to `POST /api/v1/chat`.
+   - Observed: `search_similar_chunks` fails in PostgreSQL native search with dimension mismatch, aborts the asyncpg transaction block, causing in-memory cosine fallback to fail with `InFailedSQLTransactionError` and return `[]`.
+   - User Impact: Treated as out-of-scope (`is_fallback: False`, `confidence: 0.45`, `citations: []`, `escalation_recommended: True`). At request teardown, session commit raises `PendingRollbackError`.
+
+#### Task 2 — Implementation & Offline Verification
+- Configuration: Added `EMBEDDING_DIMENSIONS: int = 768` to `backend/app/core/config.py` and `backend/.env.example`.
+- ORM Models: Updated `FAQItem` and `KnowledgeChunk` in `backend/app/models/knowledge.py` to use `Vector(settings.EMBEDDING_DIMENSIONS)`.
+- Service Implementation:
+  * In `_call_gemini_embedding`, passed `output_dimensionality=settings.EMBEDDING_DIMENSIONS` (via `types.EmbedContentConfig` for `google.genai` and direct kwarg for `gai`).
+  * Implemented `_normalize_vector` with epsilon protection (`norm > 1e-12`).
+  * In `get_text_embedding`, added validation ensuring received vectors match `settings.EMBEDDING_DIMENSIONS`; mismatched vectors are rejected and logged at ERROR, falling back to deterministic pseudo-embeddings.
+  * In `search_similar_chunks`, guarded against mismatched query vector lengths and added session rollback on PostgreSQL error to prevent transaction poisoning.
+- Automated Platform Tests (`backend/tests/platform/test_embedding_dimension.py`):
+  * Unfixed code: `4 failed, 1 skipped in 6.90s` (proves tests detect the bug).
+  * Fixed code: `5 passed in 36.79s` (including `test_postgresql_store_and_query_768_vector` against PostgreSQL with `TEST_DATABASE_URL`).
+  * Full platform test suite: `pytest backend/tests/platform -q` -> `48 passed, 2 skipped in 33.24s`.
+
+#### Task 3 — Existing Data & Live Proof
+1. Docker DB Chunk Vectors Audit:
+   - `knowledge_chunks`: 13 rows total (all doc chunks, 768 dims).
+   - `faq_items`: 12 rows total (seed FAQs, 768 dims).
+   - Total items to re-embed: 25 items. Live-call budget: max 6 calls.
+   - Re-embedding all 25 items exceeds the live-call budget: `NOT DONE`.
+   - Exact command: `python backend/scripts/reembed_chunks.py`.
+2. Live Proof on PostgreSQL in Docker:
+   - Upload: `chinh_sach_supercare_2026.txt` uploaded to Workspace 1 (Document ID 7).
+   - Database verification: `SELECT id, chunk_id, document_id, vector_dims(embedding) FROM knowledge_chunks WHERE document_id = 7;` -> `vector_dims = 768` (1 row).
+   - Verification: `POST /api/v1/documents/7/verify` -> HTTP 200 (`passed`).
+   - Publishing: `POST /api/v1/documents/7/publish` -> HTTP 200 (`published`).
+   - Grounded RAG Query: `POST /api/v1/chat` -> HTTP 200, `is_fallback: False`, `confidence: 0.9`, top citation `doc-7-chk-1` (`chinh_sach_supercare_2026.txt - Trang 1 (Mục 1)`).
+   - Captured PostgreSQL SQL Statement:
+     ```sql
+     SELECT knowledge_chunks.id, knowledge_chunks.chunk_id, knowledge_chunks.parent_doc_id, 
+            knowledge_chunks.workspace_id, knowledge_chunks.document_id, knowledge_chunks.chunk_index, 
+            knowledge_chunks.page_number, knowledge_chunks.title, knowledge_chunks.content, 
+            knowledge_chunks.source_url, knowledge_chunks.embedding, knowledge_chunks.created_at, 
+            $1::INTEGER - (knowledge_chunks.embedding <=> $2) AS score, documents.status AS doc_status 
+     FROM knowledge_chunks 
+     LEFT OUTER JOIN documents ON knowledge_chunks.document_id = documents.id 
+     WHERE knowledge_chunks.workspace_id = $3::INTEGER 
+       AND (knowledge_chunks.document_id IS NULL OR documents.status = $4::VARCHAR) 
+     ORDER BY knowledge_chunks.embedding <=> $5
+     LIMIT 3;
+     ```
+   - Reset `log_statement`: `ALTER SYSTEM SET log_statement = 'none'; SELECT pg_reload_conf();` -> `SHOW log_statement;` confirmed `none`.
+   - Saved redacted outputs in `docs/audit/06-evidence/item-G2-live-embedding.txt`.
+
+
+
 
 

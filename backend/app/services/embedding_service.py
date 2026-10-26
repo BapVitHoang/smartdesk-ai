@@ -19,6 +19,16 @@ from app.models.document import Document
 logger = logging.getLogger("smartdesk.embedding")
 
 
+def _normalize_vector(vec: List[float]) -> List[float]:
+    """L2 normalize vector to unit magnitude, safe against division by zero."""
+    if not vec:
+        return []
+    norm = math.sqrt(sum(x * x for x in vec))
+    if norm > 1e-12:
+        return [round(x / norm, 6) for x in vec]
+    return vec
+
+
 class EmbeddingService:
     """Manages vector embeddings, rate limiting, and dual-mode vector search."""
 
@@ -27,6 +37,7 @@ class EmbeddingService:
         self.rate_limited_until: float = 0.0
         self.api_key: str = settings.GEMINI_API_KEY
         self.model_name: str = settings.EMBEDDING_MODEL_NAME
+        self.dimensions: int = settings.EMBEDDING_DIMENSIONS
         self._client: Any = None
 
         # Ollama local settings
@@ -68,20 +79,18 @@ class EmbeddingService:
             return False
         return time.time() < self.rate_limited_until
 
-    def generate_pseudo_embedding(self, text: str, dim: int = 768) -> List[float]:
+    def generate_pseudo_embedding(self, text: str, dim: Optional[int] = None) -> List[float]:
         """
-        Generate a deterministic 768-dimensional normalized unit vector based on text hash.
+        Generate a deterministic normalized unit vector based on text hash.
         Used as zero-cost, high-reliability fallback during rate-limit cooldown or offline mode.
         """
+        target_dim = dim or settings.EMBEDDING_DIMENSIONS
         seed_hash = hashlib.sha256(text.encode("utf-8")).digest()
         seed_int = int.from_bytes(seed_hash[:8], byteorder="big")
         rng = random.Random(seed_int)
 
-        vec = [rng.gauss(0.0, 1.0) for _ in range(dim)]
-        norm = math.sqrt(sum(x * x for x in vec))
-        if norm > 0:
-            vec = [round(x / norm, 6) for x in vec]
-        return vec
+        vec = [rng.gauss(0.0, 1.0) for _ in range(target_dim)]
+        return _normalize_vector(vec)
 
     @staticmethod
     def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
@@ -105,7 +114,14 @@ class EmbeddingService:
         safe_text = redact_pii(text)
 
         if self.provider == "ollama":
-            return await self._call_ollama_embedding(safe_text)
+            raw_emb = await self._call_ollama_embedding(safe_text)
+            if not raw_emb or len(raw_emb) != settings.EMBEDDING_DIMENSIONS:
+                logger.error(
+                    f"Ollama embedding dimension mismatch: expected {settings.EMBEDDING_DIMENSIONS}, "
+                    f"got {len(raw_emb) if raw_emb else 0}. Falling back to pseudo-embedding."
+                )
+                return self.generate_pseudo_embedding(safe_text, dim=settings.EMBEDDING_DIMENSIONS)
+            return _normalize_vector(raw_emb)
 
         if self.is_rate_limited():
             logger.debug("[Cost-Guard] Embedding rate-limit cooldown active. Using pseudo-embedding.")
@@ -115,10 +131,17 @@ class EmbeddingService:
             return self.generate_pseudo_embedding(safe_text)
 
         try:
-            return await asyncio.wait_for(
+            raw_emb = await asyncio.wait_for(
                 self._call_gemini_embedding(safe_text),
                 timeout=min(2.0, settings.LLM_TIMEOUT_SECONDS)
             )
+            if not raw_emb or len(raw_emb) != settings.EMBEDDING_DIMENSIONS:
+                logger.error(
+                    f"Gemini embedding dimension mismatch: expected {settings.EMBEDDING_DIMENSIONS}, "
+                    f"got {len(raw_emb) if raw_emb else 0}. Falling back to pseudo-embedding."
+                )
+                return self.generate_pseudo_embedding(safe_text, dim=settings.EMBEDDING_DIMENSIONS)
+            return _normalize_vector(raw_emb)
         except Exception as exc:
             err_str = str(exc)
             if "429" in err_str or "ResourceExhausted" in err_str or "quota" in err_str.lower():
@@ -164,12 +187,15 @@ class EmbeddingService:
         return [self.generate_pseudo_embedding(t) for t in texts]
 
     async def _call_gemini_embedding(self, text: str) -> List[float]:
-        """Synchronous wrapper for Gemini Embedding SDK calls."""
+        """Synchronous wrapper for Gemini Embedding SDK calls with explicit output dimensionality."""
         if self._sdk_type == "genai":
             def _sync_call() -> List[float]:
+                from google.genai import types
+                config = types.EmbedContentConfig(output_dimensionality=settings.EMBEDDING_DIMENSIONS)
                 result = self._client.models.embed_content(
                     model=self.model_name,
-                    contents=text
+                    contents=text,
+                    config=config
                 )
                 if hasattr(result, "embedding") and result.embedding:
                     return result.embedding.values or []
@@ -184,7 +210,8 @@ class EmbeddingService:
                 result = self._client.embed_content(
                     model=f"models/{self.model_name}",
                     content=text,
-                    task_type="retrieval_document"
+                    task_type="retrieval_document",
+                    output_dimensionality=settings.EMBEDDING_DIMENSIONS
                 )
                 return result.get("embedding", [])
             emb = await asyncio.to_thread(_sync_call)
@@ -243,6 +270,12 @@ class EmbeddingService:
             return []
 
         query_vector = await self.get_text_embedding(query)
+        if not query_vector or len(query_vector) != settings.EMBEDDING_DIMENSIONS:
+            logger.error(
+                f"Query vector dimension mismatch: received {len(query_vector) if query_vector else 0}, "
+                f"expected {settings.EMBEDDING_DIMENSIONS}. Using pseudo-embedding fallback."
+            )
+            query_vector = self.generate_pseudo_embedding(query, dim=settings.EMBEDDING_DIMENSIONS)
 
         # Detect dialect to determine if PostgreSQL pgvector can be used
         is_postgres = False
@@ -288,6 +321,10 @@ class EmbeddingService:
                 return scored_chunks
             except Exception as pg_err:
                 logger.warning(f"PostgreSQL pgvector native search failed ({pg_err}). Falling back to memory cosine.")
+                try:
+                    await session.rollback()
+                except Exception:
+                    pass
 
         # 2. SQLite / In-memory Fallback Search
         stmt = (
