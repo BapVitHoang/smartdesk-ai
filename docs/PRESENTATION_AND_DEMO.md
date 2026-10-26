@@ -2,7 +2,10 @@
 
 > **Môn học:** Các Hệ thống AI Ứng dụng & Agentic Nâng cao (Advanced Agentic & Applied AI Systems)  
 > **Dự án:** SmartDesk AI – Intelligent Customer Support & Knowledge Synthesizer  
-> **Nhóm thực hiện:** Nhóm 3 / Developer C (`@TKhanh`), Nhóm 1 / Dev A (`@TheOrijinnn`), Nhóm 2 / Dev B (`@BapVitHoang`)
+> **Nhóm thực hiện (Thông tin chính thức từ docs/TEAM_ROSTER.md):**  
+> - **Ngô Việt Hoàng** (MSSV: **23110020**) — Dev B & Integrator ([`@BapVitHoang`](https://github.com/BapVitHoang))  
+> - **Lê Nguyên** (MSSV: **23110043**) — Dev A ([`@TheOrijinnn`](https://github.com/TheOrijinnn))  
+> - **Tống Gia Khánh** (MSSV: **23110032**) — Dev C ([`@TKhanh`](https://github.com/TKhanh))
 
 ---
 
