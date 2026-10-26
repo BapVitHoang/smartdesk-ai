@@ -168,5 +168,35 @@ Khi Hội đồng bảo vệ yêu cầu sửa đổi trực tiếp mã nguồn �
   4. Lưu tệp. Vào chat hỏi: `"Hệ thống máy chủ hiện tại có đang hoạt động ổn định không?"`, chatbot sẽ tự động gọi tool và thông báo máy chủ đang ONLINE.
 
 ---
+
+## PHẦN 4: NGÂN HÀNG CÂU HỎI & KỊCH BẢN BẢO VỆ CÁ NHÂN 12 PHÚT (12-MINUTE INDIVIDUAL DEFENSE Q&A PREP)
+
+Mỗi thành viên có 4 phút trả lời vấn đáp cá nhân trực tiếp với Hội đồng phản biện về module mình làm chủ (tổng cộng 12 phút). Dưới đây là các câu hỏi trọng tâm và cấu trúc trả lời chuẩn:
+
+### 1. Lê Nguyên (MSSV: 23110043) — Phụ trách AI Engine, RAG & Verification
+- **Câu hỏi 1: "Tại sao nhóm chọn mô hình Gemini 3.5 Flash Lite thay vì các mô hình lớn hơn như Gemini Pro hay GPT-4o?"**
+  - *Trả lời:* Nhóm đặt mục tiêu First Response Time < 1,500ms cho bài toán CSKH theo chuẩn SLA thời gian thực. `gemini-3.5-flash-lite` với thiết lập `thinking_budget=0` đạt độ trễ sinh từ trung bình ~922ms, trích xuất cấu trúc Pydantic v2 trong 1 lệnh gọi (single-call) và chi phí cực thấp ($0.30/1M input, $2.50/1M output), tiết kiệm hơn 85% so với dòng Pro trong khi vẫn đạt 100% độ chính xác trên bộ 24 test cases của đề tài.
+- **Câu hỏi 2: "Cơ chế 3-Agent Active Verification hoạt động như thế nào để ngăn chặn dữ liệu bẩn?"**
+  - *Trả lời:* Khi tài liệu mới được tải lên, thay vì lưu ngay vào vector database, 3 tác tử AI thực hiện: (1) Generator tạo 3 câu hỏi tổng hợp từ tài liệu; (2) Resolver truy vấn RAG giả lập lấy câu trả lời; (3) Judge chấm điểm độ trung thực (Faithfulness Score 0.0–1.0) và trích xuất bằng chứng đối chiếu. Chỉ tài liệu đạt ngưỡng phê duyệt của Quản trị viên mới được lập chỉ mục phục vụ khách hàng.
+- **Câu hỏi 3: "Hàng rào bảo vệ chống Prompt Injection được thiết kế ra sao?"**
+  - *Trả lời:* Hàm `check_prompt_injection` trong `core/security.py` quét qua 2 tầng: tầng regex/heuristic phát hiện các mẫu câu chiếm quyền điều khiển bằng cả tiếng Anh và tiếng Việt (như 'quên hết các hướng dẫn trước đó', 'bỏ qua vai trò', 'system override'), sau đó từ chối ngay lập tức với mã lỗi HTTP 400 `PROMPT_SECURITY_VIOLATION` trước khi bất kỳ token nào được gửi tới LLM.
+
+### 2. Ngô Việt Hoàng (MSSV: 23110020) — Phụ trách Platform, Database, Security & Integration
+- **Câu hỏi 1: "Cơ chế Dual-Engine Vector Store giữa PostgreSQL pgvector và SQLite hoạt động như thế nào?"**
+  - *Trả lời:* Trong môi trường triển khai Production/Docker Compose, hệ thống sử dụng PostgreSQL 16 với phần mở rộng `pgvector` và chỉ mục `HNSW` (Hierarchical Navigable Small World) để tìm kiếm vector 768 chiều với khoảng cách Cosine Distance. Khi chạy trên môi trường phát triển cục bộ không có Docker, hệ thống tự động phát hiện và chuyển sang SQLite bất đồng bộ (`aiosqlite`), đồng thời tính khoảng cách Cosine Distance thuần bằng Python `numpy`/mã thuần nhằm đảm bảo trải nghiệm Zero-Config cho toàn đội ngũ.
+- **Câu hỏi 2: "Tại sao nhóm cần mạch ngắt Cost-Guard Circuit Breaker và nó vận hành ra sao?"**
+  - *Trả lời:* Khi sử dụng gói Google Gemini miễn phí hoặc gặp sự cố quá tải, mã lỗi HTTP 429 (`ResourceExhausted`) có thể làm tắc nghẽn toàn bộ dịch vụ. Cost-Guard Circuit Breaker tự động khóa provider đám mây trong 60 giây (`FREE_TIER_RATE_LIMIT_COOLDOWN = 60s`), lập tức chuyển hướng mọi truy vấn sang bộ so khớp xác định Okapi BM25 trên tập dữ liệu FAQ chuẩn `seed_faq.json` với độ trễ < 10ms. Quản trị viên cũng có thể chủ động bấm 'Reset Cooldown' trên giao diện Telemetry sau khi nạp thêm quota.
+- **Câu hỏi 3: "Việc phân quyền RBAC và cách ly dữ liệu giữa các Workspace được đảm bảo như thế nào?"**
+  - *Trả lời:* Mỗi yêu cầu API được bảo vệ bởi JSON Web Token (JWT) với thuật toán HMAC-SHA256, hạn dùng 8 giờ. Hệ thống trích xuất thông tin người dùng từ token qua dependency `get_current_user`. Với khách hàng thường (`role: user`), truy vấn chỉ trả về các ticket có `customer_id` trùng khớp. Với quản trị viên (`role: admin`), hệ thống cho phép thao tác duyệt ticket và chỉnh sửa workspace. Mọi truy vấn RAG đều bắt buộc có điều kiện `workspace_id` nhằm đảm bảo 0% rò rỉ chéo giữa các doanh nghiệp.
+
+### 3. Tống Gia Khánh (MSSV: 23110032) — Phụ trách Frontend SPA, UX & Documentation
+- **Câu hỏi 1: "Tại sao nhóm quyết định sử dụng React 19 + Vite 6 Single Page Application thay vì Next.js?"**
+  - *Trả lời:* Theo quyết định kiến trúc ADR-004, ứng dụng SmartDesk AI là một bảng điều khiển nội bộ dành cho tổng đài viên và khách hàng có xác thực, không yêu cầu tối ưu hóa công cụ tìm kiếm (SEO) hay Server-Side Rendering (SSR). Kiến trúc React 19 SPA chạy hoàn toàn phía client giúp đơn giản hóa pipeline build, loại bỏ node server phụ trợ, và cho phép nạp dữ liệu offline mượt mà khi backend mất kết nối.
+- **Câu hỏi 2: "Trải nghiệm Server-Sent Events (SSE) Streaming và Thẻ xác nhận 2 pha được xử lý như thế nào?"**
+  - *Trả lời:* Endpoint `POST /api/v1/chat/stream` phát dữ liệu theo định dạng text/event-stream. Frontend đọc luồng qua `ReadableStreamDefaultReader`, hiển thị từng chữ cái với hiệu ứng gõ mượt mà. Khi AI Agent đề xuất một thao tác thay đổi dữ liệu (như đóng ticket, hủy đơn hàng), hệ thống không tự ý thực thi mà trả về payload thẻ `PendingAction`. Giao diện hiển thị Thẻ xác nhận trực quan với 2 nút 'Xác nhận' và 'Từ chối' để người dùng kiểm soát 100% rủi ro (Human-in-the-loop).
+- **Câu hỏi 3: "Làm thế nào để ứng dụng xử lý tình huống mất kết nối mạng hoặc Backend gặp sự cố?"**
+  - *Trả lời:* Client service tuân thủ nguyên tắc Dual-Mode Graceful Fallback. Khi `fetchWithTimeout` bắt được lỗi mạng (`TypeError` hoặc quá thời gian chờ 4.0s), ứng dụng không gây lỗi màn hình trắng mà tự động chuyển sang đọc dữ liệu mẫu `frontend/src/data.ts`, đồng thời hiển thị thanh thông báo Toast màu hổ phách giải thích hệ thống đang chạy ở chế độ cục bộ để người dùng tiếp tục thao tác mà không bị gián đoạn công việc.
+
+---
 *Kịch bản và Playbook đã sẵn sàng phục vụ buổi bảo vệ đồ án chính thức.*
 

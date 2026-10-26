@@ -50,7 +50,7 @@ Trong kỷ nguyên số, bộ phận Chăm sóc Khách hàng (Customer Support) 
 Dự án được thực hiện bởi nhóm 3 thành viên theo phân quyền module cụ thể:
 - **Ngô Việt Hoàng (MSSV: 23110020) — Dev B & Integrator ([`@BapVitHoang`](https://github.com/BapVitHoang)):**
   - Chịu trách nhiệm: Nền tảng Backend, Kiến trúc cơ sở dữ liệu (PostgreSQL 16 pgvector & SQLite fallback), Xác thực OAuth2/JWT & phân quyền RBAC, Quản trị Ticket CRUD, Docker Compose và quản trị các tệp hợp đồng dùng chung (Frozen Contracts).
-  - Đóng góp Git: 104 commits trên nhánh hiện tại (`docs/final-documents`), 114 commits trên toàn bộ repository.
+  - Đóng góp Git: 114 commits trên nhánh hiện tại (`docs/final-documents`), 124 commits trên toàn bộ repository.
 - **Lê Nguyên (MSSV: 23110043) — Dev A ([`@TheOrijinnn`](https://github.com/TheOrijinnn)):**
   - Chịu trách nhiệm: Lõi trí tuệ nhân tạo (AI Engine), Pipeline RAG, Trích xuất dữ liệu cấu trúc Pydantic v2 (Single-call Structured Output), 4 Agent Tools với cơ chế Thẻ xác nhận 2 pha, Hàng rào bảo vệ Prompt Injection song ngữ và Bộ dữ liệu đánh giá 24 test cases.
   - Đóng góp Git: 9 commits trên nhánh hiện tại, 10 commits trên toàn bộ repository.
