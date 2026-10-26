@@ -848,11 +848,39 @@ Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
   3. Đối với nhân viên hỗ trợ / Quản trị viên (`role == "admin"`):
      - Cho phép giữ nguyên `customer_email` và `customer_name` từ payload để hỗ trợ viên có thể tiếp nhận và ghi nhận ticket thay cho khách hàng qua điện thoại/kênh khác.
 
-### 4.8 Cấu hình Nginx SSE Streaming không bộ đệm (`proxy_buffering off;`)
-- **Tối ưu truyền phát thời gian thực:**
-  - Nginx mặc định kích hoạt bộ đệm (`proxy_buffering on;`), gom các gói tin nhỏ lại trước khi gửi về client, khiến tính năng truyền token từng chữ (Token-by-Token Streaming) của AI Chat bị giật hoặc hiển thị cả đoạn văn bản cùng lúc.
-  - Trong `frontend/nginx.conf`, khối `location /api/v1/` đã được bổ sung chỉ thị `proxy_buffering off;`, cùng với `proxy_read_timeout 300s;` và `proxy_send_timeout 300s;`.
-  - Kết quả kiểm thử thực tế qua container chứng minh gói tin đầu tiên (`event: metadata`) phản hồi chỉ trong 0.096 giây và các gói tin `event: token` liên tục truyền trực tiếp đến trình duyệt mà không hề bị giữ lại.
+
+### 4.9 Tái thẩm tra toàn diện theo Đề cương yêu cầu chính thức (Prompt 4b)
+- **Bối cảnh & Mục tiêu:**
+  - Hoàn thiện tái thẩm tra đối chiếu với nguồn sự thật duy nhất của môn học (`docs/audit/00-checklist.md`), khắc phục triệt để các bảng yêu cầu cũ tự sinh.
+  - Trích xuất nguyên văn toàn bộ 42 Yêu cầu tường minh (`REQ-01` đến `REQ-42`) và 10 Tiêu chí chấm điểm / Điểm trừ (`CRIT-01` đến `CRIT-10`) vào tệp `docs/audit/06-requirements-extract.md`.
+  - Tái cấu trúc Bảng tuân thủ yêu cầu và Mục tiêu chí đánh giá trong `docs/audit/06-final-verification.md`, xóa bỏ hoàn toàn các điểm số tự phong dạng "x/10", thay thế bằng nhận định định tính dựa trên bằng chứng lệnh thực thi đã chạy xong.
+- **Kết quả thực thi & Bằng chứng thực tế:**
+  1. **Task 0 (Preconditions Baseline):**
+     - Nhánh kiểm tra: `verify/final-verification-2` tạo từ `origin/Hoang` (`4e514db`).
+     - Pytest Backend: 139 passed, 2 skipped trong 45.12s.
+     - Frontend: `npm run lint` đạt 0 lỗi, `npm run build` thành công trong 9.41s.
+     - Docker containers: 3 dịch vụ (`smartdesk-postgres`, `smartdesk-backend`, `smartdesk-frontend`) đều hoạt động ổn định và probe `/api/v1/health` trả về `status: ok, database: connected`.
+     - `check_ownership.py --verify-consistency`: Đạt 261 tệp có phân quyền, 0 chồng lấn.
+     - `check_roster.py`: Đúng 12 lỗi tồn tại duy nhất trong 2 tệp nhị phân slide (`MRG-DEF-01`), 0 lỗi trong mã nguồn và tài liệu markdown.
+  2. **Task 1 & Task 2 (Trích xuất & Tái cấu trúc Bảng REQ):**
+     - Tạo `docs/audit/06-requirements-extract.md` đối chiếu nguyên văn 100% khớp từng ký tự với `docs/audit/00-checklist.md`.
+     - Tái cấu trúc Table 3.1: 40 yêu cầu đạt `DONE`, 1 yêu cầu đạt `PARTIAL` (`REQ-41` do slide nhị phân), 1 yêu cầu `NOT SELECTED` (`REQ-16` Năng lực D Đa phương thức OCR).
+     - Ghi nhận rõ: Theo `REQ-12`, nhóm 3 thành viên cần tối thiểu 3 năng lực AI, SmartDesk AI đã triển khai 4 năng lực (A: RAG, B: Công cụ Agent, C: Dữ liệu cấu trúc Pydantic, E: Luồng đa Agent kiểm định), vượt mức tối thiểu yêu cầu.
+  3. **Task 3 (Tiêu chí chấm điểm CRIT-01..10):**
+     - Đưa toàn bộ trọng số chính thức vào tài liệu, bỏ hẳn điểm số tự phong dạng số.
+     - Không bị phạt theo `CRIT-09` (`AI_USAGE.md` đầy đủ 5 ca thất bại thực tế) và `CRIT-10` (0 bí mật/khóa API bị lộ trong lịch sử Git).
+  4. **Task 4 (Thực thi & Thu thập bằng chứng thực tế):**
+     - Phân trang & X-Total-Count: Lưu vào `docs/audit/06-evidence/item-C-tickets.txt`.
+     - Live RAG Chat trên PostgreSQL: Lưu vào `docs/audit/06-evidence/item-D-chat.txt`.
+     - Upload tài liệu & Active verification: Lưu vào `docs/audit/06-evidence/item-G-documents.txt`.
+     - Quyền hạn công cụ & Chặn chéo tài khoản: Kiểm thử xác nhận hành động giữa hai tài khoản, trả về đúng `HTTP 403 ACTION_FORBIDDEN` khi người dùng khác cố xác nhận hành động không thuộc về mình (`docs/audit/06-evidence/item-F-tools.txt`).
+     - Admin AI Telemetry & Reset Cooldown: Kiểm thử `/api/v1/agent/ai-usage` và `/api/v1/agent/reset-cooldown` ghi nhận trong `docs/audit/06-evidence/item-I-telemetry.txt`.
+     - Khử trùng nhạy cảm: Toàn bộ JWT và mật khẩu được thay thế bằng `[REDACTED_JWT_TOKEN]` và `[REDACTED_SECRET]`.
+  5. **Task 5 (Kiểm toán báo cáo đánh giá & Ảnh chụp màn hình):**
+     - Làm rõ baseline 8/24 trong `A-eval-report.md` chạy từ hàm mô phỏng `run_legacy_baseline_case()` (FAQ matcher + regex tiếng Anh của mã nguồn cũ), không có tập dữ liệu held-out riêng biệt.
+     - Kiểm toán 14 tệp ảnh màn hình trong `docs/evidence/` khớp các kịch bản kiểm thử chấp nhận.
+  6. **Review Loop & Authorship:**
+     - Cả 4 subagent đánh giá chuyên sâu (Ownership Hunter, Requirements Auditor, Security Reviewer, Skeptical Verifier) đều báo cáo ALL PASS sau khi hợp nhất đầy đủ dữ liệu bằng chứng hỗn hợp và cập nhật số commit lên 129 (111 Bap, 10 TheOrijinnn, 8 TKhanhJK).
 
 
 
