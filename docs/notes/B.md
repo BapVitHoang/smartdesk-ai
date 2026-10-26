@@ -1071,6 +1071,33 @@ Table auditing all cross-document claims across `README.md`, `docs/PROPOSAL.md`,
     ```
   - Round-trip latency measured: `1150.06 ms` (< 1,500ms target).
 
+---
+
+## Task 5: Publication and PR Preparation
+
+- **Branch:** `docs/final-documents` branched from `origin/Hoang` (`b77376c`).
+- **Commits Overview:**
+  - `738c59d`: docs(notes): record prompt 5 plan and task 0 preconditions
+  - `2539556`: chore(tools): add docs/tools ownership and verify_rtm script
+  - `412aa00`: docs(report): align REPORT.md with 42-req RTM, eval breakdown and limitations
+  - `b3e3276`: docs(notes): record prompt 5 task 1 claims table and task 2 report alignment
+  - `6e05ab6`: chore(tools): add build_report_pdf and build_slides reproducible generators
+  - `f7e0b04`: docs(deliverables): rebuild REPORT.pdf (11 pages) and SLIDES.pptx/pdf (15 slides)
+  - `ab42b27`: docs(notes): record prompt 5 task 3 deliverable rebuild evidence
+  - `75b3007`: chore(tools): add verify_live_changes automated scratch verification script
+  - `2102390`: docs(presentation): align PRESENTATION_AND_DEMO.md roster facts and live demo script
+  - `c28119c`: docs(notes): record prompt 5 task 4 live change execution evidence
+- **Quality Gates Verification:**
+  - Automated RTM Check: `python docs/tools/verify_rtm.py` -> `SUCCESS: 100% of RTM table entries (42/42) verified successfully!`
+  - Anti-Fabrication Check: `python scripts/check_roster.py` -> `[PASS] Anti-Fabrication & Roster Gate passed cleanly (0 violations).` (Fixed `MRG-DEF-01`).
+  - Pytest Suite: `pytest backend/tests/ -q` -> `139 passed, 2 skipped in 56.94s`.
+  - Frontend Build: `npm run lint --prefix frontend; npm run build --prefix frontend` verified passing.
+  - Ownership Boundaries: Verified with `check_ownership.py` for all commits.
+- **PR Title & Review Note:**
+  - Title: `docs(final): formal capstone deliverables (report, slides, live-change playbook)`
+  - Description: *"Prepared by Hoàng with an AI agent; TKhanhJK and TheOrijinnn review the report and slides before merge."*
+
+
 
 
 
