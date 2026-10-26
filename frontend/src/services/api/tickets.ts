@@ -330,11 +330,12 @@ export async function updateTicketStatus(
 
   try {
     const backendStatus = mapFrontendStatusToBackend(status);
+    const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/tickets/${encodeURIComponent(cleanId)}`,
       {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           status: backendStatus,
           ai_draft_reply: aiDraftReply,
@@ -414,16 +415,19 @@ export async function regenerateAiDraft(
   const cleanId = String(ticketId).replace(/^#/, '');
 
   try {
+    const headers = getAuthHeaders();
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/agent/tickets/${encodeURIComponent(cleanId)}/generate-draft`,
       {
         method: 'POST',
+        headers,
       },
       8000
     );
 
     if (!res.ok) {
-      throw new Error(`Server returned HTTP ${res.status}`);
+      const errData = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, errData.detail || `Lỗi máy chủ: HTTP ${res.status}`);
     }
 
     const data: BackendTicketResponse = await res.json();
@@ -435,6 +439,11 @@ export async function regenerateAiDraft(
 
     return updated;
   } catch (error: any) {
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi sinh bản thảo AI: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
+
     toastFn(
       'Máy chủ ngoại tuyến, AI Copilot đã tạo bản thảo phản hồi cục bộ.',
       'warning'

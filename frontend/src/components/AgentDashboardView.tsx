@@ -156,7 +156,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
       setSelectedTicket(updated);
       onToast(`Đã cập nhật trạng thái #${selectedTicket.id} sang ${newStatus}!`, 'info');
     } catch {
-      onUpdateTicketStatus(selectedTicket.id, newStatus, agentReplyText);
+      // Keep UI state synchronized with server truth; do not apply status change when API call fails
     }
   };
 
