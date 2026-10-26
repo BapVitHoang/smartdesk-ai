@@ -181,6 +181,7 @@
 /frontend/package-lock.json                   @BapVitHoang  # integrator
 /frontend/package.json                        @BapVitHoang  # integrator
 /frontend/src/types.ts                        @BapVitHoang  # integrator
+/frontend/src/vite-env.d.ts                   @BapVitHoang  # integrator
 /frontend/src/services/api.ts                 @BapVitHoang  # integrator
 /frontend/src/services/api/client.ts          @BapVitHoang  # integrator
 /frontend/src/services/api/index.ts           @BapVitHoang  # integrator

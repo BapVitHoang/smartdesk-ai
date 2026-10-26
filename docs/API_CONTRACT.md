@@ -440,9 +440,17 @@ Safely delete a document with cascade cleanup of all associated chunks, verifica
 ## 8. Authentication & RBAC (Hybrid OAuth2 & JWT)
 
 ### `POST /api/v1/auth/oauth2/login`
-Authenticate via Google OAuth2 ID Token or 1-click Demo accounts (`admin@smartdesk.ai` or `an.nguyen@company.vn`).
+Authenticate via Google Identity Services (GIS) ID Token or 1-click Demo accounts (`admin@smartdesk.ai` or `an.nguyen@company.vn`).
 
-#### Request Body
+#### Request Body - Google ID Token (Production & Development)
+```json
+{
+  "provider": "google",
+  "credential": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEy..."
+}
+```
+
+#### Request Body - Demo Account (Non-production environments only)
 ```json
 {
   "provider": "demo",
@@ -451,20 +459,30 @@ Authenticate via Google OAuth2 ID Token or 1-click Demo accounts (`admin@smartde
 ```
 
 #### Response (HTTP 200 OK)
+Standardized single response schema for all authentication endpoints:
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "bearer",
-  "expires_in": 86400,
   "user": {
     "id": 1,
     "email": "admin@smartdesk.ai",
     "full_name": "Quản trị viên SmartDesk",
     "role": "admin",
+    "workspace_id": 1,
+    "avatar_url": "https://lh3.googleusercontent.com/a/...",
     "is_active": true
-  }
+  },
+  "role": "admin",
+  "email": "admin@smartdesk.ai",
+  "full_name": "Quản trị viên SmartDesk"
 }
 ```
+
+#### Error Responses
+- `HTTP 400 Bad Request`: `{"detail": "Email Google chưa được xác thực (email_verified=False)."}` hoặc thiếu credential/sub.
+- `HTTP 401 Unauthorized`: `{"detail": "Google ID Token không hợp lệ hoặc đã hết hạn."}`.
+- `HTTP 403 Forbidden`: `{"detail": "Tính năng Đăng nhập Demo bị vô hiệu hóa trên môi trường production."}` hoặc `{"detail": "Tài khoản đã bị vô hiệu hóa."}`.
 
 ---
 
@@ -498,6 +516,8 @@ Retrieve currently authenticated user profile.
   "full_name": "Nguyễn Văn An",
   "role": "user",
   "workspace_id": 1,
-  "oauth_provider": "demo"
+  "oauth_provider": "google",
+  "avatar_url": "https://lh3.googleusercontent.com/a/...",
+  "is_active": true
 }
 ```

@@ -25,13 +25,16 @@ async def get_current_user(
     """
     Resolves the authenticated User from the Bearer JWT token.
     - Decodes HS256 JWT signed with settings.JWT_SECRET_KEY.
-    - Retains backward compatibility for demo tokens ('demo_jwt_token_for_{email}').
+    - Retains backward compatibility for demo tokens ('demo_jwt_token_for_{email}') in non-production.
+    - Blocks demo tokens and dev bypass in production (ENVIRONMENT == 'production').
     - Returns HTTP 401 Unauthorized if token is missing, invalid, or expired.
-    - Allows DEV_AUTH_BYPASS only if explicitly configured in settings.
+    - Enforces is_active check (HTTP 403 Forbidden).
     """
+    is_prod = settings.ENVIRONMENT.lower() == "production"
+
     if not credentials or not credentials.credentials:
-        if settings.DEV_AUTH_BYPASS:
-            # Temporary development bypass (must never be True in production)
+        if settings.DEV_AUTH_BYPASS and not is_prod:
+            # Temporary development bypass (strictly forbidden in production)
             return User(
                 id=1,
                 email="admin@smartdesk.ai",
@@ -39,6 +42,7 @@ async def get_current_user(
                 role="admin",
                 oauth_provider="demo",
                 workspace_id=1,
+                is_active=True,
             )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -48,16 +52,28 @@ async def get_current_user(
 
     token = credentials.credentials.strip()
 
-    # 1. Backward compatibility for legacy test demo tokens
+    # 1. Backward compatibility for legacy test demo tokens (FORBIDDEN IN PRODUCTION)
     if token.startswith("demo_jwt_token_for_"):
+        if is_prod:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Demo token không được phép sử dụng trên môi trường production.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         email = token.replace("demo_jwt_token_for_", "").strip().lower()
-        role = "admin" if "admin" in email else "user"
+        role = "admin" if ("admin" in email or email in settings.ADMIN_EMAILS) else "user"
         full_name = "Quản trị viên SmartDesk" if role == "admin" else "Nguyễn Văn An"
 
         # Check DB to get real user ID/workspace_id if available
         res = await db.execute(select(User).where(User.email == email))
         existing_user = res.scalars().first()
         if existing_user:
+            if not existing_user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Tài khoản đã bị vô hiệu hóa.",
+                )
             return existing_user
 
         return User(
@@ -67,6 +83,7 @@ async def get_current_user(
             role=role,
             oauth_provider="demo",
             workspace_id=1,
+            is_active=True,
         )
 
     # 2. Real HS256 JWT verification
@@ -93,6 +110,11 @@ async def get_current_user(
         res = await db.execute(select(User).where(User.email == email))
         user = res.scalars().first()
         if user:
+            if not user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Tài khoản đã bị vô hiệu hóa.",
+                )
             return user
 
         # Fallback to User instance constructed from validated claims
@@ -103,6 +125,7 @@ async def get_current_user(
             role=role,
             oauth_provider="jwt",
             workspace_id=workspace_id,
+            is_active=True,
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -130,3 +153,6 @@ def require_role(required_role: str) -> Callable:
         return current_user
 
     return role_checker
+
+
+require_admin = require_role("admin")

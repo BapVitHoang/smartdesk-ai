@@ -162,6 +162,7 @@ OWNERSHIP_MAP = {
         "frontend/package.json",
         "frontend/src/types.ts",
         "frontend/src/types/*",
+        "frontend/src/vite-env.d.ts",
         "frontend/src/services/api.ts",
         "frontend/src/services/api/client.ts",
         "frontend/src/services/api/index.ts",

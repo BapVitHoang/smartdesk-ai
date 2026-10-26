@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 import pytest
 import jwt
 from httpx import AsyncClient
@@ -81,6 +82,7 @@ def test_create_access_token_hs256() -> None:
         role="admin",
         oauth_provider="demo",
         workspace_id=1,
+        is_active=True,
     )
     token = create_access_token(user)
     assert isinstance(token, str)
@@ -102,8 +104,9 @@ async def test_oauth2_login_and_jwt_issuance(unauth_client: AsyncClient) -> None
     )
     assert res_admin.status_code == 200
     data_admin = res_admin.json()
+    assert data_admin["user"]["role"] == "admin"
+    assert data_admin["user"]["email"] == "admin@smartdesk.ai"
     assert data_admin["role"] == "admin"
-    assert data_admin["email"] == "admin@smartdesk.ai"
     admin_token = data_admin["access_token"]
     decoded_admin = jwt.decode(admin_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     assert decoded_admin["sub"] == "admin@smartdesk.ai"
@@ -116,8 +119,8 @@ async def test_oauth2_login_and_jwt_issuance(unauth_client: AsyncClient) -> None
     )
     assert res_user.status_code == 200
     data_user = res_user.json()
-    assert data_user["role"] == "user"
-    assert data_user["email"] == "an.nguyen@company.vn"
+    assert data_user["user"]["role"] == "user"
+    assert data_user["user"]["email"] == "an.nguyen@company.vn"
 
 
 @pytest.mark.asyncio
@@ -129,8 +132,8 @@ async def test_oauth2_password_grant_token(unauth_client: AsyncClient) -> None:
     )
     assert res.status_code == 200
     data = res.json()
-    assert data["role"] == "user"
-    assert data["email"] == "an.nguyen@company.vn"
+    assert data["user"]["role"] == "user"
+    assert data["user"]["email"] == "an.nguyen@company.vn"
     assert "access_token" in data
 
 
@@ -162,6 +165,195 @@ async def test_unauthorized_access_without_token(unauth_client: AsyncClient) -> 
     tickets_res = await unauth_client.get("/api/v1/tickets")
     assert tickets_res.status_code == 401
 
+
+# =========================================================================
+# Google OAuth2 Verified ID Token Tests (google.oauth2.id_token.verify_oauth2_token)
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_google_oauth2_login_new_user_success(unauth_client: AsyncClient) -> None:
+    """Verify verified Google ID token creates new user with role 'user', google_sub, and avatar."""
+    mock_payload = {
+        "sub": "google-sub-10001",
+        "email": "new.customer@gmail.com",
+        "name": "Trần Thị Khách Hàng",
+        "picture": "https://lh3.googleusercontent.com/a/avatar123",
+        "email_verified": True,
+        "iss": "https://accounts.google.com",
+    }
+
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value=mock_payload):
+        res = await unauth_client.post(
+            "/api/v1/auth/oauth2/login",
+            json={"provider": "google", "credential": "valid.mocked.google.jwt"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+        assert data["user"]["email"] == "new.customer@gmail.com"
+        assert data["user"]["full_name"] == "Trần Thị Khách Hàng"
+        assert data["user"]["role"] == "user"
+        assert data["user"]["avatar_url"] == "https://lh3.googleusercontent.com/a/avatar123"
+        assert data["user"]["is_active"] is True
+
+
+@pytest.mark.asyncio
+async def test_google_oauth2_login_account_linking_by_email(unauth_client: AsyncClient) -> None:
+    """Verify Google login links google_sub to existing account matching email address."""
+    # First create an account via demo login
+    await unauth_client.post(
+        "/api/v1/auth/oauth2/login",
+        json={"provider": "demo", "email": "link.target@company.vn"}
+    )
+
+    mock_payload = {
+        "sub": "google-sub-linked-999",
+        "email": "link.target@company.vn",
+        "name": "Target Account",
+        "picture": "https://lh3.googleusercontent.com/a/linked_pic",
+        "email_verified": True,
+    }
+
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value=mock_payload):
+        res = await unauth_client.post(
+            "/api/v1/auth/oauth2/login",
+            json={"provider": "google", "credential": "mocked.token"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["user"]["email"] == "link.target@company.vn"
+        assert data["user"]["full_name"] == "Target Account"
+        assert data["user"]["avatar_url"] == "https://lh3.googleusercontent.com/a/linked_pic"
+
+
+@pytest.mark.asyncio
+async def test_google_oauth2_login_overwrites_existing_full_name_with_google_name(unauth_client: AsyncClient) -> None:
+    """Verify Google login overwrites old seed/demo full_name with real Google display name."""
+    # 1. Create initial user with Vietnamese mock name
+    await unauth_client.post(
+        "/api/v1/auth/oauth2/login",
+        json={"provider": "demo", "email": "realuser@gmail.com"}
+    )
+
+    # 2. Login via Google with real profile name
+    mock_payload = {
+        "sub": "google-sub-realuser-777",
+        "email": "realuser@gmail.com",
+        "name": "Bart Simpson Real Name",
+        "picture": "https://lh3.googleusercontent.com/a/bart.png",
+        "email_verified": True,
+    }
+
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value=mock_payload):
+        res = await unauth_client.post(
+            "/api/v1/auth/oauth2/login",
+            json={"provider": "google", "credential": "mocked.token"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["user"]["full_name"] == "Bart Simpson Real Name"
+        assert data["user"]["avatar_url"] == "https://lh3.googleusercontent.com/a/bart.png"
+
+
+@pytest.mark.asyncio
+async def test_google_oauth2_login_rejects_unverified_email(unauth_client: AsyncClient) -> None:
+    """Verify HTTP 400 is raised when Google token has email_verified == False."""
+    mock_payload = {
+        "sub": "google-sub-unverified",
+        "email": "unverified@gmail.com",
+        "name": "Unverified User",
+        "email_verified": False,
+    }
+
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value=mock_payload):
+        res = await unauth_client.post(
+            "/api/v1/auth/oauth2/login",
+            json={"provider": "google", "credential": "mocked.token"}
+        )
+        assert res.status_code == 400
+        assert "email_verified=False" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_google_oauth2_login_rejects_invalid_token(unauth_client: AsyncClient) -> None:
+    """Verify HTTP 401 is raised when token signature/claims fail verification."""
+    with patch("google.oauth2.id_token.verify_oauth2_token", side_effect=ValueError("Token expired")):
+        res = await unauth_client.post(
+            "/api/v1/auth/oauth2/login",
+            json={"provider": "google", "credential": "expired.invalid.token"}
+        )
+        assert res.status_code == 401
+        assert "Token expired" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_google_oauth2_admin_assignment_only_via_admin_emails(unauth_client: AsyncClient) -> None:
+    """Verify only emails configured in ADMIN_EMAILS are granted role 'admin' from Google login."""
+    orig_admins = settings.ADMIN_EMAILS
+    try:
+        settings.ADMIN_EMAILS = ["superadmin@company.com"]
+
+        # 1. Non-admin Google user
+        mock_user = {
+            "sub": "sub-regular-user",
+            "email": "regular@company.com",
+            "name": "Regular",
+            "email_verified": True,
+        }
+        with patch("google.oauth2.id_token.verify_oauth2_token", return_value=mock_user):
+            res1 = await unauth_client.post(
+                "/api/v1/auth/oauth2/login",
+                json={"provider": "google", "credential": "regular.token"}
+            )
+            assert res1.status_code == 200
+            assert res1.json()["user"]["role"] == "user"
+
+        # 2. Configured admin Google user
+        mock_admin = {
+            "sub": "sub-superadmin-user",
+            "email": "superadmin@company.com",
+            "name": "Super Admin",
+            "email_verified": True,
+        }
+        with patch("google.oauth2.id_token.verify_oauth2_token", return_value=mock_admin):
+            res2 = await unauth_client.post(
+                "/api/v1/auth/oauth2/login",
+                json={"provider": "google", "credential": "admin.token"}
+            )
+            assert res2.status_code == 200
+            assert res2.json()["user"]["role"] == "admin"
+    finally:
+        settings.ADMIN_EMAILS = orig_admins
+
+
+@pytest.mark.asyncio
+async def test_demo_login_blocked_in_production(unauth_client: AsyncClient) -> None:
+    """Verify demo login and demo bearer tokens are strictly forbidden when ENVIRONMENT is 'production'."""
+    orig_env = settings.ENVIRONMENT
+    try:
+        settings.ENVIRONMENT = "production"
+
+        # 1. Demo login endpoint must return HTTP 403 Forbidden
+        demo_res = await unauth_client.post(
+            "/api/v1/auth/oauth2/login",
+            json={"provider": "demo", "email": "admin@smartdesk.ai"}
+        )
+        assert demo_res.status_code == 403
+
+        # 2. Legacy demo token header must return HTTP 401 Unauthorized
+        me_res = await unauth_client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": "Bearer demo_jwt_token_for_admin@smartdesk.ai"}
+        )
+        assert me_res.status_code == 401
+    finally:
+        settings.ENVIRONMENT = orig_env
+
+
+# =========================================================================
+# RBAC Tests (Data Isolation & Role Enforcement)
+# =========================================================================
 
 @pytest.mark.asyncio
 async def test_rbac_ticket_isolation_and_admin_only_routes(unauth_client: AsyncClient) -> None:

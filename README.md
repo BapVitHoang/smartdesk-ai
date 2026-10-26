@@ -108,7 +108,32 @@ smartdesk-ai/
    ```bash
    npm install --prefix frontend
    ```
-2. (Tùy chọn) Tạo file `frontend/.env.local` từ mẫu `frontend/.env.example`.
+2. Tạo file `frontend/.env` từ mẫu `frontend/.env.example`.
+
+### 3.3. Hướng dẫn cấu hình Google OAuth 2.0 (Google Identity Services)
+Để sử dụng tính năng **Đăng nhập bằng Google**:
+1. Truy cập [Google Cloud Console](https://console.cloud.google.com/) -> **APIs & Services** -> **Credentials**.
+2. Chọn **Create Credentials** -> **OAuth client ID** -> Loại ứng dụng chọn **Web application**.
+3. Tại mục **Authorized JavaScript origins**, thêm các URL:
+   - `http://localhost:3000` (cổng frontend Vite mặc định)
+   - `http://localhost:5173` (cổng Vite fallback)
+   - `http://127.0.0.1:3000`
+   - *(Domain production của bạn nếu deploy)*
+4. Nhấn **Create** và sao chép **Client ID** (dạng `xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com`).
+5. Cấu hình biến môi trường:
+   - **Backend (`backend/.env`):**
+     ```env
+     GOOGLE_CLIENT_ID="<Client ID của bạn>"
+     ADMIN_EMAILS="admin@smartdesk.ai,email_cua_ban@gmail.com"
+     ENVIRONMENT="development" # hoặc "production"
+     ```
+   - **Frontend (`frontend/.env`):**
+     ```env
+     VITE_GOOGLE_CLIENT_ID="<Client ID của bạn>"
+     ```
+6. **Lưu ý bảo mật về Token:**
+   - Trong kiến trúc SmartDesk AI, access token được lưu trữ trong **in-memory** của client service và đính kèm vào HTTP header `Authorization: Bearer <token>`.
+   - Nếu bạn lưu token vào `localStorage`, hãy lưu ý rủi ro tấn công XSS (Cross-Site Scripting) nếu ứng dụng có lỗ hổng render HTML không an toàn. Trên môi trường production, khuyến nghị kết hợp `ENVIRONMENT=production` để vô hiệu hóa hoàn toàn các demo account/demo bypass.
 
 ---
 

@@ -80,6 +80,7 @@ async def init_db() -> None:
     from app.models.workspace import Workspace  # noqa: F401
     from app.models.document import Document  # noqa: F401
     from app.models.verification import VerificationReport, VerificationItem  # noqa: F401
+    from app.models.user import User  # noqa: F401
 
     def _migrate_sqlite_columns(sync_conn):
         try:
@@ -97,6 +98,17 @@ async def init_db() -> None:
                     sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN chunk_index INTEGER DEFAULT 0")
                 if "page_number" not in kc_cols:
                     sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN page_number INTEGER DEFAULT 1")
+
+            user_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()]
+            if user_cols:
+                if "google_sub" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN google_sub VARCHAR(255)")
+                if "avatar_url" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512)")
+                if "is_active" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT 1")
+                if "updated_at" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN updated_at DATETIME")
         except Exception as mig_err:
             logger.warning(f"SQLite auto-migration notice: {mig_err}")
 

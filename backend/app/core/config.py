@@ -1,7 +1,7 @@
 """Application configuration settings module using Pydantic Settings."""
 
-from typing import List, Union
-from pydantic import field_validator
+from typing import List, Union, Optional
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import json
 from pathlib import Path
@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = False
+    ENVIRONMENT: str = "development"  # "development" | "production" | "test"
 
     # AI Provider: "gemini" | "ollama"
     # Primary Cloud LLM (GA Google Gemini 3.5 Flash Lite)
@@ -53,9 +54,12 @@ class Settings(BaseSettings):
 
     # Authentication & RBAC (Hybrid OAuth2 + Demo Login)
     JWT_SECRET_KEY: str = "smartdesk-secret-key-change-in-production-2026"
+    JWT_SECRET: str = ""  # Backward-compatible env alias for JWT_SECRET_KEY
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
-    GOOGLE_OAUTH_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_OAUTH_CLIENT_ID: str = ""  # Backward-compatible env alias for GOOGLE_CLIENT_ID
+    ADMIN_EMAILS: Union[List[str], str] = ["admin@smartdesk.ai"]
     DEMO_LOGIN_ENABLED: bool = True
     DEV_AUTH_BYPASS: bool = False
 
@@ -64,6 +68,7 @@ class Settings(BaseSettings):
     FALLBACK_SQLITE_URL: str = f"sqlite+aiosqlite:///{DEFAULT_SQLITE_PATH}"
 
     # CORS Allowed Origins
+    ALLOWED_ORIGINS: Optional[Union[List[str], str]] = None
     CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3000",
         "http://localhost:5173",
@@ -85,6 +90,16 @@ class Settings(BaseSettings):
         case_sensitive=True
     )
 
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, v: object) -> bool:
+        """Safely parse DEBUG from boolean or arbitrary string (e.g. 'release', 'false')."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "debug", "dev")
+        return False
+
     @field_validator("DATABASE_URL", "FALLBACK_SQLITE_URL", mode="before")
     @classmethod
     def resolve_sqlite_path(cls, v: str) -> str:
@@ -101,6 +116,24 @@ class Settings(BaseSettings):
                     return f"{prefix}{abs_path}"
         return v
 
+    @field_validator("ADMIN_EMAILS", mode="before")
+    @classmethod
+    def parse_admin_emails(cls, v: Union[str, List[str]]) -> List[str]:
+        """Parse ADMIN_EMAILS into a normalized lowercase list."""
+        if isinstance(v, str):
+            v_stripped = v.strip()
+            if v_stripped.startswith("[") and v_stripped.endswith("]"):
+                try:
+                    loaded = json.loads(v_stripped)
+                    if isinstance(loaded, list):
+                        return [str(e).strip().lower() for e in loaded if str(e).strip()]
+                except Exception:
+                    pass
+            return [e.strip().lower() for e in v.split(",") if e.strip()]
+        elif isinstance(v, list):
+            return [str(e).strip().lower() for e in v if str(e).strip()]
+        return ["admin@smartdesk.ai"]
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
@@ -116,6 +149,29 @@ class Settings(BaseSettings):
         elif isinstance(v, list):
             return v
         return ["*"]
+
+    @model_validator(mode="after")
+    def reconcile_aliases(self) -> "Settings":
+        """Reconcile environment variable aliases."""
+        if self.JWT_SECRET and not self.JWT_SECRET_KEY:
+            self.JWT_SECRET_KEY = self.JWT_SECRET
+        elif self.JWT_SECRET and self.JWT_SECRET_KEY == "smartdesk-secret-key-change-in-production-2026":
+            self.JWT_SECRET_KEY = self.JWT_SECRET
+
+        if self.GOOGLE_CLIENT_ID and not self.GOOGLE_OAUTH_CLIENT_ID:
+            self.GOOGLE_OAUTH_CLIENT_ID = self.GOOGLE_CLIENT_ID
+        elif self.GOOGLE_OAUTH_CLIENT_ID and not self.GOOGLE_CLIENT_ID:
+            self.GOOGLE_CLIENT_ID = self.GOOGLE_OAUTH_CLIENT_ID
+
+        if self.ALLOWED_ORIGINS:
+            if isinstance(self.ALLOWED_ORIGINS, str):
+                origins = [i.strip() for i in self.ALLOWED_ORIGINS.split(",") if i.strip()]
+            else:
+                origins = list(self.ALLOWED_ORIGINS)
+            if origins:
+                self.CORS_ORIGINS = origins
+
+        return self
 
     @property
     def resolved_seed_faq_path(self) -> Path:

@@ -149,13 +149,8 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </nav>
 
-        {/* Right Section: RAG status & LoginSwitcher */}
+        {/* Right Section: LoginSwitcher */}
         <div className="flex items-center gap-3">
-          <div className="hidden xl:flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/70 px-2.5 py-1 rounded-full text-xs font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            RAG Engine: Active
-          </div>
-
           {/* Login / Role Switcher Component */}
           <LoginSwitcher
             currentUser={currentUser}

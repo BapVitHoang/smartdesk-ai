@@ -17,13 +17,26 @@ class OAuth2PasswordRequest(BaseModel):
     password: str = Field(..., description="User password")
 
 
+class AuthUserPayload(BaseModel):
+    """Authenticated user info nested in TokenResponse."""
+    id: int = Field(..., description="User primary key ID")
+    email: str = Field(..., description="User email address")
+    full_name: str = Field(..., description="User display name")
+    role: str = Field(..., description="User role ('admin' or 'user')")
+    workspace_id: int = Field(1, description="Workspace ID")
+    avatar_url: Optional[str] = Field(None, description="Avatar image URL")
+    is_active: bool = Field(True, description="Account active status")
+
+
 class TokenResponse(BaseModel):
     """JWT Access Token response model."""
     access_token: str = Field(..., description="HS256 signed JWT access token")
     token_type: str = Field("bearer", description="Token type, default 'bearer'")
-    role: str = Field(..., description="User role ('admin' or 'user')")
-    email: str = Field(..., description="User email address")
-    full_name: str = Field(..., description="User full display name")
+    user: AuthUserPayload = Field(..., description="Authenticated user profile")
+    # Backwards compatibility top-level aliases
+    role: Optional[str] = Field(None, description="Backwards compatible top-level role")
+    email: Optional[str] = Field(None, description="Backwards compatible top-level email")
+    full_name: Optional[str] = Field(None, description="Backwards compatible top-level full_name")
 
 
 class UserProfileResponse(BaseModel):
@@ -34,4 +47,5 @@ class UserProfileResponse(BaseModel):
     role: str = Field(..., description="User authorization role ('admin' or 'user')")
     oauth_provider: str = Field(..., description="OAuth identity provider ('google' or 'demo')")
     workspace_id: int = Field(..., description="Default workspace ID associated with the user")
-
+    avatar_url: Optional[str] = Field(None, description="Avatar image URL")
+    is_active: bool = Field(True, description="Account active status")
