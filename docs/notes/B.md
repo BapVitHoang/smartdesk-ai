@@ -905,7 +905,15 @@ Bảng tái hiện trạng thái lỗi HTTP trước khi gắn auth headers và 
 3. **Bắt và Lan truyền Lỗi (Error Propagation):**
    - Khi backend phản hồi mã lỗi không thành công (`!res.ok`), lớp client đọc JSON payload và ném ngoại lệ `ApiError(status, detail)`.
    - Nếu mã lỗi là `401 Unauthorized` hoặc `403 Forbidden`, khối `catch` tại service layer hiển thị toast cảnh báo bằng tiếng Việt và tái ném ngoại lệ (`throw error`), tuyệt đối không nuốt lỗi để chuyển sang fallback dữ liệu giả (fake success).
-   - Component UI (`AgentDashboardView`, `KnowledgeManagerView`) nhận ngoại lệ và giữ nguyên trạng thái hiển thị hiện tại, tránh cập nhật lạc quan sai lệch với cơ sở dữ liệu.
+
+## Review round 1
+- **Kết quả rà soát từ 4 subagent độc lập:**
+  1. Skeptical Verifier: PASS — Chạy lại toàn bộ lệnh kiểm thử offline `backend/tests/common`: 12 passed in 7.88s; `npm run lint`: 0 errors; `npm run build`: thành công trong 5.13s; kiểm định ảnh chụp `docs/evidence/ticket-pagination-page2.png` (255,707 bytes) khớp chính xác với dữ liệu seed.
+  2. Requirements and Honesty Auditor: PASS — Xác minh đầy đủ các tiêu chí hoàn thành của Task 0, 1, 2, 3, 4. 0 lỗi bịa đặt thông tin. Ghi nhận 1 quan sát mức Low (AUD-SC-01) về cơ chế phân trang hybrid khi số lượng ticket vượt quá 50.
+  3. Security and Robustness Reviewer: PASS — Tất cả 8 endpoint được bảo vệ đều gắn `getAuthHeaders()`; tải lên multipart bảo toàn boundary của trình duyệt (không ghi đè Content-Type); mã lỗi 401/403 được lan truyền rõ ràng qua `ApiError` và không bị nuốt thành fake success; loại bỏ trạng thái cập nhật lạc quan sai lệch trên UI khi API thất bại.
+  4. Ownership and Conflict Hunter: PASS — 6 file thuộc lane Dev C, 3 file ghi chép thuộc lane Dev B / Integrator; 0 file đóng băng hay ngoài phạm vi bị sửa đổi; 0 nguy cơ xung đột với nhánh `origin/Hoang` hay Prompt S-A.
+- **Tổng kết:** 0 Blocker, 0 High, 0 Medium. Vòng tự đánh giá 1 đạt yêu cầu dừng sớm (Stop early).
+
 
 
 
