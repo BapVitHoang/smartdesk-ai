@@ -196,12 +196,23 @@ export async function createTicket(
   }
 }
 
+// Track last known X-Total-Count response header from server
+let lastTotalTicketCount: number = 0;
+
+export function getLastTotalTicketCount(): number {
+  return lastTotalTicketCount;
+}
+
+export interface PaginatedTicketsResult {
+  tickets: Ticket[];
+  totalCount: number;
+}
+
 /**
- * List and Filter Tickets
- * Endpoint: GET /api/v1/tickets
- * Supports server-side filtering, sorting, and pagination (CR-DEVC-02, REQ-30, REQ-31).
+ * Wrapper exposing both ticket list and X-Total-Count header from Backend.
+ * (MRG-DEF-09 / CONTRACTS.md §8.10)
  */
-export async function getTickets(
+export async function getTicketsWithCount(
   filters?: {
     workspace_id?: number;
     status?: string;
@@ -215,7 +226,7 @@ export async function getTickets(
     sort_order?: string;
   },
   onToast?: ToastNotifier
-): Promise<Ticket[]> {
+): Promise<PaginatedTicketsResult> {
   const toastFn = onToast || notifyFallback;
 
   try {
@@ -226,9 +237,8 @@ export async function getTickets(
     if (filters?.priority) params.append('priority', filters.priority);
     if (filters?.search) params.append('search', filters.search);
 
-    // CR-DEVC-02: Support pagination (?page=2, ?skip, ?limit)
-    // Default limit to 50 so all 43 seeded demo tickets are retrieved for Admin
-    const limit = filters?.limit !== undefined ? filters.limit : 50;
+    // CONTRACTS.md §8.10: limit default is 20
+    const limit = filters?.limit !== undefined ? filters.limit : 20;
     params.append('limit', String(limit));
 
     if (filters?.page !== undefined) {
@@ -251,11 +261,14 @@ export async function getTickets(
       throw new ApiError(res.status, errData.detail || `Lỗi máy chủ: HTTP ${res.status}`);
     }
 
+    const totalHeader = res.headers.get('X-Total-Count');
     const data: BackendTicketResponse[] = await res.json();
     const mapped = data.map(mapBackendTicketToFrontend);
-    
+    const totalCount = totalHeader ? parseInt(totalHeader, 10) : mapped.length;
+    lastTotalTicketCount = totalCount;
     localFallbackTickets = mapped;
-    return mapped;
+
+    return { tickets: mapped, totalCount };
   } catch (error: any) {
     if (error instanceof ApiError) {
       toastFn(error.detail || `Lỗi tải danh sách ticket: HTTP ${error.statusCode}`, 'warning');
@@ -266,8 +279,36 @@ export async function getTickets(
       'Không thể kết nối Backend để tải danh sách ticket. Đang sử dụng dữ liệu dự phòng.',
       'warning'
     );
-    return localFallbackTickets;
+    return {
+      tickets: localFallbackTickets,
+      totalCount: localFallbackTickets.length,
+    };
   }
+}
+
+/**
+ * List and Filter Tickets
+ * Endpoint: GET /api/v1/tickets
+ * Supports server-side filtering, sorting, and pagination (CR-DEVC-02, REQ-30, REQ-31, MRG-DEF-09).
+ * Defaults limit to 20 per contract specification (CONTRACTS.md §8.10).
+ */
+export async function getTickets(
+  filters?: {
+    workspace_id?: number;
+    status?: string;
+    category?: string;
+    priority?: string;
+    search?: string;
+    page?: number;
+    skip?: number;
+    limit?: number;
+    sort_by?: string;
+    sort_order?: string;
+  },
+  onToast?: ToastNotifier
+): Promise<Ticket[]> {
+  const result = await getTicketsWithCount(filters, onToast);
+  return result.tickets;
 }
 
 /**

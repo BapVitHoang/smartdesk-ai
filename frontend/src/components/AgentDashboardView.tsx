@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Inbox, Activity } from 'lucide-react';
 import { Ticket, UIState, TicketStatus, ToastType } from '../types';
-import { getTickets, updateTicketStatus, regenerateAiDraft, deleteTicket } from '../services/api';
+import {
+  getTickets,
+  getTicketsWithCount,
+  getLastTotalTicketCount,
+  updateTicketStatus,
+  regenerateAiDraft,
+  deleteTicket,
+} from '../services/api';
 import { TicketToolbar, TicketList, TicketDetail, TicketSortField } from '../features/agent';
 import { TelemetryPanel } from '../features/telemetry';
 
@@ -95,8 +102,19 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
     return timeB - timeA;
   });
 
-  // Client-side pagination
-  const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize));
+  // Server total count tracking via X-Total-Count header (MRG-DEF-09 / CONTRACTS.md §8.10)
+  const [serverTotalCount, setServerTotalCount] = useState<number>(getLastTotalTicketCount() || tickets.length);
+
+  useEffect(() => {
+    const lastCount = getLastTotalTicketCount();
+    if (lastCount > 0) {
+      setServerTotalCount(lastCount);
+    }
+  }, [tickets]);
+
+  // Page size 8 per UI layout; totalPages calculated from X-Total-Count
+  const effectiveTotal = serverTotalCount > 0 ? serverTotalCount : sortedTickets.length;
+  const totalPages = Math.max(1, Math.ceil(effectiveTotal / pageSize));
   const paginatedTickets = sortedTickets.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleRefreshTickets = async () => {
@@ -117,9 +135,13 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
       if (searchTerm.trim()) filters.search = searchTerm.trim();
       if (currentWorkspaceId) filters.workspace_id = currentWorkspaceId;
 
-      const fresh = await getTickets(Object.keys(filters).length > 0 ? filters : undefined, onToast);
+      const { tickets: fresh, totalCount } = await getTicketsWithCount(
+        Object.keys(filters).length > 0 ? filters : undefined,
+        onToast
+      );
       if (setTickets && fresh && fresh.length > 0) {
         setTickets(fresh);
+        setServerTotalCount(totalCount);
         if (!selectedTicket || !fresh.some((t) => t.id === selectedTicket.id)) {
           setSelectedTicket(fresh[0]);
         }
@@ -274,7 +296,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
             {totalPages > 1 && (
               <div className="p-2.5 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
                 <span>
-                  Trang <strong>{currentPage}</strong> / {totalPages} ({sortedTickets.length} tickets)
+                  Trang <strong>{currentPage}</strong> / {totalPages} (Tổng cộng {effectiveTotal} tickets từ X-Total-Count)
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
