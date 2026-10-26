@@ -882,5 +882,64 @@ Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
   6. **Review Loop & Authorship:**
      - Cả 4 subagent đánh giá chuyên sâu (Ownership Hunter, Requirements Auditor, Security Reviewer, Skeptical Verifier) đều báo cáo ALL PASS sau khi hợp nhất đầy đủ dữ liệu bằng chứng hỗn hợp và cập nhật số commit lên 129 (111 Bap, 10 TheOrijinnn, 8 TKhanhJK).
 
+---
+
+# Final documents (Prompt 5 — Taking over Dev C Final Deliverables)
+
+## Plan
+
+1. **Task 0 (Preconditions):**
+   - Files: `docs/notes/B.md`, `docs/TEAM_ROSTER.md`, `docs/audit/06-final-verification.md`.
+   - Approach: Verify identity `Bap <23110020@student.hcmute.edu.vn>`, branch `docs/final-documents` from `origin/Hoang` (`b77376c`), verify all 3 rows in `TEAM_ROSTER.md` (zero `CHƯA CÓ DỮ LIỆU`), list limitations from 06 (`REQ-16` NOT SELECTED, `MRG-DEF-01` slide roster hits, `MRG-DEF-10` pgvector 768 vs 3072 fallback).
+   - Proof: Precondition outputs and origin/Hoang SHA recorded in `B.md`. Main risk: Unverified cells in roster.
+2. **Task 1 (Claims table):**
+   - Files: `docs/notes/B.md`, `README.md`, `docs/PROPOSAL.md`, `docs/REPORT.md`, `docs/PRESENTATION_AND_DEMO.md`, `docs/TEST_ACCEPTANCE.md`.
+   - Approach: Build table `document | claim | source (06 row, command, file) | status (OK / CORRECT / REMOVE)`. Audit every number (139 pytest passed, 43 demo tickets, 24 eval cases 8/24->24/24, SLA 2h/4h/8h/24h, 129 commits: 111/10/8), tech name (purge Next.js/Redis claims). Reconcile all CORRECT/REMOVE items.
+   - Proof: Zero unresolved CORRECT or REMOVE rows in table. Main risk: Unverified claims or missing sources.
+3. **Task 2 (Report content - REQ-40):**
+   - Files: `docs/REPORT.md`.
+   - Approach: Align structure to course guidelines (Ch 1-7); separate deterministic (<2s CI) and live eval (24 cases, no held-out); add limitations chapter (MRG-DEF-01, MRG-DEF-10, REQ-16); team chapter with official roster facts and Git commit subjects (no percentages, note agent-assisted round); update Mermaid diagram; align RTM table to 4 columns (`Story -> Endpoint/Component -> Source file -> Test case`); validate traceability paths and test names.
+   - Proof: Python script checking every file path and test in traceability table exists. Main risk: Broken path references.
+4. **Task 3 (Rebuild deliverables reproducibly):**
+   - Files: `docs/tools/build_report_pdf.py`, `build_slides.py`, `docs/tools/requirements.txt`, `scripts/ownership_map.py`, `.github/CODEOWNERS`, `docs/REPORT.pdf`, `docs/SLIDES.pptx`, `docs/SLIDES.pdf`.
+   - Approach: Build standalone python generator scripts using `reportlab` with registered Windows TrueType fonts (`C:\Windows\Fonts\arial.ttf`, `arialbd.ttf`) for Vietnamese diacritics and `python-pptx` (never weasyprint or Office COM). Map under Integrator in `ownership_map.py` and regenerate `CODEOWNERS`. Generate 10-20 page `REPORT.pdf` and exactly <=15 slide `SLIDES.pptx` / `SLIDES.pdf`.
+   - Proof: `check_roster.py` exits 0 (0 violations, fixing MRG-DEF-01); zero TODO/lorem/invented names; page count recorded. Main risk: Vietnamese font diacritics in PDF.
+5. **Task 4 (Demo script & live-change playbook - REQ-41, 42):**
+   - Files: `docs/PRESENTATION_AND_DEMO.md`, `docs/DEMO_VIDEO_CHECKLIST.md`.
+   - Approach: 8-minute demo script with exact demo accounts and click path; 3 live-change scenarios (prompts.json, chunk size, agent tool). Execute each in a clean `%TEMP%` scratch copy without `.git` using targeted unit tests (never `docker compose down -v` to protect pgdata volume). Max 3 live Gemini calls (>=4.5s delay).
+   - Proof: Executed scratch command outputs in playbook; reset cooldown via admin API if tripped. Main risk: Port collision or rate limit.
+6. **Task 5 (Notes, commits and publish):**
+   - Files: `docs/notes/B.md`.
+   - Approach: Record evidence for every task in `B.md`. Commit in small commits (documents and binaries separately). Push `docs/final-documents` to origin. PR description: "Prepared by Hoàng with an AI agent; TKhanhJK and TheOrijinnn review the report and slides before merge."
+   - Proof: `git ls-remote --heads origin docs/final-documents` matches local commit SHA. Main risk: Push to protected branches (forbidden).
+
+---
+
+## Task 0: Preconditions Baseline Verification
+
+- **Base Commit (`origin/Hoang` SHA):** `b77376ccf172a4a196e2c73faeddb8a4bb0f5fbd`
+- **Active Branch:** `docs/final-documents` branched directly from `origin/Hoang`.
+- **Identity Check (RULE 4):**
+  - `git config user.name`: `Bap`
+  - `git config user.email`: `23110020@student.hcmute.edu.vn`
+  - Matches verified row for Ngô Việt Hoàng in `docs/TEAM_ROSTER.md`.
+- **Merge & File Check:**
+  - `git log origin/Hoang --oneline -5` shows Prompt 4b commits (`b77376c`, `61fafc0`, `0c56884`, `3cd7747`, `4e514db`).
+  - `docs/audit/06-final-verification.md` and `docs/audit/06-requirements-extract.md` exist and are present on the branch.
+- **Roster Check (`docs/TEAM_ROSTER.md`):**
+  - All 3 members have `verified_by_user = True`.
+  - Zero cells contain `CHƯA CÓ DỮ LIỆU`:
+    * Ngô Việt Hoàng (MSSV: 23110020) — Dev B & Integrator
+    * Lê Nguyên (MSSV: 23110043) — Dev A
+    * Tống Gia Khánh (MSSV: 23110032) — Dev C
+- **Audit 06 Defects and Limitations List:**
+  - **FAILED items:** 0
+  - **NOT TESTED / NOT SELECTED items:**
+    * `REQ-16` (Capability D — Multimodal Input): Marked **NOT SELECTED** (SmartDesk AI implements 4 capabilities: A, B, C, E, exceeding the 3 required under `REQ-12`). Must appear as a scope decision and limitation, not an achievement.
+  - **OPEN Blocker defects:** 0 (None exist).
+  - **OPEN High defects:**
+    * `MRG-DEF-01`: 12 fabrication violations in slide binaries (`docs/SLIDES.pdf` and `docs/SLIDES.pptx`) detected by `check_roster.py`. Must appear as limitation until cleanly rebuilt in Task 3.
+    * `MRG-DEF-10`: Google Gemini live embedding API returns 3072 dimensions vs PostgreSQL `vector(768)` column schema, handled with pseudo-embedding fallback in `embedding_service.py:138-144`. Must appear as limitation in Report Chapter 7.
+
 
 
