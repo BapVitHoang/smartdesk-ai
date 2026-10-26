@@ -1040,6 +1040,38 @@ Table auditing all cross-document claims across `README.md`, `docs/PROPOSAL.md`,
   - **Result:** Defect `MRG-DEF-01` (12 historical slide roster violations) is 100% resolved across all PDFs and PPTX files.
 - **Content Sanity:** Verified zero TODO, lorem, [name], "CHƯA CÓ DỮ LIỆU", or historical invented names.
 
+---
+
+## Task 4: Demo Script and Live-Change Playbook Verification (REQ-41, REQ-42)
+
+- **Presentation & Demo Script Alignment:**
+  - Updated `docs/PRESENTATION_AND_DEMO.md` with official roster facts from `docs/TEAM_ROSTER.md` (Ngô Việt Hoàng 23110020, Lê Nguyên 23110043, Tống Gia Khánh 23110032).
+  - Verified 8-minute demo script minute-by-minute breakdown with exact demo credentials (`admin@smartdesk.ai`, `an.nguyen@company.vn`), covering RAG citations, 2-phase confirmation cards, Vietnamese prompt injection defense, agent triage & delete, 3-agent verification studio, and telemetry circuit breaker reset.
+  - Verified `docs/DEMO_VIDEO_CHECKLIST.md` with 7 matching shots (`0:00` to `4:15`).
+- **Live-Change Playbook Execution in Isolated Scratch Copy (%TEMP%):**
+  - Created automated test tool `docs/tools/verify_live_changes.py`.
+  - Executed 3 live changes in `%TEMP%\smartdesk_live_scratch` (clean copy without `.git` or Docker volumes):
+    * **Scenario 1 (Prompt rule update in `prompts.json`):**
+      - Added mandatory energetic greeting rule to `templates["rag_customer_support"]`.
+      - Pytest command: `pytest test_rag_module.py -k test_prompt_registry_loads_versioned_templates -q`
+      - Result: `1 passed, 7 deselected in 3.61s` (Exit code: 0).
+    * **Scenario 2 (Chunk size & overlap update in `config.py`):**
+      - Changed `CHUNK_SIZE = 500` and `CHUNK_OVERLAP = 50`.
+      - Pytest command: `pytest test_workspace_and_verification.py -k test_clean_json_response_fail_closed -q`
+      - Result: `1 passed, 6 deselected in 5.25s` (Exit code: 0).
+    * **Scenario 3 (Structured output schema field addition in `ai_structured.py`):**
+      - Added `requires_manager_review: bool = Field(default=False, description='True if ticket is Urgent')` to `TicketCopilotStructuredOutput`.
+      - Pytest command: `pytest test_rag_module.py -k test_structured_output_schemas_and_category_alias_normalization -q`
+      - Result: `1 passed, 7 deselected in 5.25s` (Exit code: 0).
+    * Scratch folder cleanup: Completely removed scratch directory with `shutil.rmtree()`. Working tree and Docker `smartdesk-ai_pgdata` volume were 100% preserved.
+- **Live Gemini API Smoke Test Verification:**
+  - Invoked `GET /api/v1/health/smoke-test` (1 call used of 3-call budget):
+    ```json
+    {"model": "gemini-3.5-flash-lite", "latency_ms": 1150.06, "status": "PASS", "sample_prompt": "You are an AI Customer Support Assistant...", "sample_response": "Hello, welcome to SmartDesk AI Support! To reset your password..."}
+    ```
+  - Round-trip latency measured: `1150.06 ms` (< 1,500ms target).
+
+
 
 
 
