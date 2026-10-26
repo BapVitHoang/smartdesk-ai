@@ -1,6 +1,6 @@
 """Pydantic v2 schemas for OAuth2 authentication, JWT tokens, and RBAC user profiles."""
 
-from typing import Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -9,6 +9,18 @@ class OAuth2LoginRequest(BaseModel):
     credential: Optional[str] = Field(None, description="Google OAuth2 JWT ID token")
     email: Optional[EmailStr] = Field(None, description="Demo login email (e.g. admin@smartdesk.ai, an.nguyen@company.vn)")
     provider: str = Field("google", description="Identity provider: 'google' or 'demo'")
+
+
+class DemoLoginRequest(BaseModel):
+    """Payload for demo login endpoint."""
+    email: Optional[EmailStr] = Field(None, description="Demo account email")
+    role: Optional[str] = Field(None, description="Demo role ('admin' or 'user')")
+
+
+class GoogleLoginRequest(BaseModel):
+    """Payload for Google OAuth2 ID token login endpoint."""
+    id_token: Optional[str] = Field(None, description="Google OAuth2 ID token")
+    credential: Optional[str] = Field(None, description="Google OAuth2 credential alias")
 
 
 class OAuth2PasswordRequest(BaseModel):
@@ -24,6 +36,7 @@ class TokenResponse(BaseModel):
     role: str = Field(..., description="User role ('admin' or 'user')")
     email: str = Field(..., description="User email address")
     full_name: str = Field(..., description="User full display name")
+    user: Optional[Dict[str, Any]] = Field(None, description="Detailed user profile object")
 
 
 class UserProfileResponse(BaseModel):

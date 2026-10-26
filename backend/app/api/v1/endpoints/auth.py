@@ -21,6 +21,8 @@ from app.db.seed.seed_users import DEMO_ACCOUNT_EMAILS
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
+    DemoLoginRequest,
+    GoogleLoginRequest,
     OAuth2LoginRequest,
     TokenResponse,
     UserProfileResponse,
@@ -53,12 +55,22 @@ def create_access_token(user: User) -> str:
 
 def _token_response(user: User) -> TokenResponse:
     """Builds the standard token response for an authenticated user."""
+    user_payload = {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": user.role,
+        "is_active": user.is_active,
+        "workspace_id": user.workspace_id,
+        "created_at": user.created_at.isoformat() if hasattr(user, "created_at") and user.created_at else None,
+    }
     return TokenResponse(
         access_token=create_access_token(user),
         token_type="bearer",
         role=user.role,
         email=user.email,
         full_name=user.full_name,
+        user=user_payload,
     )
 
 
@@ -114,6 +126,45 @@ async def oauth2_login(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Nhà cung cấp đăng nhập không được hỗ trợ.",
     )
+
+
+@router.post(
+    "/demo-login",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Demo Login (Frontend Client Alias)",
+    description="Convenience endpoint matching frontend loginDemo calls for seeded demo accounts.",
+)
+async def demo_login_alias(
+    payload: DemoLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """One-click demo login alias matching frontend client calls."""
+    target_email = str(payload.email).strip().lower() if payload.email else ""
+    if not target_email and payload.role:
+        target_email = "admin@smartdesk.ai" if payload.role == "admin" else "an.nguyen@company.vn"
+    if not target_email:
+        target_email = "admin@smartdesk.ai"
+    req = OAuth2LoginRequest(email=target_email, provider="demo")
+    return await _demo_login(req, db)
+
+
+@router.post(
+    "/google",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Google OAuth2 Login (Frontend Client Alias)",
+    description="Convenience endpoint matching frontend loginWithGoogle calls.",
+)
+async def google_login_alias(
+    payload: GoogleLoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Google sign-in alias matching frontend loginWithGoogle calls."""
+    cred = payload.credential or payload.id_token or ""
+    req = OAuth2LoginRequest(credential=cred, provider="google")
+    return await _google_login(req, request, db)
 
 
 async def _demo_login(payload: OAuth2LoginRequest, db: AsyncSession) -> TokenResponse:

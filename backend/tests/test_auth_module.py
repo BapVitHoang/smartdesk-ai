@@ -121,6 +121,22 @@ async def test_oauth2_login_and_jwt_issuance(unauth_client: AsyncClient) -> None
 
 
 @pytest.mark.asyncio
+async def test_demo_login_alias_and_user_payload(unauth_client: AsyncClient) -> None:
+    """Verify POST /api/v1/auth/demo-login returns valid token and user payload (REQ-06, REQ-09)."""
+    res = await unauth_client.post(
+        "/api/v1/auth/demo-login",
+        json={"email": "admin@smartdesk.ai"}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["role"] == "admin"
+    assert "access_token" in data
+    assert "user" in data
+    assert data["user"]["email"] == "admin@smartdesk.ai"
+    assert data["user"]["role"] == "admin"
+
+
+@pytest.mark.asyncio
 async def test_oauth2_password_grant_token(unauth_client: AsyncClient) -> None:
     """Verify POST /api/v1/auth/token supports OAuth2 Password Grant for test accounts."""
     res = await unauth_client.post(
