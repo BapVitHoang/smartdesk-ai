@@ -121,7 +121,7 @@ class EmbeddingService:
                     f"got {len(raw_emb) if raw_emb else 0}. Falling back to pseudo-embedding."
                 )
                 return self.generate_pseudo_embedding(safe_text, dim=settings.EMBEDDING_DIMENSIONS)
-            return _normalize_vector(raw_emb)
+            return raw_emb
 
         if self.is_rate_limited():
             logger.debug("[Cost-Guard] Embedding rate-limit cooldown active. Using pseudo-embedding.")

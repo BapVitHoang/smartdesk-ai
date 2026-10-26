@@ -69,3 +69,4 @@
       none
      (1 row)
    - Confirmed: Query logging safely restored to 'none' preventing credential leaks.
+
