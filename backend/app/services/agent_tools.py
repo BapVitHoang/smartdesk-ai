@@ -22,6 +22,15 @@ logger = logging.getLogger("smartdesk.agent_tools")
 ToolHandler = Callable[..., Awaitable[Dict[str, Any]]]
 
 
+def _get_user_attr(user: Any, attr: str, default: Any = None) -> Any:
+    """Safely extracts an attribute whether user is an ORM model, dict, or None."""
+    if user is None:
+        return default
+    if isinstance(user, dict):
+        return user.get(attr, default)
+    return getattr(user, attr, default)
+
+
 @dataclass
 class ToolDefinition:
     """Metadata and async handler for a callable support agent tool."""
@@ -155,34 +164,7 @@ class AgentToolRegistry:
             except Exception as e:
                 logger.warning(f"Error parsing expires_at: {e}")
 
-        # 4. User scoping & RBAC isolation
-        if current_user is not None:
-            user_role = getattr(current_user, "role", "user")
-            if user_role != "admin":
-                user_id = getattr(current_user, "id", None)
-                user_email = str(getattr(current_user, "email", "")).lower()
-                c_id = pending.get("creator_id")
-                c_email = str(pending.get("creator_email", "")).lower()
-
-                has_mismatch = False
-                if c_id is not None and user_id is not None and c_id != user_id:
-                    has_mismatch = True
-                if c_email and user_email and c_email != user_email:
-                    has_mismatch = True
-
-                if has_mismatch:
-                    return {
-                        "action_id": action_id,
-                        "status": "forbidden",
-                        "error_code": "ACTION_FORBIDDEN",
-                        "executed": False,
-                        "result_message": "Quyền truy cập bị từ chối: Bạn không có quyền xác nhận hành động của người dùng khác.",
-                        "message": "Quyền truy cập bị từ chối: Bạn không có quyền xác nhận hành động của người dùng khác.",
-                        "ticket_id": None,
-                        "data": {"status": "forbidden"},
-                    }
-
-        # 5. Cancellation path
+        # 4. Cancellation path (clean abort without mutating state)
         if not confirmed:
             pending["status"] = "cancelled"
             return {
@@ -194,6 +176,47 @@ class AgentToolRegistry:
                 "ticket_id": None,
                 "data": {"status": "cancelled"},
             }
+
+        # 5. User scoping & RBAC isolation for action confirmation
+        user_role = _get_user_attr(current_user, "role", None)
+        user_id = _get_user_attr(current_user, "id", None)
+        user_email = str(_get_user_attr(current_user, "email", "") or "").lower()
+        c_id = pending.get("creator_id")
+        c_email = str(pending.get("creator_email", "") or "").lower()
+
+        # Decision Option A: Mutating ticket status or priority is strictly restricted to Admins
+        if pending.get("action_type") == "update_ticket_priority_or_status" and user_role != "admin":
+            return {
+                "action_id": action_id,
+                "status": "forbidden",
+                "error_code": "ACTION_FORBIDDEN",
+                "executed": False,
+                "result_message": "Quyền truy cập bị từ chối: Thao tác cập nhật trạng thái/độ ưu tiên ticket chỉ dành cho Quản trị viên (Admin).",
+                "message": "Quyền truy cập bị từ chối: Thao tác cập nhật trạng thái/độ ưu tiên ticket chỉ dành cho Quản trị viên (Admin).",
+                "ticket_id": None,
+                "data": {"status": "forbidden"},
+            }
+
+        # General creator isolation: Non-admin users cannot confirm actions created by another authenticated user
+        if user_role != "admin":
+            has_mismatch = False
+            if c_id is not None:
+                if current_user is None or user_id != c_id:
+                    has_mismatch = True
+            elif c_email and current_user is not None and user_email and c_email != user_email:
+                has_mismatch = True
+
+            if has_mismatch:
+                return {
+                    "action_id": action_id,
+                    "status": "forbidden",
+                    "error_code": "ACTION_FORBIDDEN",
+                    "executed": False,
+                    "result_message": "Quyền truy cập bị từ chối: Bạn không có quyền xác nhận hành động của người dùng khác.",
+                    "message": "Quyền truy cập bị từ chối: Bạn không có quyền xác nhận hành động của người dùng khác.",
+                    "ticket_id": None,
+                    "data": {"status": "forbidden"},
+                }
 
         action_type = pending["action_type"]
         params = pending.get("parameters", {})
@@ -447,6 +470,8 @@ async def handle_prepare_ticket_update(
     ticket_code: str,
     priority: Optional[str] = None,
     status: Optional[str] = None,
+    creator_id: Optional[int] = None,
+    creator_email: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Tool 4: Mutating tool that prepares a PendingAction to update a ticket's priority or status (requires user confirmation)."""
     formatted_code = ticket_code.upper() if ticket_code.startswith("#") else f"#{ticket_code.upper()}"
@@ -468,6 +493,8 @@ async def handle_prepare_ticket_update(
         action_type="update_ticket_priority_or_status",
         summary=summary,
         parameters=params,
+        creator_id=creator_id,
+        creator_email=creator_email,
     )
     response_text = (
         f"Tôi đã chuẩn bị lệnh cập nhật cho phiếu hỗ trợ **{formatted_code}** ({change_str}).\n"
@@ -576,6 +603,21 @@ async def detect_and_route_tool(
         r"(đóng|giải\s+quyết|resolve)\s+(ticket|phiếu)\s+#?tick-\d+",
     ]
     if any(re.search(p, q_low) for p in update_patterns) and ticket_code:
+        # Decision Option A: Enforce authorization at prepare time
+        user_role = _get_user_attr(current_user, "role", None)
+        if user_role != "admin":
+            refusal_msg = (
+                "Chỉ Quản trị viên (Admin) hoặc Nhân viên hỗ trợ mới có quyền cập nhật trạng thái "
+                "hoặc mức độ ưu tiên của phiếu hỗ trợ qua hệ thống tự động. "
+                "Nếu quý khách cần thay đổi thông tin phiếu, vui lòng liên hệ trực tiếp với bộ phận chăm sóc khách hàng để được hỗ trợ."
+            )
+            return {
+                "tools_called": ["update_ticket_priority_or_status"],
+                "response": refusal_msg,
+                "pending_action": None,
+                "confidence": 0.95,
+            }
+
         new_prio: Optional[str] = None
         for p_level in ["urgent", "high", "medium", "low"]:
             if p_level in q_low:
@@ -595,6 +637,8 @@ async def detect_and_route_tool(
             ticket_code=ticket_code,
             priority=new_prio,
             status=new_status,
+            creator_id=_get_user_attr(current_user, "id", None),
+            creator_email=_get_user_attr(current_user, "email", None),
         )
         return {
             "tools_called": ["update_ticket_priority_or_status"],
@@ -626,10 +670,10 @@ async def detect_and_route_tool(
         subject = cleaned_subj[:120] if len(cleaned_subj) >= 5 else "Yêu cầu hỗ trợ kỹ thuật khẩn cấp"
         description = f"Khách hàng yêu cầu tạo ticket qua AI Chat: {query.strip()}"
 
-        user_email = customer_email or (getattr(current_user, "email", None) if current_user else "an.nguyen@company.vn")
-        user_name = getattr(current_user, "full_name", "Nguyễn Văn An") if current_user else "Nguyễn Văn An"
-        c_id = getattr(current_user, "id", None) if current_user else None
-        c_email = getattr(current_user, "email", None) if current_user else None
+        user_email = customer_email or (_get_user_attr(current_user, "email", None) if current_user else "an.nguyen@company.vn")
+        user_name = _get_user_attr(current_user, "full_name", "Nguyễn Văn An") if current_user else "Nguyễn Văn An"
+        c_id = _get_user_attr(current_user, "id", None) if current_user else None
+        c_email = _get_user_attr(current_user, "email", None) if current_user else None
 
         prep = await handle_prepare_escalation_ticket(
             registry=active_registry,

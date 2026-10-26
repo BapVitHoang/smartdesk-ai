@@ -84,3 +84,10 @@ async def _extract_text_from_pdf(self, content: bytes) -> str:
 - [ ] Reviewed by Dev B (`@BapVitHoang`)
 - [ ] Reviewed by Lead / Integration Owner
 - [ ] Verified with `python -m pytest backend/tests/test_workspace_and_verification.py -v`
+
+---
+
+## 5. Post-Merge Integration Requests (Prompt M / S-A)
+
+REQ-AI-01 | docs/spec/CONTRACTS.md:55 | In CONTRACTS.md §2, add "config_error" to status Literal["success", "fallback", "refused", "config_error"] (called in rag_service.py:448 and ticket_copilot_service.py:186 on LLMConfigException to prevent false HTTP 429 cooldowns) | integrator | PENDING
+

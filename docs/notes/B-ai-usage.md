@@ -81,4 +81,21 @@
   - *Commit Subject:* `chore(docker): add smoke_docker.ps1 script and record daemon blocker`
   - *Fix Applied:* Added both paths to `integrator` in `scripts/ownership_map.py` and regenerated `.github/CODEOWNERS` via `scripts/gen_codeowners.py`.
 
+---
+
+### Session 6: Defect Remediation Takeover — Two-Phase Confirmation Authorization, Privilege Escalation Defense & Anti-Fabrication Cleanup (`Prompt S-A`: `MRG-DEF-06`, `MRG-DEF-02`, `MRG-DEF-07`)
+- **Date:** 2026-10-26
+- **AI Tool Used:** Antigravity AI Assistant
+- **Key Prompt:** "Hoàng tiếp quản sửa các lỗi AI-Engine từ Báo cáo Tích hợp: Fix MRG-DEF-06 (Ngăn chặn leo thang đặc quyền qua tool update_ticket_priority_or_status, chỉ cho phép Quản trị viên cập nhật, cô lập creator_id/creator_email, kiểm tra 2 tầng PREPARE và EXECUTE), Fix MRG-DEF-02 (Chuẩn hóa ghi chép AI usage tránh false positive trong check_roster.py), Fix MRG-DEF-07 (Tạo request cập nhật status config_error trong CONTRACTS.md §2)."
+- **Manual Verification & Changes:**
+  - Viết suite kiểm thử offline `backend/tests/ai/test_pending_action_authorization.py` gồm 7 test cases xác minh từ chối lịch sự với khách thường/chưa đăng nhập, lưu creator metadata cho Admin, chặn thực thi trái phép và bảo vệ an toàn DB.
+  - Sửa `detect_and_route_tool`, `handle_prepare_ticket_update` và `execute_pending_action` trong `backend/app/services/agent_tools.py` với helper an toàn `_get_user_attr()`.
+  - Chạy toàn bộ test suite AI: 38/38 tests passed. Common/API suite: 14/14 tests passed.
+  - Sửa dòng 51 trong `docs/notes/A-ai-usage.md` và xác minh `check_roster.py` không còn lỗi nào từ notes.
+- **AI Mistakes & Corrections (if encountered):**
+  - *Observed Issue 1 (Over-restrictive Creator Check on Public Chat):* Khi triển khai bước cô lập người tạo trong `execute_pending_action()`, ban đầu AI kiểm tra `if has_creator: if current_user is None: has_mismatch = True`. Điều này khiến khách vãng lai chưa đăng nhập trong luồng chat công khai khi tạo phiếu hỗ trợ (`create_escalation_ticket`) và bấm xác nhận bị từ chối với lỗi `ACTION_FORBIDDEN` (403), gây fail 2 bài test `test_dev_a_suite.py::test_chat_tool_lookup_and_mutating_confirmation_flow` và `test_security_audit_gaps.py::test_confirm_action_full_lifecycle_and_double_confirm_prevention`.
+  - *File:* `backend/app/services/agent_tools.py`
+  - *Fix Applied:* Phân tách rõ ràng: đối với hành động cập nhật phiếu (`update_ticket_priority_or_status`), chỉ Quản trị viên (`role == "admin"`) mới được phép thực thi. Đối với hành động tạo phiếu của người dùng vãng lai (`c_id is None`), cho phép xác nhận mà không yêu cầu tài khoản nội bộ. Nếu hành động do tài khoản đã đăng nhập tạo (`c_id is not None`), chỉ chính tài khoản đó hoặc Admin mới có quyền xác nhận. Kết quả toàn bộ 38/38 bài test pass 100%.
+
+
 
