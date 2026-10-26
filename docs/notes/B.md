@@ -941,5 +941,70 @@ Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
     * `MRG-DEF-01`: 12 fabrication violations in slide binaries (`docs/SLIDES.pdf` and `docs/SLIDES.pptx`) detected by `check_roster.py`. Must appear as limitation until cleanly rebuilt in Task 3.
     * `MRG-DEF-10`: Google Gemini live embedding API returns 3072 dimensions vs PostgreSQL `vector(768)` column schema, handled with pseudo-embedding fallback in `embedding_service.py:138-144`. Must appear as limitation in Report Chapter 7.
 
+---
+
+## Task 1: Claims Table Reconciliation
+
+Table auditing all cross-document claims across `README.md`, `docs/PROPOSAL.md`, `docs/REPORT.md`, `docs/PRESENTATION_AND_DEMO.md`, `docs/TEST_ACCEPTANCE.md`:
+
+| Document | Claim | Source (06 row, command, file) | Status | Notes & Resolution |
+| :--- | :--- | :--- | :---: | :--- |
+| `README.md` | SLA hours: Urgent: 2h, High: 4h, Medium: 8h, Low: 24h | `README.md:10`, `backend/app/db/seed/seed_demo_tickets.py:15-17`, `00-checklist.md:REQ-30` | **OK** | Perfectly matches canonical SLA hours in config and database seeders. |
+| `README.md` | Models: `gemini-3.5-flash-lite`, `qwen2.5:3b`, `nomic-embed-text` | `README.md:14,24`, `backend/app/core/config.py:34-40` | **OK** | Verified live on Google GenAI API; retired `gemini-1.5-flash` purged. |
+| `README.md` | Cost-Guard timeout 4.0s, cooldown 60s | `README.md:15,104`, `backend/app/core/config.py:46-48` | **OK** | Matches `LLM_TIMEOUT_SECONDS=4.0` and `FREE_TIER_RATE_LIMIT_COOLDOWN=60`. |
+| `README.md` | Canonical categories: `Authentication`, `Billing`, `Bug Report`, `Feature Request`, `General` | `README.md:16`, `backend/app/schemas/ticket.py:13-19` | **OK** | `Technical Bug` supported as backwards-compatible alias normalizing to `Bug Report`. |
+| `README.md` | Test accounts: `admin@smartdesk.ai` (admin), `an.nguyen@company.vn` (user) | `README.md:167-168`, `backend/app/db/seed/seed_users.py:20-35` | **OK** | 1-click switcher accounts populated in both SQLite and PostgreSQL. |
+| `README.md` | Roster facts & roles: Refers to `docs/TEAM_ROSTER.md` | `README.md:151-158`, `docs/TEAM_ROSTER.md` | **OK** | Zero unverified names or percentages. |
+| `docs/PROPOSAL.md` | 12 User Stories (`US-01`..`US-12`) | `docs/PROPOSAL.md:28-42`, `00-checklist.md:REQ-24` | **OK** | All 12 stories follow "As a... I want... So that..." with acceptance criteria. |
+| `docs/PROPOSAL.md` | Tech Stack: React 19 + Vite 6, FastAPI Async, PostgreSQL pgvector / SQLite, Gemini / Ollama | `docs/PROPOSAL.md:49-55` | **OK** | Completely matches actual repository code; zero Next.js / Redis claims. |
+| `docs/PROPOSAL.md` | Smoke-test latency benchmark: `922.74ms` | `docs/PROPOSAL.md:135`, Prompt 1 smoke test | **OK** | Recorded from live endpoint benchmark. |
+| `docs/REPORT.md` | Backend test suite: 139 passed, 2 skipped | Command `python -m pytest backend/tests/ -q` (56.94s) | **CORRECT** | Reconciled exact suite output: 139 passed, 2 skipped in 56.94s in Ch 2 & Ch 6. |
+| `docs/REPORT.md` | Docker demo tickets: 43 seeded tickets (15 for An Nguyen) | `seed_tickets.py` (3 tickets, 1 An Nguyen) + `seed_demo_tickets.py` (40 tickets, 14 An Nguyen) | **OK** | Seeded base is 43 tickets (15 An Nguyen); runtime container has 48 tickets due to smoke tests. |
+| `docs/REPORT.md` | AI evaluation benchmark: 24 cases (10 normal, 6 edge, 8 should-refuse), baseline 8/24 (33.3%) -> upgraded 24/24 (100.0%), 0 held-out cases | `backend/data/eval_dataset.json` (24 items), `backend/scripts/run_eval.py` | **OK** | Full breakdown: 10 normal, 6 edge, 8 should-refuse. Baseline derivation documented. 0 held-out cases explicitly reported. |
+| `docs/REPORT.md` | SLA hours: Urgent: 2h, High: 4h, Medium: 8h, Low: 24h | `docs/REPORT.md:41,223`, `backend/app/services/ticket_service.py` | **OK** | Perfectly matches canonical SLA rules. |
+| `docs/REPORT.md` | Commits breakdown: 121 commits on branch HEAD (104 Bap, 9 TheOrijinnn, 8 TKhanhJK) / 132 across all branches (114 Bap, 10 TheOrijinnn, 8 TKhanhJK); zero percentages | Command `git shortlog -sn HEAD` & `git shortlog -sn --all` | **CORRECT** | Document exact commit counts from git log without percentages in Team Section. |
+| `docs/REPORT.md` | RTM table: 4 columns (`User story -> API endpoint or component -> source file(s) -> test case(s)`) mapping 42 REQs | `docs/audit/00-checklist.md:REQ-01..42` | **CORRECT** | Rebuild Chapter 2 RTM table to match 4 columns and expand to cover all 42 official REQs. |
+| `docs/REPORT.md` | Limitations: Capability D not selected, slide binaries roster violations, pgvector 768 vs 3072 dims fallback | `docs/audit/06-final-verification.md` (`REQ-16`, `MRG-DEF-01`, `MRG-DEF-10`) | **CORRECT** | Add explicit dedicated limitations subsection in Chapter 7. |
+| `docs/REPORT.md` | Outdated tech names (Next.js, Redis, MongoDB) | `git grep -i "next\.js"`, `git grep -i "redis"`, `git grep -i "mongodb"` | **OK** | Next.js rejected in ADR-004; Redis mentioned only as future distributed queue; zero MongoDB. |
+| `docs/PRESENTATION_AND_DEMO.md` | 15 slides structure, 8-minute demo, 10-minute live change | `docs/PRESENTATION_AND_DEMO.md:11-28`, `00-checklist.md:REQ-41, REQ-42` | **OK** | Structured strictly according to syllabus requirements. |
+| `docs/PRESENTATION_AND_DEMO.md` | Test accounts: `admin@smartdesk.ai` and `an.nguyen@company.vn` | `docs/PRESENTATION_AND_DEMO.md:64` | **OK** | Accounts and credentials verified. |
+| `docs/TEST_ACCEPTANCE.md` | 7 core manual acceptance scenarios | `docs/TEST_ACCEPTANCE.md:42-184` | **OK** | Covering customer RAG, fallback, ticket submit, agent triage, verification, and telemetry. |
+| `docs/TEST_ACCEPTANCE.md` | Automated test suite coverage | `docs/TEST_ACCEPTANCE.md:17-39` | **OK** | Lists core endpoints, models, and security test cases. |
+
+### Reconciliation Summary:
+- **Total claims audited:** 21
+- **Status breakdown:** 16 OK, 5 CORRECT, 0 REMOVE.
+- **Key resolutions to apply in Task 2:**
+  1. Rebuild RTM in `docs/REPORT.md` Chapter 2 to 4-column format mapping all 42 REQs.
+  2. In Chapter 6, record exact suite counts: 139 passed, 2 skipped (56.94s) and eval benchmark breakdown (24 cases, baseline 8/24, 0 held-out).
+  3. In Chapter 7, detail `REQ-16` (Capability D not selected), `MRG-DEF-01` (slide roster violations), and `MRG-DEF-10` (pgvector 768 vs 3072 fallback).
+  4. In Team Chapter, record official names and MSSVs from `TEAM_ROSTER.md`, exact git commit counts (zero percentages), and the two required sentences acknowledging AI agent assistance.
+
+---
+
+## Task 2: Report Content Alignment (REQ-40)
+
+- **Structure & Alignment:**
+  - Updated `docs/REPORT.md` to strictly follow syllabus chapters 1–7.
+  - Front Matter & Section 1.4: Documented official team roster from `docs/TEAM_ROSTER.md` (Ngô Việt Hoàng 23110020, Lê Nguyên 23110043, Tống Gia Khánh 23110032). Documented module ownership, exact commit counts (104/9/8 on branch HEAD; 114/10/8 across repository; zero percentages). Included the two plain sentences acknowledging AI agent assistance.
+  - Chapter 2: Rebuilt RTM table with 4 columns (`User Story / REQ -> API Endpoint / UI Component -> Source Files -> Test Cases`) mapping all 42 official requirements.
+  - Automated RTM validation tool: Created `docs/tools/verify_rtm.py` and mapped `docs/tools/*` in `scripts/ownership_map.py` & `.github/CODEOWNERS`.
+  - Executed `python docs/tools/verify_rtm.py`:
+    ```
+    Found 42 RTM requirement rows in docs/REPORT.md.
+    --- Validation Results ---
+    Checked source files across 42 requirements.
+    [PASS] All referenced source files exist on disk.
+    [PASS] All referenced test files exist on disk.
+    SUCCESS: 100% of RTM table entries (42/42) verified successfully!
+    ```
+  - Chapter 6: Separated Deterministic CI Evaluation (< 2s) and Live Cloud Evaluation. Documented exact 24 evaluation cases (10 normal, 6 edge, 8 should-refuse; 0 held-out cases). Documented baseline 8/24 derivation (simulated legacy logic: ungrounded prompt, missing Vietnamese regex, schema parse failure). Documented automated Pytest suite (139 passed, 2 skipped in 56.94s).
+  - Chapter 7: Added explicit limitations detailing:
+    * `REQ-16` (Capability D — Multimodal Input not selected by group scope decision; system implements 4 capabilities: A, B, C, E, exceeding the 3 required under `REQ-12`).
+    * `MRG-DEF-01` (Roster fabrication violations in historical slide binaries `docs/SLIDES.pdf` and `docs/SLIDES.pptx`, resolved by rebuilding in Task 3).
+    * `MRG-DEF-10` (Google Gemini live embedding API 3072 dimensions vs database `vector(768)` column schema, handled with deterministic SHA-256 unit pseudo-embedding fallback in `embedding_service.py:138-144`).
+
+
+
 
 
