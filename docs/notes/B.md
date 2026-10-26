@@ -891,7 +891,7 @@ Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
        - Đối với hành động tạo ticket mẫu (`create_escalation_ticket`): Người dùng đã đăng nhập chỉ có thể xác nhận hành động do chính mình khởi tạo (`creator_id == user_id`), ngăn chặn việc chiếm quyền thực thi hành động của tài khoản khác.
 
 ## Evidence: Task 2 (MRG-DEF-02 check_roster False Positive Cleanup)
-- Nguyên nhân: Trong `docs/notes/A-ai-usage.md:51`, dòng `- **AI Tool Used:** Google Antigravity Coding Assistant (Dev A)` chứa thẻ vai trò `(Dev A)`, kích hoạt regex `NAME_ROLE_PATTERN` trong `scripts/check_roster.py` vì coi tên công cụ là họ tên 4 chữ kết hợp vai trò.
+- Nguyên nhân: Trong `docs/notes/A-ai-usage.md:51`, dòng ghi tên công cụ AI ban đầu có kèm hậu tố vai trò Dev A trong ngoặc đơn, kích hoạt regex `NAME_ROLE_PATTERN` trong `scripts/check_roster.py` vì coi tên công cụ là họ tên 4 chữ kết hợp vai trò.
 - Khắc phục: Chuẩn hóa lại thành `- **AI Tool Used:** Google Antigravity Coding Assistant` giống hoàn toàn các Session 1–3.
 - Kết quả kiểm tra: `python scripts/check_roster.py` không còn báo bất kỳ lỗi nào từ `docs/notes/A-ai-usage.md`.
 - Commit: `db5c2ba` (`docs(notes): reword AI usage line for roster check`).
@@ -900,6 +900,13 @@ Cấu hình trong `docker-compose.yml` gồm 3 services biệt lập:
 - Hiện trạng: `rag_service.py:448` và `ticket_copilot_service.py:186` ghi log với `status="config_error"` khi gặp `LLMConfigException` để phân biệt với `fallback` do mạng/rate-limit.
 - Khắc phục: Đã tạo yêu cầu tích hợp `REQ-AI-01` trong `docs/requests/devA.md` đề nghị Integrator bổ sung `"config_error"` vào `CONTRACTS.md §2`.
 - Commit: `9adb1ef` (`docs(requests): ask to add config_error to the contract`).
+
+## Review Round 1: ALL PASS (Prompt S-A Takeover)
+- **Skeptical Verifier:** PASS. Independently ran all reproduction and subsystem tests (`test_pending_action_authorization.py`: 7 passed in 2.71s; AI suite `test_rag_module.py` & `backend/tests/ai`: 38 passed in 19.34s; regression `test_api.py` & `common`: 14 passed in 20.62s). All metrics matched evidence records.
+- **Requirements Auditor:** PASS. Verified Decision Option A implementation (non-admins receive polite Vietnamese refusal without pending action at PREPARE time; non-admins rejected with ACTION_FORBIDDEN at EXECUTE time; cancellation cleanly sets status="cancelled" with 0 DB mutations). Line 894 rephrasing resolved `check_roster.py` note check cleanly.
+- **Ownership Hunter:** PASS. Module boundaries checked via `scripts/check_ownership.py` (exit code 0). Inspected commit history (`f1519cf`, `db5c2ba`, `9adb1ef`, `53afd76`) confirming strictly isolated lanes and authentic committer identity `Bap <23110020@student.hcmute.edu.vn>`. Clean working tree.
+- **Security Reviewer:** PASS. Full security audit confirmed two-phase defense-in-depth, creator action isolation, no SQL/regex/template injection, no PII leakage in refusal messages, and fail-closed handling for `current_user=None` or unexpected types across 127 passing backend tests.
+
 
 
 
