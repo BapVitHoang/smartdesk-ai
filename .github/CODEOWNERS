@@ -30,6 +30,7 @@
 /docs/audit/*                                 @BapVitHoang  # integrator
 /docs/plan/*                                  @BapVitHoang  # integrator
 /docs/spec/*                                  @BapVitHoang  # integrator
+/docs/tools/*                                 @BapVitHoang  # integrator
 /frontend/src/types/*                         @BapVitHoang  # integrator
 
 # =============================================================================

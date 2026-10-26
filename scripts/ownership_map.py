@@ -161,6 +161,7 @@ OWNERSHIP_MAP = {
         "docs/plan/*",
         "docs/requests/template.md",
         "docs/spec/*",
+        "docs/tools/*",
         "frontend/.env.example",
         "frontend/Dockerfile",
         "frontend/nginx.conf",
