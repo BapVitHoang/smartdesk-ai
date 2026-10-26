@@ -1004,6 +1004,43 @@ Table auditing all cross-document claims across `README.md`, `docs/PROPOSAL.md`,
     * `MRG-DEF-01` (Roster fabrication violations in historical slide binaries `docs/SLIDES.pdf` and `docs/SLIDES.pptx`, resolved by rebuilding in Task 3).
     * `MRG-DEF-10` (Google Gemini live embedding API 3072 dimensions vs database `vector(768)` column schema, handled with deterministic SHA-256 unit pseudo-embedding fallback in `embedding_service.py:138-144`).
 
+---
+
+## Task 3: Rebuild Deliverables Reproducibly (REQ-40, REQ-41)
+
+- **Generator Tools Created:**
+  - `docs/tools/build_report_pdf.py`: Python script utilizing ReportLab with registered Windows TrueType fonts (`Arial`, `Arial-Bold`, `Arial-Italic`) for Vietnamese diacritics. Builds complete report covering chapters 1–7, formal cover page, table of contents, glossary, and 42-requirement RTM table.
+  - `docs/tools/build_slides.py`: Python script utilizing `python-pptx` to generate `docs/SLIDES.pptx` (15 slides in 16:9 widescreen layout) and ReportLab to generate `docs/SLIDES.pdf` (15 landscape pages in 16:9 layout matching the exact presentation outline).
+  - `docs/tools/requirements.txt`: Specifying `reportlab>=4.0.0`, `python-pptx>=1.0.0`, `pypdf>=5.0.0`.
+- **Generation & Page Count Verification:**
+  - Command: `python docs/tools/build_report_pdf.py`
+    * Output: `Generated docs/REPORT.pdf successfully with 11 pages. [PASS] Page count 11 is strictly within the 10–20 page requirement (REQ-40).`
+  - Command: `python docs/tools/build_slides.py`
+    * Output:
+      ```
+      Generated docs/SLIDES.pptx successfully with 15 slides.
+      Generated docs/SLIDES.pdf successfully with 15 pages.
+      [PASS] Slide count 15 satisfies <= 15 requirement (REQ-41).
+      ```
+- **Roster & Anti-Fabrication Gate Verification:**
+  - Command: `python scripts/check_roster.py`
+  - Output:
+    ```
+    ============================================================
+    SmartDesk AI — Roster & Anti-Fabrication Gate (check_roster.py)
+    ============================================================
+    Loaded from docs/TEAM_ROSTER.md:
+      - Verified Full Names : ['ngô việt hoàng', 'tống gia khánh', 'lê nguyên']
+      - Verified MSSVs      : ['23110032', '23110043', '23110020']
+      - Allowed Git Emails  : ['khanhssaa77@gmail.com', 'lenguyensonghinh@gmail.com', '23110020@student.hcmute.edu.vn']
+      - Allowed Handles     : ['@tkhanh', '@theorijinnn', '@bapvithoang']
+    ------------------------------------------------------------
+    [PASS] Anti-Fabrication & Roster Gate passed cleanly (0 violations).
+    ```
+  - **Result:** Defect `MRG-DEF-01` (12 historical slide roster violations) is 100% resolved across all PDFs and PPTX files.
+- **Content Sanity:** Verified zero TODO, lorem, [name], "CHƯA CÓ DỮ LIỆU", or historical invented names.
+
+
 
 
 
