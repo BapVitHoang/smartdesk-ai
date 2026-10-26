@@ -183,12 +183,15 @@ export async function streamChatMessage(
     let escalationRecommended: boolean | undefined = undefined;
     let pendingAction: PendingAction | undefined = undefined;
     let toolsCalled: string[] = [];
+    let pendingLine = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const text = decoder.decode(value, { stream: true });
-      const lines = text.split('\n');
+      // An SSE line can be split across network reads; keep the trailing partial line for the next read.
+      pendingLine += decoder.decode(value, { stream: true });
+      const lines = pendingLine.split('\n');
+      pendingLine = lines.pop() ?? '';
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {

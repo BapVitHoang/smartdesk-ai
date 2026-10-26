@@ -27,7 +27,7 @@ async def test_sse_chat_stream_emits_metadata_tokens_and_done(client) -> None:
     assert "event: done" in raw_body
 
     data_lines = [
-        json.loads(line[len("data: "):])
+        json.loads(line[len("data: ") :])
         for line in raw_body.splitlines()
         if line.startswith("data: ")
     ]
@@ -105,6 +105,12 @@ async def test_ai_usage_telemetry_and_reset_cooldown_endpoints(client) -> None:
     assert "total_tokens" in usage_data
     assert "total_cost_usd" in usage_data
     assert "avg_latency_ms" in usage_data
+    expected_avg_cost = (
+        round(usage_data["total_cost_usd"] / usage_data["total_requests"], 6)
+        if usage_data["total_requests"]
+        else 0.0
+    )
+    assert usage_data["avg_cost_usd"] == pytest.approx(expected_avg_cost, abs=1e-6)
     assert "refused_count" in usage_data
     assert "fallback_count" in usage_data
     assert isinstance(usage_data["recent_logs"], list)

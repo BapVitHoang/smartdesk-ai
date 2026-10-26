@@ -141,7 +141,7 @@ export function getRagResponse(question: string, workspaceId: number = 1): {
   if (workspaceId === 2) {
     if (q.includes("niềng") || q.includes("invisalign") || q.includes("mắc cài") || q.includes("trả góp")) {
       return {
-        text: `Bác sĩ SmileCare Bot xin tư vấn về dịch vụ Chỉnh nha & Niềng răng tại phòng khám:`,
+        text: `Trợ lý ảo SmileCare xin tư vấn về dịch vụ Chỉnh nha & Niềng răng tại phòng khám (thông tin tham khảo, không thay thế tư vấn của bác sĩ):`,
         bulletPoints: [
           "Niềng răng mắc cài kim loại tiêu chuẩn: 25.000.000đ - 35.000.000đ.",
           "Niềng răng trong suốt Invisalign (Mỹ): 60.000.000đ - 95.000.000đ tùy mức độ xô lệch.",
@@ -161,7 +161,7 @@ export function getRagResponse(question: string, workspaceId: number = 1): {
 
     if (q.includes("implant") || q.includes("trụ") || q.includes("răng") || q.includes("cạo vôi") || q.includes("trám")) {
       return {
-        text: `Bác sĩ SmileCare Bot xin gửi thông tin chi phí các dịch vụ nha khoa tổng quát và cấy ghép Implant:`,
+        text: `Trợ lý ảo SmileCare xin gửi thông tin chi phí các dịch vụ nha khoa tổng quát và cấy ghép Implant (giá tham khảo):`,
         bulletPoints: [
           "Cạo vôi răng và đánh bóng siêu âm: 200.000đ / 2 hàm.",
           "Trám răng thẩm mỹ bằng Composite hạt Nano: 350.000đ - 500.000đ / răng.",
@@ -181,11 +181,11 @@ export function getRagResponse(question: string, workspaceId: number = 1): {
     }
 
     return {
-      text: `Bác sĩ SmileCare Bot xin chào quý khách! Hiện tại trong tài liệu nha khoa chưa có thông tin chính xác về câu hỏi "${question}".`,
+      text: `Trợ lý ảo SmileCare xin chào quý khách! Hiện tại trong tài liệu nha khoa chưa có thông tin chính xác về câu hỏi "${question}". Thông tin của trợ lý chỉ mang tính tham khảo, không thay thế tư vấn của bác sĩ.`,
       bulletPoints: [
         "Nha Khoa SmileCare là cơ sở y tế chuyên khoa răng hàm mặt (niềng răng, implant, bọc sứ, thẩm mỹ).",
         "Nếu quý khách cần tư vấn tình trạng răng miệng hoặc đặt lịch khám với bác sĩ chuyên khoa, quý khách có thể gửi câu hỏi thêm.",
-        "Quý khách vui lòng bấm nút 'Gửi Ticket' để đội ngũ lễ tân và trợ lý nha khoa liên hệ tư vấn trực tiếp."
+        "Quý khách vui lòng bấm nút 'Gửi yêu cầu hỗ trợ' để đội ngũ lễ tân và trợ lý nha khoa liên hệ tư vấn trực tiếp."
       ],
       citations: [
         {
@@ -225,7 +225,7 @@ export function getRagResponse(question: string, workspaceId: number = 1): {
       text: `TechStore Advisor xin chào quý khách! Trong hệ thống chính sách điện máy chưa tìm thấy thông tin chính xác cho câu hỏi "${question}".`,
       bulletPoints: [
         "Hệ thống Điện Máy TechStore hỗ trợ thiết bị điện thoại, laptop, tablet, tivi và gia dụng thông minh.",
-        "Quý khách có thể bấm 'Gửi Ticket' để nhân viên kỹ thuật hoặc tổng đài viên 1800 6060 hỗ trợ nhanh chóng."
+        "Quý khách có thể bấm 'Gửi yêu cầu hỗ trợ' để nhân viên kỹ thuật hoặc tổng đài viên 1800 6060 hỗ trợ nhanh chóng."
       ],
       citations: [
         {
@@ -327,7 +327,7 @@ export function getRagResponse(question: string, workspaceId: number = 1): {
     bulletPoints: [
       "Hệ thống SmartDesk tự động cập nhật chính sách hỗ trợ khách hàng theo chuẩn ITIL v4 mới nhất.",
       "Để điều chỉnh cài đặt tài khoản hoặc quyền truy cập, bạn có thể thực hiện tại mục Hồ sơ người dùng.",
-      "Nếu câu trả lời chưa giải quyết trọn vẹn sự cố, bạn hãy nhấn nút chuyển sang Gửi Ticket phía trên để chuyển giao cho chuyên viên kỹ thuật."
+      "Nếu câu trả lời chưa giải quyết trọn vẹn sự cố, bạn hãy nhấn nút 'Gửi yêu cầu hỗ trợ' phía trên để chuyển giao cho chuyên viên kỹ thuật."
     ],
     citations: [
       {
@@ -413,7 +413,7 @@ export const INITIAL_WORKSPACES: Workspace[] = [
     slug: "smilecare",
     name: "Nha Khoa Thẩm Mỹ SmileCare",
     industry: "Y tế & Nha khoa",
-    persona_name: "Bác sĩ SmileCare Bot",
+    persona_name: "Trợ lý ảo SmileCare",
     tone_of_voice: "Ân cần, chu đáo, đồng cảm, chuyên môn y khoa cao nhưng dễ hiểu.",
     business_rules: "Tư vấn niềng răng, bọc sứ, tẩy trắng, cấy ghép Implant. Báo giá dịch vụ minh bạch. Không đưa ra chỉ định thuốc kháng sinh khi chưa có đơn khám.",
     created_at: "2026-09-02T00:00:00Z"

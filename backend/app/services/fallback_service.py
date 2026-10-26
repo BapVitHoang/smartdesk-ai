@@ -13,23 +13,158 @@ logger = logging.getLogger("smartdesk.fallback")
 
 # Standard English and basic Vietnamese stopwords
 STOPWORDS = {
-    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and",
-    "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being",
-    "below", "between", "both", "but", "by", "can", "can't", "cannot", "could",
-    "did", "do", "does", "doing", "don't", "down", "during", "each", "few", "for",
-    "from", "further", "had", "has", "have", "having", "he", "her", "here", "hers",
-    "herself", "him", "himself", "his", "how", "i", "if", "in", "into", "is",
-    "isn't", "it", "its", "itself", "let's", "me", "more", "most", "my", "myself",
-    "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought",
-    "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should",
-    "so", "some", "such", "than", "that", "the", "their", "theirs", "them",
-    "themselves", "then", "there", "these", "they", "this", "those", "through",
-    "to", "too", "under", "until", "up", "very", "was", "we", "were", "what",
-    "when", "where", "which", "while", "who", "whom", "why", "with", "would",
-    "you", "your", "yours", "yourself", "yourselves",
+    "a",
+    "about",
+    "above",
+    "after",
+    "again",
+    "against",
+    "all",
+    "am",
+    "an",
+    "and",
+    "any",
+    "are",
+    "aren't",
+    "as",
+    "at",
+    "be",
+    "because",
+    "been",
+    "before",
+    "being",
+    "below",
+    "between",
+    "both",
+    "but",
+    "by",
+    "can",
+    "can't",
+    "cannot",
+    "could",
+    "did",
+    "do",
+    "does",
+    "doing",
+    "don't",
+    "down",
+    "during",
+    "each",
+    "few",
+    "for",
+    "from",
+    "further",
+    "had",
+    "has",
+    "have",
+    "having",
+    "he",
+    "her",
+    "here",
+    "hers",
+    "herself",
+    "him",
+    "himself",
+    "his",
+    "how",
+    "i",
+    "if",
+    "in",
+    "into",
+    "is",
+    "isn't",
+    "it",
+    "its",
+    "itself",
+    "let's",
+    "me",
+    "more",
+    "most",
+    "my",
+    "myself",
+    "no",
+    "nor",
+    "not",
+    "of",
+    "off",
+    "on",
+    "once",
+    "only",
+    "or",
+    "other",
+    "ought",
+    "our",
+    "ours",
+    "ourselves",
+    "out",
+    "over",
+    "own",
+    "same",
+    "she",
+    "should",
+    "so",
+    "some",
+    "such",
+    "than",
+    "that",
+    "the",
+    "their",
+    "theirs",
+    "them",
+    "themselves",
+    "then",
+    "there",
+    "these",
+    "they",
+    "this",
+    "those",
+    "through",
+    "to",
+    "too",
+    "under",
+    "until",
+    "up",
+    "very",
+    "was",
+    "we",
+    "were",
+    "what",
+    "when",
+    "where",
+    "which",
+    "while",
+    "who",
+    "whom",
+    "why",
+    "with",
+    "would",
+    "you",
+    "your",
+    "yours",
+    "yourself",
+    "yourselves",
     # Vietnamese common stopwords
-    "la", "la", "cac", "nhung", "va", "cua", "trong", "co", "duoc", "de", "cho",
-    "voi", "khong", "toi", "ban", "ve", "nay", "do", "khi", "nhu", "tai"
+    "la",
+    "la",
+    "cac",
+    "nhung",
+    "va",
+    "cua",
+    "trong",
+    "co",
+    "duoc",
+    "de",
+    "cho",
+    "voi",
+    "khong",
+    "toi",
+    "ban",
+    "ve",
+    "nay",
+    "do",
+    "khi",
+    "nhu",
+    "tai",
 }
 
 
@@ -68,7 +203,7 @@ class BM25Engine:
             title_tokens = tokenize(doc.get("title", ""))
             content_tokens = tokenize(doc.get("content", ""))
             all_tokens = title_tokens + title_tokens + content_tokens
-            
+
             self.doc_lengths.append(len(all_tokens))
             unique_tokens = set(all_tokens)
             for token in unique_tokens:
@@ -109,7 +244,9 @@ class BM25Engine:
                 idf = math.log((self.total_docs - df + 0.5) / (df + 0.5) + 1.0)
                 # Term score
                 numerator = freq * (self.k1 + 1.0)
-                denominator = freq + self.k1 * (1.0 - self.b + self.b * (doc_len / max(self.avg_doc_len, 1.0)))
+                denominator = freq + self.k1 * (
+                    1.0 - self.b + self.b * (doc_len / max(self.avg_doc_len, 1.0))
+                )
                 doc_score += idf * (numerator / denominator)
 
             if doc_score > 0:
@@ -124,7 +261,9 @@ class FallbackService:
     """Deterministic, zero-LLM FAQ Matcher and Escalation Provider."""
 
     def __init__(self, faq_file_path: Optional[str] = None) -> None:
-        self.faq_file_path = Path(faq_file_path) if faq_file_path else settings.resolved_seed_faq_path
+        self.faq_file_path = (
+            Path(faq_file_path) if faq_file_path else settings.resolved_seed_faq_path
+        )
         self.bm25 = BM25Engine()
         self.faq_items: List[Dict[str, Any]] = []
         self._load_faq()
@@ -136,7 +275,9 @@ class FallbackService:
                 with open(self.faq_file_path, "r", encoding="utf-8") as f:
                     self.faq_items = json.load(f)
                 self.bm25.fit(self.faq_items)
-                logger.info(f"FallbackService loaded {len(self.faq_items)} FAQs successfully.")
+                logger.info(
+                    f"FallbackService loaded {len(self.faq_items)} FAQs successfully."
+                )
             else:
                 logger.warning(f"Seed FAQ file not found at: {self.faq_file_path}")
                 self.faq_items = []
@@ -149,7 +290,7 @@ class FallbackService:
         query: str,
         workspace_id: Optional[int] = 1,
         workspace_name: Optional[str] = None,
-        docs: Optional[List[Dict[str, Any]]] = None
+        docs: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         Matches customer query deterministically against verified knowledge base.
@@ -157,9 +298,9 @@ class FallbackService:
         """
         ws_id = workspace_id or 1
         ws_label = workspace_name or (
-            "Nha Khoa SmileCare" if ws_id == 2 else (
-                "Điện Máy TechStore" if ws_id == 3 else "SmartDesk Cloud"
-            )
+            "Nha Khoa SmileCare"
+            if ws_id == 2
+            else ("Điện Máy TechStore" if ws_id == 3 else "SmartDesk Cloud")
         )
 
         # 1. Non-default workspaces: match against provided published chunks if available
@@ -176,18 +317,18 @@ class FallbackService:
                             f"Hệ thống trợ lý AI thời gian thực đang trong chế độ dự phòng. "
                             f"Dựa trên Cơ sở tri thức của {ws_label}, dưới đây là thông tin liên quan nhất từ '{top_chk['title']}':\n\n"
                             f"{top_chk['content']}\n\n"
-                            f"Quý khách có thể gửi ticket hỗ trợ nếu cần tư vấn thêm."
+                            f"Quý khách có thể gửi yêu cầu hỗ trợ nếu cần tư vấn thêm."
                         ),
                         "citations": [
                             {
                                 "doc_id": top_chk["doc_id"],
                                 "title": top_chk["title"],
-                                "source_url": top_chk.get("source_url", "/docs")
+                                "source_url": top_chk.get("source_url", "/docs"),
                             }
                         ],
                         "confidence": confidence,
                         "is_fallback": True,
-                        "escalation_recommended": confidence < 0.65
+                        "escalation_recommended": confidence < 0.65,
                     }
 
             return {
@@ -195,18 +336,18 @@ class FallbackService:
                     f"Hiện tại hệ thống trợ lý AI đang tạm thời gián đoạn kết nối thời gian thực. "
                     f"Chúng tôi chưa tìm thấy tài liệu phù hợp trong kho tri thức của {ws_label}.\n\n"
                     f"Để được hỗ trợ nhanh nhất và chính xác nhất, quý khách vui lòng bấm nút "
-                    f"'Leo thang sự cố (Gửi Ticket ưu tiên)' để chuyển yêu cầu trực tiếp tới đội ngũ chuyên trách."
+                    f"'Gửi yêu cầu hỗ trợ ưu tiên' để chuyển yêu cầu trực tiếp tới đội ngũ chuyên trách."
                 ),
                 "citations": [
                     {
                         "doc_id": f"ws-{ws_id}-support",
                         "title": f"Trung tâm hỗ trợ {ws_label}",
-                        "source_url": "/tickets"
+                        "source_url": "/tickets",
                     }
                 ],
                 "confidence": 0.40,
                 "is_fallback": True,
-                "escalation_recommended": True
+                "escalation_recommended": True,
             }
 
         # 2. For default IT workspace, query seed FAQs
@@ -218,19 +359,19 @@ class FallbackService:
         if ranked and ranked[0][1] > 0.8:
             top_doc, raw_score = ranked[0]
             confidence = min(0.85, max(0.40, round(raw_score / 15.0, 2)))
-            
+
             response_text = (
                 f"Hệ thống trợ lý AI thời gian thực đang bận hoặc gián đoạn kết nối. "
                 f"Dựa trên Cơ sở tri thức đã xác thực, dưới đây là tài liệu liên quan nhất: '{top_doc['title']}':\n\n"
                 f"{top_doc['content']}\n\n"
                 f"Nếu thông tin trên chưa giải quyết trọn vẹn vấn đề, quý khách vui lòng bấm "
-                f"'Leo thang sự cố (Gửi Ticket ưu tiên)' phía dưới để chuyên viên kỹ thuật hỗ trợ trực tiếp."
+                f"'Gửi yêu cầu hỗ trợ ưu tiên' phía dưới để chuyên viên kỹ thuật hỗ trợ trực tiếp."
             )
             citations = [
                 {
                     "doc_id": top_doc.get("doc_id", "faq-ref"),
                     "title": top_doc.get("title", "Knowledge Article"),
-                    "source_url": top_doc.get("source_url", "/faq")
+                    "source_url": top_doc.get("source_url", "/faq"),
                 }
             ]
             return {
@@ -238,14 +379,14 @@ class FallbackService:
                 "citations": citations,
                 "confidence": confidence,
                 "is_fallback": True,
-                "escalation_recommended": confidence < 0.60
+                "escalation_recommended": confidence < 0.60,
             }
 
         # No direct keyword/BM25 match found
         fallback_text = (
             "Hệ thống hiện đang gặp lượng truy cập lớn hoặc gián đoạn kết nối với bộ máy suy luận AI. "
             "Hiện tại chưa tìm thấy bài viết phù hợp chính xác với câu hỏi của quý khách trong cơ sở tri thức.\n\n"
-            "Để nhận được hỗ trợ trực tiếp và kịp thời, quý khách vui lòng chuyển sang tab 'Gửi Ticket' "
+            "Để nhận được hỗ trợ trực tiếp và kịp thời, quý khách vui lòng chuyển sang tab 'Gửi yêu cầu hỗ trợ' "
             "để đội ngũ chuyên viên tiếp nhận xử lý."
         )
         return {
@@ -254,12 +395,12 @@ class FallbackService:
                 {
                     "doc_id": "faq-general",
                     "title": "SmartDesk Help Center & Ticket Escalation",
-                    "source_url": "/tickets"
+                    "source_url": "/tickets",
                 }
             ],
             "confidence": 0.30,
             "is_fallback": True,
-            "escalation_recommended": True
+            "escalation_recommended": True,
         }
 
 

@@ -1,9 +1,10 @@
 """RAG (Retrieval-Augmented Generation) pipeline with Workspace Persona, Agent Tool Routing, SSE Token Streaming, Telemetry Logging, and Cost-Guard Circuit Breaker."""
 
+import asyncio
 import json
 import logging
 import time
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,7 +42,9 @@ class RAGService:
         }
         if session:
             try:
-                ws_res = await session.execute(select(Workspace).where(Workspace.id == ws_id))
+                ws_res = await session.execute(
+                    select(Workspace).where(Workspace.id == ws_id)
+                )
                 ws_obj = ws_res.scalar_one_or_none()
                 if ws_obj:
                     persona["persona_name"] = ws_obj.persona_name
@@ -58,7 +61,7 @@ class RAGService:
         query: str,
         session: Optional[AsyncSession] = None,
         workspace_id: Optional[int] = 1,
-        top_k: int = 3
+        top_k: int = 3,
     ) -> List[Dict[str, Any]]:
         """
         Retrieves top relevant knowledge articles from workspace vector chunks or seed FAQ cache.
@@ -74,23 +77,29 @@ class RAGService:
                     query=query,
                     top_k=top_k,
                     session=session,
-                    only_published=True
+                    only_published=True,
                 )
                 min_score = getattr(settings, "RAG_MIN_SIMILARITY_SCORE", 0.25)
                 for chk in similar_chunks:
                     chunk_score = chk.get("score", 0.8)
                     if chunk_score < min_score:
                         continue
-                    docs.append({
-                        "doc_id": chk["chunk_id"],
-                        "title": chk["title"],
-                        "content": chk["content"],
-                        "category": "Workspace Document",
-                        "source_url": chk["source_url"],
-                        "page": chk.get("page_number", 1),
-                        "snippet": chk["content"][:160] + "..." if len(chk["content"]) > 160 else chk["content"],
-                        "score": chunk_score
-                    })
+                    docs.append(
+                        {
+                            "doc_id": chk["chunk_id"],
+                            "title": chk["title"],
+                            "content": chk["content"],
+                            "category": "Workspace Document",
+                            "source_url": chk["source_url"],
+                            "page": chk.get("page_number", 1),
+                            "snippet": (
+                                chk["content"][:160] + "..."
+                                if len(chk["content"]) > 160
+                                else chk["content"]
+                            ),
+                            "score": chunk_score,
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Workspace chunk retrieval failed: {e}")
 
@@ -108,35 +117,55 @@ class RAGService:
                 for chk_obj, doc_status in chunk_rows:
                     if chk_obj.document_id is not None and doc_status != "published":
                         continue
-                    published_chunk_dicts.append({
-                        "doc_id": chk_obj.chunk_id,
-                        "title": chk_obj.title,
-                        "content": chk_obj.content,
-                        "category": "Workspace Document",
-                        "source_url": chk_obj.source_url,
-                        "page": chk_obj.page_number or 1,
-                        "snippet": chk_obj.content[:160] + "..." if len(chk_obj.content) > 160 else chk_obj.content,
-                    })
+                    published_chunk_dicts.append(
+                        {
+                            "doc_id": chk_obj.chunk_id,
+                            "title": chk_obj.title,
+                            "content": chk_obj.content,
+                            "category": "Workspace Document",
+                            "source_url": chk_obj.source_url,
+                            "page": chk_obj.page_number or 1,
+                            "snippet": (
+                                chk_obj.content[:160] + "..."
+                                if len(chk_obj.content) > 160
+                                else chk_obj.content
+                            ),
+                        }
+                    )
                 if not published_chunk_dicts and ws_id in (2, 3):
                     sample_map = {
-                        2: ("Bảng giá Nha Khoa SmileCare", "nha_khoa_smilecare_bang_gia_dich_vu.txt"),
-                        3: ("Chính sách đổi trả Điện Máy TechStore", "dien_may_techstore_chinh_sach_doi_tra.txt"),
+                        2: (
+                            "Bảng giá Nha Khoa SmileCare",
+                            "nha_khoa_smilecare_bang_gia_dich_vu.txt",
+                        ),
+                        3: (
+                            "Chính sách đổi trả Điện Máy TechStore",
+                            "dien_may_techstore_chinh_sach_doi_tra.txt",
+                        ),
                     }
                     doc_title, fname = sample_map[ws_id]
                     sample_path = BACKEND_DIR / "data" / "sample_documents" / fname
                     if sample_path.exists():
                         raw_txt = sample_path.read_text(encoding="utf-8")
-                        sections = [s.strip() for s in raw_txt.split("\n\n") if len(s.strip()) > 20]
+                        sections = [
+                            s.strip()
+                            for s in raw_txt.split("\n\n")
+                            if len(s.strip()) > 20
+                        ]
                         for s_idx, sec in enumerate(sections):
-                            published_chunk_dicts.append({
-                                "doc_id": f"doc-{ws_id}-chk-{s_idx + 1}",
-                                "title": f"{doc_title} - Phần {s_idx + 1}",
-                                "content": sec,
-                                "category": "Workspace Document",
-                                "source_url": f"/workspaces/{ws_id}/documents/sample",
-                                "page": 1,
-                                "snippet": sec[:160] + "..." if len(sec) > 160 else sec,
-                            })
+                            published_chunk_dicts.append(
+                                {
+                                    "doc_id": f"doc-{ws_id}-chk-{s_idx + 1}",
+                                    "title": f"{doc_title} - Phần {s_idx + 1}",
+                                    "content": sec,
+                                    "category": "Workspace Document",
+                                    "source_url": f"/workspaces/{ws_id}/documents/sample",
+                                    "page": 1,
+                                    "snippet": (
+                                        sec[:160] + "..." if len(sec) > 160 else sec
+                                    ),
+                                }
+                            )
                 if published_chunk_dicts:
                     bm25_ws = BM25Engine()
                     bm25_ws.fit(published_chunk_dicts)
@@ -149,7 +178,9 @@ class RAGService:
                         if item_dict["doc_id"] not in seen_doc_ids:
                             seen_doc_ids.add(item_dict["doc_id"])
                             item_copy = dict(item_dict)
-                            item_copy["score"] = min(0.92, round(0.55 + (b_score / 12.0), 2))
+                            item_copy["score"] = min(
+                                0.92, round(0.55 + (b_score / 12.0), 2)
+                            )
                             docs.append(item_copy)
             except Exception as e:
                 logger.warning(f"Hybrid BM25 workspace chunk search failed: {e}")
@@ -166,16 +197,18 @@ class RAGService:
                         continue
                     if doc_item["doc_id"] not in seen_doc_ids:
                         seen_doc_ids.add(doc_item["doc_id"])
-                        docs.append({
-                            "doc_id": doc_item["doc_id"],
-                            "title": doc_item["title"],
-                            "content": doc_item["content"],
-                            "category": doc_item.get("category", "General"),
-                            "source_url": doc_item.get("source_url", "/docs"),
-                            "page": 1,
-                            "snippet": doc_item["content"][:160] + "...",
-                            "score": min(0.95, round(0.55 + (score_val / 15.0), 2)),
-                        })
+                        docs.append(
+                            {
+                                "doc_id": doc_item["doc_id"],
+                                "title": doc_item["title"],
+                                "content": doc_item["content"],
+                                "category": doc_item.get("category", "General"),
+                                "source_url": doc_item.get("source_url", "/docs"),
+                                "page": 1,
+                                "snippet": doc_item["content"][:160] + "...",
+                                "score": min(0.95, round(0.55 + (score_val / 15.0), 2)),
+                            }
+                        )
 
         return docs[:top_k]
 
@@ -185,9 +218,11 @@ class RAGService:
         session: Optional[AsyncSession] = None,
         workspace_id: Optional[int] = None,
         current_user: Optional[Any] = None,
+        token_sink: Optional[Callable[[str], None]] = None,
     ) -> ChatResponse:
         """
         Executes end-to-end RAG query resolution with Agent Tool routing, Workspace Persona, and Cost-Guard Circuit Breaker fallback.
+        When token_sink is given, LLM answer tokens are pushed to it as the provider streams them.
         """
         overall_start = time.perf_counter()
         ws_id = workspace_id or 1
@@ -200,25 +235,40 @@ class RAGService:
         tone_of_voice = persona["tone_of_voice"]
         business_rules = persona["business_rules"]
 
-        # 0. Single-Pass Agent Tool Router (Capability B - REQ-14)
+        # 0. Agent Tool Router: LLM native function calling, keyword router when the LLM is down (Capability B - REQ-14)
+        routing_info: Dict[str, Any] = {}
         try:
             tool_result = await detect_and_route_tool(
                 query=query,
                 session=session,
                 workspace_id=ws_id,
                 current_user=current_user,
+                routing_info=routing_info,
             )
+            routed_by_llm = routing_info.get("router") == "llm"
             if tool_result is not None:
                 latency_ms = round((time.perf_counter() - overall_start) * 1000, 2)
                 await log_ai_call(
                     endpoint="/api/v1/chat",
-                    prompt_version=prompt_ver,
-                    provider=llm_service.provider if llm_service.is_available() else "agent_tool_router",
-                    model_name=llm_service.active_model_name,
+                    prompt_version=(
+                        prompt_registry.get_prompt_version("agent_tool_router")
+                        if routed_by_llm
+                        else prompt_ver
+                    ),
+                    provider=(
+                        llm_service.provider if routed_by_llm else "agent_tool_router"
+                    ),
+                    model_name=(
+                        llm_service.active_model_name
+                        if routed_by_llm
+                        else "keyword_router"
+                    ),
                     tools_called=tool_result["tools_called"],
-                    input_tokens=llm_service.estimate_tokens(query),
-                    output_tokens=llm_service.estimate_tokens(tool_result["response"]),
-                    cost_usd=0.0,
+                    input_tokens=llm_service.last_input_tokens if routed_by_llm else 0,
+                    output_tokens=(
+                        llm_service.last_output_tokens if routed_by_llm else 0
+                    ),
+                    cost_usd=llm_service.last_cost_usd if routed_by_llm else 0.0,
                     latency_ms=latency_ms,
                     status="success",
                     workspace_id=ws_id,
@@ -234,14 +284,37 @@ class RAGService:
                     tools_called=tool_result["tools_called"],
                     pending_action=tool_result["pending_action"],
                 )
+            if routed_by_llm:
+                await log_ai_call(
+                    endpoint="/api/v1/chat",
+                    prompt_version=prompt_registry.get_prompt_version(
+                        "agent_tool_router"
+                    ),
+                    provider=llm_service.provider,
+                    model_name=llm_service.active_model_name,
+                    tools_called=[],
+                    input_tokens=llm_service.last_input_tokens,
+                    output_tokens=llm_service.last_output_tokens,
+                    cost_usd=llm_service.last_cost_usd,
+                    latency_ms=round((time.perf_counter() - overall_start) * 1000, 2),
+                    status="success",
+                    workspace_id=ws_id,
+                    session=session,
+                )
         except Exception as tool_err:
             logger.warning(f"Agent tool routing skipped due to error: {tool_err}")
 
         # Check if already in Free Tier cooldown
         if llm_service.is_in_cooldown():
-            logger.warning("[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.")
-            docs_for_fb = await self.retrieve_context_documents(query, session=session, workspace_id=ws_id, top_k=3)
-            fb_result = fallback_service.match_faq(query, workspace_id=ws_id, workspace_name=ws_name, docs=docs_for_fb)
+            logger.warning(
+                "[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService."
+            )
+            docs_for_fb = await self.retrieve_context_documents(
+                query, session=session, workspace_id=ws_id, top_k=3
+            )
+            fb_result = fallback_service.match_faq(
+                query, workspace_id=ws_id, workspace_name=ws_name, docs=docs_for_fb
+            )
             latency_ms = round((time.perf_counter() - overall_start) * 1000, 2)
             await log_ai_call(
                 endpoint="/api/v1/chat",
@@ -278,7 +351,9 @@ class RAGService:
 
             if not docs:
                 if llm_service.is_in_cooldown():
-                    fb_result = fallback_service.match_faq(query, workspace_id=ws_id, workspace_name=ws_name)
+                    fb_result = fallback_service.match_faq(
+                        query, workspace_id=ws_id, workspace_name=ws_name
+                    )
                     latency_ms = round((time.perf_counter() - overall_start) * 1000, 2)
                     await log_ai_call(
                         endpoint="/api/v1/chat",
@@ -301,13 +376,17 @@ class RAGService:
                         confidence=fb_result["confidence"],
                         is_fallback=True,
                         fallback_reason="FREE_TIER_RATE_LIMIT_COOLDOWN",
-                        escalation_recommended=fb_result.get("escalation_recommended", True),
+                        escalation_recommended=fb_result.get(
+                            "escalation_recommended", True
+                        ),
                         tools_called=[],
                         pending_action=None,
                     )
 
                 # Synthesize polite out-of-scope refusal using externalized prompt
-                logger.info(f"No grounded documents found for workspace {ws_id}. Synthesizing polite persona refusal.")
+                logger.info(
+                    f"No grounded documents found for workspace {ws_id}. Synthesizing polite persona refusal."
+                )
                 oos_system_prompt = prompt_registry.render(
                     "rag_out_of_scope_persona",
                     persona_name=persona_name,
@@ -321,14 +400,16 @@ class RAGService:
                     "Hãy trả lời bằng tiếng Việt, lịch sự, đúng phong thái thương hiệu."
                 )
                 response_text, _ = await llm_service.generate_response(
-                    prompt=user_prompt,
-                    system_prompt=oos_system_prompt,
-                    temperature=0.2
+                    prompt=user_prompt, system_prompt=oos_system_prompt, temperature=0.2
                 )
-                total_latency_ms = round((time.perf_counter() - overall_start) * 1000, 2)
+                total_latency_ms = round(
+                    (time.perf_counter() - overall_start) * 1000, 2
+                )
                 await log_ai_call(
                     endpoint="/api/v1/chat",
-                    prompt_version=prompt_registry.get_prompt_version("rag_out_of_scope_persona"),
+                    prompt_version=prompt_registry.get_prompt_version(
+                        "rag_out_of_scope_persona"
+                    ),
                     provider=llm_service.provider,
                     model_name=llm_service.active_model_name,
                     tools_called=[],
@@ -367,7 +448,7 @@ class RAGService:
                         title=doc["title"],
                         source_url=doc.get("source_url", "/docs"),
                         page=doc.get("page"),
-                        snippet=doc.get("snippet")
+                        snippet=doc.get("snippet"),
                     )
                 )
 
@@ -386,24 +467,42 @@ class RAGService:
                 grounded_context=grounded_context,
             )
 
-            # 3. Call LLM with hard timeout (4.0s)
-            response_text, _ = await llm_service.generate_response(
-                prompt=user_prompt,
-                system_prompt=system_prompt,
-                temperature=0.2
-            )
+            # 3. Call LLM with hard timeout (4.0s); stream tokens to the SSE client when requested
+            if token_sink is not None:
+                response_text, _ = await llm_service.stream_generate(
+                    prompt=user_prompt,
+                    system_prompt=system_prompt,
+                    temperature=0.2,
+                    on_token=token_sink,
+                )
+            else:
+                response_text, _ = await llm_service.generate_response(
+                    prompt=user_prompt, system_prompt=system_prompt, temperature=0.2
+                )
 
             total_latency_ms = round((time.perf_counter() - overall_start) * 1000, 2)
 
             # Dynamic confidence and refusal detection
             top_score = max((d.get("score", 0.0) for d in docs), default=0.0)
             refusal_keywords = [
-                "không có thông tin", "chưa có thông tin", "không thể tìm thấy",
-                "không được đề cập", "gửi ticket", "liên hệ bộ phận hỗ trợ",
-                "không có trong tài liệu", "không thuộc phạm vi", "tôi không biết"
+                "không có thông tin",
+                "chưa có thông tin",
+                "không thể tìm thấy",
+                "không được đề cập",
+                "gửi ticket",
+                "gửi yêu cầu hỗ trợ",
+                "liên hệ bộ phận hỗ trợ",
+                "không có trong tài liệu",
+                "không thuộc phạm vi",
+                "tôi không biết",
             ]
-            is_refusal = any(kw in response_text.lower() for kw in refusal_keywords) or len(docs) == 0
-            confidence = round(top_score, 2) if (top_score > 0 and not is_refusal) else 0.45
+            is_refusal = (
+                any(kw in response_text.lower() for kw in refusal_keywords)
+                or len(docs) == 0
+            )
+            confidence = (
+                round(top_score, 2) if (top_score > 0 and not is_refusal) else 0.45
+            )
             confidence_threshold = getattr(settings, "RAG_CONFIDENCE_THRESHOLD", 0.65)
             escalation_recommended = is_refusal or (confidence < confidence_threshold)
 
@@ -436,15 +535,20 @@ class RAGService:
         except (LLMTimeoutException, LLMServiceException, Exception) as exc:
             total_latency_ms = round((time.perf_counter() - overall_start) * 1000, 2)
             is_cooldown_error = "FREE_TIER_RATE_LIMIT_COOLDOWN" in str(exc)
-            is_config_error = isinstance(exc, LLMConfigException) or getattr(exc, "telemetry_status", None) == "config_error"
+            is_config_error = (
+                isinstance(exc, LLMConfigException)
+                or getattr(exc, "telemetry_status", None) == "config_error"
+            )
 
             log_level = logging.ERROR if is_config_error else logging.WARNING
             logger.log(
                 log_level,
-                f"Routing to FallbackService due to [{type(exc).__name__}: {str(exc)}]..."
+                f"Routing to FallbackService due to [{type(exc).__name__}: {str(exc)}]...",
             )
 
-            fallback_data = fallback_service.match_faq(query, workspace_id=ws_id, workspace_name=ws_name, docs=docs)
+            fallback_data = fallback_service.match_faq(
+                query, workspace_id=ws_id, workspace_name=ws_name, docs=docs
+            )
             telemetry_status = "config_error" if is_config_error else "fallback"
 
             await log_ai_call(
@@ -483,7 +587,9 @@ class RAGService:
                 confidence=fallback_data["confidence"],
                 is_fallback=True,
                 fallback_reason=fb_reason,
-                escalation_recommended=fallback_data.get("escalation_recommended", True),
+                escalation_recommended=fallback_data.get(
+                    "escalation_recommended", True
+                ),
                 tools_called=[],
                 pending_action=None,
             )
@@ -499,39 +605,52 @@ class RAGService:
         """
         Streams RAG response token-by-token via Server-Sent Events (SSE - REQ-04, REQ-10).
         Emits `metadata`, `token`, and `done` events compatible with both CONTRACTS.md §8.3 and frontend streamChatMessage().
+        LLM answers are relayed as the provider emits them; tool, refusal and fallback answers are sent once ready.
+        Citations, confidence and fallback flags are final in the `done` event.
         """
-        chat_res = await self.answer_query(
-            query=query,
-            session=session,
-            workspace_id=workspace_id,
-            current_user=current_user,
-        )
-        citations_dicts = [c.model_dump() for c in chat_res.citations]
-        pending_dict = chat_res.pending_action.model_dump() if chat_res.pending_action else None
-
         meta_payload = {
             "type": "metadata",
             "session_id": session_id or "sess-stream",
-            "model": llm_service.active_model_name if not chat_res.is_fallback else "seed_faq_bm25",
+            "model": llm_service.active_model_name,
             "prompt_version": f"v{prompt_registry.version}",
-            "citations": citations_dicts,
-            "confidence": chat_res.confidence,
-            "is_fallback": chat_res.is_fallback,
-            "escalation_recommended": chat_res.escalation_recommended,
-            "tools_called": chat_res.tools_called,
-            "pending_action": pending_dict,
         }
         yield f"event: metadata\ndata: {json.dumps(meta_payload, ensure_ascii=False)}\n\n"
 
-        words = chat_res.response.split(" ")
-        for idx, word in enumerate(words):
-            chunk_str = f"{word}{' ' if idx < len(words) - 1 else ''}"
-            token_payload = {
-                "type": "token",
-                "token": chunk_str,
-                "delta": chunk_str,
-            }
-            yield f"event: token\ndata: {json.dumps(token_payload, ensure_ascii=False)}\n\n"
+        def _token_event(chunk_str: str) -> str:
+            token_payload = {"type": "token", "token": chunk_str, "delta": chunk_str}
+            return f"event: token\ndata: {json.dumps(token_payload, ensure_ascii=False)}\n\n"
+
+        queue: asyncio.Queue = asyncio.Queue()
+        answer_task = asyncio.create_task(
+            self.answer_query(
+                query=query,
+                session=session,
+                workspace_id=workspace_id,
+                current_user=current_user,
+                token_sink=queue.put_nowait,
+            )
+        )
+        streamed_any = False
+        while not (answer_task.done() and queue.empty()):
+            getter = asyncio.create_task(queue.get())
+            done, _ = await asyncio.wait(
+                {getter, answer_task}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if getter in done:
+                streamed_any = True
+                yield _token_event(getter.result())
+            else:
+                getter.cancel()
+        chat_res = answer_task.result()
+        citations_dicts = [c.model_dump() for c in chat_res.citations]
+        pending_dict = (
+            chat_res.pending_action.model_dump() if chat_res.pending_action else None
+        )
+
+        if not streamed_any:
+            words = chat_res.response.split(" ")
+            for idx, word in enumerate(words):
+                yield _token_event(f"{word}{' ' if idx < len(words) - 1 else ''}")
 
         done_payload = {
             "type": "done",
@@ -545,7 +664,9 @@ class RAGService:
             "escalation_recommended": chat_res.escalation_recommended,
             "pending_action": pending_dict,
             "tools_called": chat_res.tools_called,
-            "prompt_version": prompt_registry.get_prompt_version("rag_customer_support"),
+            "prompt_version": prompt_registry.get_prompt_version(
+                "rag_customer_support"
+            ),
         }
         yield f"event: done\ndata: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
 

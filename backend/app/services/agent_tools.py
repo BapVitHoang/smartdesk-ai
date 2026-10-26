@@ -5,10 +5,11 @@ import datetime
 import logging
 import re
 import uuid
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.prompts import prompt_registry
 from app.models.knowledge import FAQItem, KnowledgeChunk
 from app.models.ticket import Ticket
 from app.schemas.chat import PendingActionSchema
@@ -79,7 +80,9 @@ class AgentToolRegistry:
     ) -> PendingActionSchema:
         """Stores a mutating tool action awaiting explicit user confirmation."""
         action_id = f"act-{uuid.uuid4().hex[:6]}"
-        expires_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=30)
+        expires_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+            minutes=30
+        )
         expires_iso = expires_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         record = {
@@ -185,7 +188,10 @@ class AgentToolRegistry:
         c_email = str(pending.get("creator_email", "") or "").lower()
 
         # Decision Option A: Mutating ticket status or priority is strictly restricted to Admins
-        if pending.get("action_type") == "update_ticket_priority_or_status" and user_role != "admin":
+        if (
+            pending.get("action_type") == "update_ticket_priority_or_status"
+            and user_role != "admin"
+        ):
             return {
                 "action_id": action_id,
                 "status": "forbidden",
@@ -203,7 +209,12 @@ class AgentToolRegistry:
             if c_id is not None:
                 if current_user is None or user_id != c_id:
                     has_mismatch = True
-            elif c_email and current_user is not None and user_email and c_email != user_email:
+            elif (
+                c_email
+                and current_user is not None
+                and user_email
+                and c_email != user_email
+            ):
                 has_mismatch = True
 
             if has_mismatch:
@@ -225,18 +236,29 @@ class AgentToolRegistry:
             ticket_in = TicketCreate(
                 workspace_id=int(params.get("workspace_id", 1)),
                 customer_name=str(params.get("customer_name", "Khách hàng Chat")),
-                customer_email=str(params.get("customer_email", "an.nguyen@company.vn")),
+                customer_email=str(
+                    params.get("customer_email", "an.nguyen@company.vn")
+                ),
                 subject=str(params.get("subject", "Yêu cầu hỗ trợ từ AI Chat")),
-                description=str(params.get("description", params.get("subject", "Yêu cầu hỗ trợ kỹ thuật cần xử lý.")))
-                if len(str(params.get("description", ""))) >= 10
-                else f"Yêu cầu hỗ trợ từ AI Chat: {params.get('subject', 'Cần chuyên viên kiểm tra')}",
+                description=(
+                    str(
+                        params.get(
+                            "description",
+                            params.get("subject", "Yêu cầu hỗ trợ kỹ thuật cần xử lý."),
+                        )
+                    )
+                    if len(str(params.get("description", ""))) >= 10
+                    else f"Yêu cầu hỗ trợ từ AI Chat: {params.get('subject', 'Cần chuyên viên kiểm tra')}"
+                ),
                 category=str(params.get("category", "General")),
                 priority=str(params.get("priority", "High")),
             )
             created = await ticket_service.create_ticket(db, ticket_in)
             pending["status"] = "executed"
             pending["ticket_code"] = created.ticket_code
-            sla_h = getattr(created, "estimated_response_hours", getattr(created, "sla_hours", 8))
+            sla_h = getattr(
+                created, "estimated_response_hours", getattr(created, "sla_hours", 8)
+            )
             msg = f"Ticket {created.ticket_code} đã được tạo thành công với mức ưu tiên {created.priority} (SLA: {sla_h}h)."
             return {
                 "action_id": action_id,
@@ -256,20 +278,27 @@ class AgentToolRegistry:
 
         if action_type == "update_ticket_priority_or_status" and db is not None:
             ticket_code = str(params.get("ticket_code", "#TICK-1042"))
-            formatted_code = ticket_code if ticket_code.startswith("#") else f"#{ticket_code}"
+            formatted_code = (
+                ticket_code if ticket_code.startswith("#") else f"#{ticket_code}"
+            )
             new_priority = params.get("priority")
             new_status = params.get("status")
 
             res = await db.execute(
                 select(Ticket).where(
-                    or_(Ticket.ticket_code == ticket_code, Ticket.ticket_code == formatted_code)
+                    or_(
+                        Ticket.ticket_code == ticket_code,
+                        Ticket.ticket_code == formatted_code,
+                    )
                 )
             )
             ticket_obj = res.scalars().first()
             if ticket_obj:
                 if new_priority:
                     ticket_obj.priority = str(new_priority)
-                    ticket_obj.estimated_response_hours = ticket_service.calculate_sla_hours(str(new_priority))
+                    ticket_obj.estimated_response_hours = (
+                        ticket_service.calculate_sla_hours(str(new_priority))
+                    )
                 if new_status:
                     ticket_obj.status = str(new_status)
                 await db.commit()
@@ -311,6 +340,7 @@ class AgentToolRegistry:
 
 # --- Tool Handlers ---
 
+
 async def handle_lookup_customer_tickets(
     session: Optional[AsyncSession] = None,
     customer_email: Optional[str] = None,
@@ -334,8 +364,17 @@ async def handle_lookup_customer_tickets(
         query = query.where(Ticket.customer_email.ilike(user_email))
 
     if ticket_code:
-        formatted = ticket_code.upper() if ticket_code.startswith("#") else f"#{ticket_code.upper()}"
-        query = query.where(or_(Ticket.ticket_code.ilike(ticket_code), Ticket.ticket_code.ilike(formatted)))
+        formatted = (
+            ticket_code.upper()
+            if ticket_code.startswith("#")
+            else f"#{ticket_code.upper()}"
+        )
+        query = query.where(
+            or_(
+                Ticket.ticket_code.ilike(ticket_code),
+                Ticket.ticket_code.ilike(formatted),
+            )
+        )
     elif customer_email:
         query = query.where(Ticket.customer_email.ilike(customer_email))
     else:
@@ -363,18 +402,20 @@ async def handle_lookup_customer_tickets(
             "resolved": "Đã giải quyết (Resolved)",
         }.get(t.status, t.status)
         lines.append(
-            f"- **{t.ticket_code}**: \"{t.subject}\" | Danh mục: `{t.category}` | "
+            f'- **{t.ticket_code}**: "{t.subject}" | Danh mục: `{t.category}` | '
             f"Ưu tiên: `{t.priority}` (SLA: {sla_h}h) | Trạng thái: **{status_vi}** | Khách hàng: `{t.customer_email}`"
         )
-        items.append({
-            "ticket_code": t.ticket_code,
-            "subject": t.subject,
-            "category": t.category,
-            "priority": t.priority,
-            "status": t.status,
-            "sla_hours": sla_h,
-            "customer_email": t.customer_email,
-        })
+        items.append(
+            {
+                "ticket_code": t.ticket_code,
+                "subject": t.subject,
+                "category": t.category,
+                "priority": t.priority,
+                "status": t.status,
+                "sla_hours": sla_h,
+                "customer_email": t.customer_email,
+            }
+        )
 
     return {
         "found": True,
@@ -397,12 +438,18 @@ async def handle_search_workspace_knowledge(
             .limit(10)
         )
         for chk in chunk_res.scalars().all():
-            if any(tok in chk.content.lower() for tok in query.lower().split() if len(tok) > 2):
-                matches.append({
-                    "doc_id": chk.chunk_id,
-                    "title": chk.title,
-                    "snippet": chk.content[:180],
-                })
+            if any(
+                tok in chk.content.lower()
+                for tok in query.lower().split()
+                if len(tok) > 2
+            ):
+                matches.append(
+                    {
+                        "doc_id": chk.chunk_id,
+                        "title": chk.title,
+                        "snippet": chk.content[:180],
+                    }
+                )
 
     if not matches and workspace_id == 1:
         fb = fallback_service.match_faq(query, workspace_id=1)
@@ -432,8 +479,12 @@ async def handle_prepare_escalation_ticket(
     creator_email: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Tool 3: Mutating tool that prepares a PendingAction to create an escalation support ticket (requires user confirmation)."""
-    norm_category = ticket_copilot_service.infer_category(f"{subject} {description}", category)
-    norm_priority = ticket_copilot_service.infer_priority(f"{subject} {description}", priority)
+    norm_category = ticket_copilot_service.infer_category(
+        f"{subject} {description}", category
+    )
+    norm_priority = ticket_copilot_service.infer_priority(
+        f"{subject} {description}", priority
+    )
 
     summary = f"Tạo ticket mới: {subject} ({norm_priority})"
     params = {
@@ -474,7 +525,11 @@ async def handle_prepare_ticket_update(
     creator_email: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Tool 4: Mutating tool that prepares a PendingAction to update a ticket's priority or status (requires user confirmation)."""
-    formatted_code = ticket_code.upper() if ticket_code.startswith("#") else f"#{ticket_code.upper()}"
+    formatted_code = (
+        ticket_code.upper()
+        if ticket_code.startswith("#")
+        else f"#{ticket_code.upper()}"
+    )
     changes = []
     params: Dict[str, Any] = {"ticket_code": formatted_code}
     if priority:
@@ -515,8 +570,14 @@ def register_default_tools(registry: AgentToolRegistry) -> None:
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "ticket_code": {"type": "string", "description": "Mã ticket dạng #TICK-1042"},
-                    "customer_email": {"type": "string", "description": "Email của khách hàng"},
+                    "ticket_code": {
+                        "type": "string",
+                        "description": "Mã ticket dạng #TICK-1042",
+                    },
+                    "customer_email": {
+                        "type": "string",
+                        "description": "Email của khách hàng",
+                    },
                 },
             },
             requires_confirmation=False,
@@ -531,7 +592,10 @@ def register_default_tools(registry: AgentToolRegistry) -> None:
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Từ khóa cần tra cứu"},
-                    "workspace_id": {"type": "integer", "description": "ID của Workspace"},
+                    "workspace_id": {
+                        "type": "integer",
+                        "description": "ID của Workspace",
+                    },
                 },
                 "required": ["query"],
             },
@@ -547,9 +611,24 @@ def register_default_tools(registry: AgentToolRegistry) -> None:
                 "type": "object",
                 "properties": {
                     "subject": {"type": "string", "description": "Tiêu đề sự cố"},
-                    "description": {"type": "string", "description": "Mô tả chi tiết sự cố"},
-                    "priority": {"type": "string", "enum": ["Low", "Medium", "High", "Urgent"]},
-                    "category": {"type": "string", "enum": ["Authentication", "Billing", "Bug Report", "Feature Request", "General"]},
+                    "description": {
+                        "type": "string",
+                        "description": "Mô tả chi tiết sự cố",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["Low", "Medium", "High", "Urgent"],
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "Authentication",
+                            "Billing",
+                            "Bug Report",
+                            "Feature Request",
+                            "General",
+                        ],
+                    },
                 },
                 "required": ["subject", "description"],
             },
@@ -563,9 +642,18 @@ def register_default_tools(registry: AgentToolRegistry) -> None:
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "ticket_code": {"type": "string", "description": "Mã ticket dạng #TICK-1042"},
-                    "priority": {"type": "string", "enum": ["Low", "Medium", "High", "Urgent"]},
-                    "status": {"type": "string", "enum": ["open", "in_progress", "resolved"]},
+                    "ticket_code": {
+                        "type": "string",
+                        "description": "Mã ticket dạng #TICK-1042",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["Low", "Medium", "High", "Urgent"],
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["open", "in_progress", "resolved"],
+                    },
                 },
                 "required": ["ticket_code"],
             },
@@ -574,50 +662,39 @@ def register_default_tools(registry: AgentToolRegistry) -> None:
     )
 
 
-async def detect_and_route_tool(
-    query: str,
-    session: Optional[AsyncSession] = None,
-    workspace_id: int = 1,
-    registry: Optional[AgentToolRegistry] = None,
-    current_user: Optional[Any] = None,
-) -> Optional[Dict[str, Any]]:
-    """
-    Single-pass deterministic + intent tool router for Chat & Streaming endpoints.
-    Returns None if the query is a normal RAG knowledge question.
-    """
-    active_registry = registry or agent_tool_registry
-    q_low = query.lower().strip()
+PRIORITY_LEVELS = ["Low", "Medium", "High", "Urgent"]
+TICKET_STATUSES = ["open", "in_progress", "resolved"]
+TICKET_CATEGORIES = [
+    "Authentication",
+    "Billing",
+    "Bug Report",
+    "Feature Request",
+    "General",
+]
 
-    # Extract #TICK-XXXX or email if present
-    tick_match = re.search(r"#?tick-\d{3,6}", q_low, re.IGNORECASE)
+
+def _extract_identifiers(query: str) -> Tuple[Optional[str], Optional[str]]:
+    """Extracts a #TICK-XXXX code and a customer email from the raw (unredacted) user message."""
+    tick_match = re.search(r"#?tick-\d{3,6}", query, re.IGNORECASE)
     ticket_code = tick_match.group(0).upper() if tick_match else None
     if ticket_code and not ticket_code.startswith("#"):
         ticket_code = f"#{ticket_code}"
+    email_match = re.search(
+        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", query
+    )
+    return ticket_code, (email_match.group(0) if email_match else None)
 
-    email_match = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", query)
-    customer_email = email_match.group(0) if email_match else None
 
-    # 1. Check for Mutating Intent: Update existing ticket priority or status
+def _select_tool_by_rules(query: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+    """Deterministic keyword router, used when the LLM is unavailable (offline / cooldown / error)."""
+    q_low = query.lower().strip()
+    ticket_code, _ = _extract_identifiers(query)
+
     update_patterns = [
         r"(cập\s+nhật|đổi|thay\s+đổi|nâng|chuyển|update)\s+.*(ticket|phiếu|#?tick-\d+)",
         r"(đóng|giải\s+quyết|resolve)\s+(ticket|phiếu)\s+#?tick-\d+",
     ]
-    if any(re.search(p, q_low) for p in update_patterns) and ticket_code:
-        # Decision Option A: Enforce authorization at prepare time
-        user_role = _get_user_attr(current_user, "role", None)
-        if user_role != "admin":
-            refusal_msg = (
-                "Chỉ Quản trị viên (Admin) hoặc Nhân viên hỗ trợ mới có quyền cập nhật trạng thái "
-                "hoặc mức độ ưu tiên của phiếu hỗ trợ qua hệ thống tự động. "
-                "Nếu quý khách cần thay đổi thông tin phiếu, vui lòng liên hệ trực tiếp với bộ phận chăm sóc khách hàng để được hỗ trợ."
-            )
-            return {
-                "tools_called": ["update_ticket_priority_or_status"],
-                "response": refusal_msg,
-                "pending_action": None,
-                "confidence": 0.95,
-            }
-
+    if ticket_code and any(re.search(p, q_low) for p in update_patterns):
         new_prio: Optional[str] = None
         for p_level in ["urgent", "high", "medium", "low"]:
             if p_level in q_low:
@@ -625,32 +702,19 @@ async def detect_and_route_tool(
                 break
         if not new_prio and ("khẩn cấp" in q_low or "gấp" in q_low):
             new_prio = "Urgent"
-
         new_status: Optional[str] = None
         if "resolved" in q_low or "đóng" in q_low or "giải quyết" in q_low:
             new_status = "resolved"
         elif "in_progress" in q_low or "đang xử lý" in q_low:
             new_status = "in_progress"
-
-        prep = await handle_prepare_ticket_update(
-            registry=active_registry,
-            ticket_code=ticket_code,
-            priority=new_prio,
-            status=new_status,
-            creator_id=_get_user_attr(current_user, "id", None),
-            creator_email=_get_user_attr(current_user, "email", None),
-        )
-        return {
-            "tools_called": ["update_ticket_priority_or_status"],
-            "response": prep["response"],
-            "pending_action": prep["pending_action"],
-            "confidence": 0.95,
+        return "update_ticket_priority_or_status", {
+            "priority": new_prio,
+            "status": new_status,
         }
 
-    # 2. Check for Mutating Intent: Create escalation ticket
     create_patterns = [
-        r"(tạo|lập|mở|gửi|create)\s+(giúp\s+)?(tôi\s+|mình\s+)?(một\s+)?(ticket|phiếu\s+hỗ\s+trợ)",
-        r"(ticket|phiếu\s+hỗ\s+trợ)\s+mới",
+        r"(tạo|lập|mở|gửi|create)\s+(giúp\s+)?(tôi\s+|mình\s+)?(một\s+)?(ticket|phiếu\s+hỗ\s+trợ|yêu\s+cầu\s+hỗ\s+trợ)",
+        r"(ticket|phiếu\s+hỗ\s+trợ|yêu\s+cầu\s+hỗ\s+trợ)\s+mới",
     ]
     if any(re.search(p, q_low) for p in create_patterns):
         prio = "Medium"
@@ -660,61 +724,217 @@ async def detect_and_route_tool(
                 break
         if "khẩn cấp" in q_low:
             prio = "Urgent"
-
         cleaned_subj = re.sub(
-            r"^(hãy\s+|vui\s+lòng\s+)?(tạo|lập|mở|gửi|create)\s+(giúp\s+)?(tôi\s+|mình\s+)?(một\s+)?(ticket|phiếu\s+hỗ\s+trợ)\s*(về\s+|cho\s+)?",
+            r"^(hãy\s+|vui\s+lòng\s+)?(tạo|lập|mở|gửi|create)\s+(giúp\s+)?(tôi\s+|mình\s+)?(một\s+)?(ticket|phiếu\s+hỗ\s+trợ|yêu\s+cầu\s+hỗ\s+trợ)\s*(về\s+|cho\s+)?",
             "",
             query.strip(),
             flags=re.IGNORECASE,
         ).strip()
-        subject = cleaned_subj[:120] if len(cleaned_subj) >= 5 else "Yêu cầu hỗ trợ kỹ thuật khẩn cấp"
-        description = f"Khách hàng yêu cầu tạo ticket qua AI Chat: {query.strip()}"
+        return "create_escalation_ticket", {
+            "subject": cleaned_subj,
+            "priority": prio,
+            "category": ticket_copilot_service.infer_category(query),
+        }
 
-        user_email = customer_email or (_get_user_attr(current_user, "email", None) if current_user else "an.nguyen@company.vn")
-        user_name = _get_user_attr(current_user, "full_name", "Nguyễn Văn An") if current_user else "Nguyễn Văn An"
-        c_id = _get_user_attr(current_user, "id", None) if current_user else None
-        c_email = _get_user_attr(current_user, "email", None) if current_user else None
+    lookup_patterns = [
+        r"(kiểm\s+tra|tra\s+cứu|xem|tình\s+trạng|trạng\s+thái|lookup|check)\s+.*(ticket|phiếu\s+hỗ\s+trợ|yêu\s+cầu\s+hỗ\s+trợ|#?tick-\d+)",
+        r"#tick-\d{3,6}",
+    ]
+    if any(re.search(p, q_low) for p in lookup_patterns):
+        return "lookup_customer_tickets", {}
 
-        prep = await handle_prepare_escalation_ticket(
-            registry=active_registry,
-            subject=subject,
-            description=description,
-            priority=prio,
-            category=ticket_copilot_service.infer_category(query),
-            customer_email=user_email,
-            customer_name=user_name,
-            workspace_id=workspace_id,
-            creator_id=c_id,
-            creator_email=c_email,
+    return None
+
+
+async def _select_tool_with_llm(
+    query: str,
+    workspace_id: int,
+    registry: AgentToolRegistry,
+) -> Optional[Tuple[str, Dict[str, Any]]]:
+    """Lets the LLM pick a registered tool and its arguments through native function calling."""
+    from app.services.llm_service import llm_service
+
+    tools = [
+        {
+            "name": t["name"],
+            "description": t["description"],
+            "parameters": t["parameters"],
+        }
+        for t in registry.list_tools()
+    ]
+    system_prompt = prompt_registry.render(
+        "agent_tool_router", workspace_id=workspace_id
+    )
+    selection = await llm_service.select_tool(query, tools, system_prompt)
+    if not selection:
+        return None
+    if registry.get(selection["name"]) is None:
+        raise ValueError(f"LLM selected unknown tool '{selection['name']}'")
+    return selection["name"], selection.get("args") or {}
+
+
+async def _execute_selected_tool(
+    tool_name: str,
+    args: Dict[str, Any],
+    query: str,
+    session: Optional[AsyncSession],
+    workspace_id: int,
+    registry: AgentToolRegistry,
+    current_user: Optional[Any],
+) -> Dict[str, Any]:
+    """Runs the chosen tool. Mutating tools only prepare a PendingAction that the user must confirm."""
+    # Identifiers come from the raw message: the LLM only sees PII-redacted text and may hallucinate codes.
+    ticket_code, customer_email = _extract_identifiers(query)
+
+    if tool_name == "update_ticket_priority_or_status":
+        if _get_user_attr(current_user, "role", None) != "admin":
+            return {
+                "tools_called": [tool_name],
+                "response": prompt_registry.render("agent_update_forbidden_message"),
+                "pending_action": None,
+                "confidence": 0.95,
+            }
+        if not ticket_code:
+            return {
+                "tools_called": [tool_name],
+                "response": "Vui lòng cho biết mã yêu cầu hỗ trợ cần cập nhật (dạng #TICK-1042).",
+                "pending_action": None,
+                "confidence": 0.6,
+            }
+        priority = args.get("priority")
+        status = args.get("status")
+        prep = await handle_prepare_ticket_update(
+            registry=registry,
+            ticket_code=ticket_code,
+            priority=(
+                str(priority).capitalize()
+                if str(priority).capitalize() in PRIORITY_LEVELS
+                else None
+            ),
+            status=(
+                str(status).lower() if str(status).lower() in TICKET_STATUSES else None
+            ),
+            creator_id=_get_user_attr(current_user, "id", None),
+            creator_email=_get_user_attr(current_user, "email", None),
         )
         return {
-            "tools_called": ["create_escalation_ticket"],
+            "tools_called": [tool_name],
             "response": prep["response"],
             "pending_action": prep["pending_action"],
             "confidence": 0.95,
         }
 
-    # 3. Check for Read-Only Intent: Lookup customer ticket status
-    lookup_patterns = [
-        r"(kiểm\s+tra|tra\s+cứu|xem|tình\s+trạng|trạng\s+thái|lookup|check)\s+.*(ticket|phiếu\s+hỗ\s+trợ|#?tick-\d+)",
-        r"#tick-\d{3,6}",
-    ]
-    if any(re.search(p, q_low) for p in lookup_patterns):
-        lookup_res = await handle_lookup_customer_tickets(
-            session=session,
-            customer_email=customer_email,
-            ticket_code=ticket_code,
+    if tool_name == "create_escalation_ticket":
+        subject = str(args.get("subject") or "").strip()
+        subject = (
+            subject[:120] if len(subject) >= 5 else "Yêu cầu hỗ trợ kỹ thuật khẩn cấp"
+        )
+        description = str(args.get("description") or "").strip()
+        if len(description) < 10:
+            description = f"Khách hàng yêu cầu tạo ticket qua AI Chat: {query.strip()}"
+        priority = str(args.get("priority") or "Medium").capitalize()
+        category = str(args.get("category") or "")
+        prep = await handle_prepare_escalation_ticket(
+            registry=registry,
+            subject=subject,
+            description=description,
+            priority=priority if priority in PRIORITY_LEVELS else "Medium",
+            category=(
+                category
+                if category in TICKET_CATEGORIES
+                else ticket_copilot_service.infer_category(query)
+            ),
+            customer_email=customer_email
+            or _get_user_attr(current_user, "email", None)
+            or "an.nguyen@company.vn",
+            customer_name=_get_user_attr(current_user, "full_name", None)
+            or "Nguyễn Văn An",
             workspace_id=workspace_id,
-            current_user=current_user,
+            creator_id=_get_user_attr(current_user, "id", None),
+            creator_email=_get_user_attr(current_user, "email", None),
         )
         return {
-            "tools_called": ["lookup_customer_tickets"],
-            "response": lookup_res["message"],
-            "pending_action": None,
-            "confidence": 0.94 if lookup_res["found"] else 0.70,
+            "tools_called": [tool_name],
+            "response": prep["response"],
+            "pending_action": prep["pending_action"],
+            "confidence": 0.95,
         }
 
-    return None
+    if tool_name == "search_workspace_knowledge":
+        search_query = str(args.get("query") or query)
+        found = await handle_search_workspace_knowledge(
+            query=search_query, workspace_id=workspace_id, session=session
+        )
+        lines = [found.get("message", "")]
+        for item in found.get("results", [])[:3]:
+            lines.append(f"- {item.get('title', '')}: {item.get('snippet', '')}")
+        return {
+            "tools_called": [tool_name],
+            "response": "\n".join(line for line in lines if line),
+            "pending_action": None,
+            "confidence": 0.85 if found.get("found") else 0.5,
+        }
+
+    lookup_res = await handle_lookup_customer_tickets(
+        session=session,
+        customer_email=customer_email,
+        ticket_code=ticket_code,
+        workspace_id=workspace_id,
+        current_user=current_user,
+    )
+    return {
+        "tools_called": ["lookup_customer_tickets"],
+        "response": lookup_res["message"],
+        "pending_action": None,
+        "confidence": 0.94 if lookup_res["found"] else 0.70,
+    }
+
+
+async def detect_and_route_tool(
+    query: str,
+    session: Optional[AsyncSession] = None,
+    workspace_id: int = 1,
+    registry: Optional[AgentToolRegistry] = None,
+    current_user: Optional[Any] = None,
+    routing_info: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Tool router for Chat & Streaming endpoints. The LLM chooses the tool via native function calling;
+    the deterministic keyword router is used only when the LLM is unavailable or fails.
+    Returns None if the query is a normal RAG knowledge question.
+    routing_info (optional) is filled with {"router": "llm" | "rules"}.
+    """
+    from app.services.llm_service import llm_service
+
+    active_registry = registry or agent_tool_registry
+    router = "rules"
+    selection: Optional[Tuple[str, Dict[str, Any]]]
+    if llm_service.is_available() and not llm_service.is_in_cooldown():
+        try:
+            selection = await _select_tool_with_llm(
+                query, workspace_id, active_registry
+            )
+            router = "llm"
+        except Exception as exc:
+            logger.warning(
+                f"[AgentTools] LLM tool selection failed ({type(exc).__name__}); using keyword router."
+            )
+            selection = _select_tool_by_rules(query)
+    else:
+        selection = _select_tool_by_rules(query)
+
+    if routing_info is not None:
+        routing_info["router"] = router
+    if selection is None:
+        return None
+
+    tool_name, args = selection
+    logger.info(f"[AgentTools] router={router} selected tool={tool_name}")
+    result = await _execute_selected_tool(
+        tool_name, args, query, session, workspace_id, active_registry, current_user
+    )
+    result["tool_router"] = router
+    return result
 
 
 agent_tool_registry = AgentToolRegistry()

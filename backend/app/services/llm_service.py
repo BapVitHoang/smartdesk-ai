@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple, Type
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple, Type
 import httpx
 
 from app.core.config import settings
@@ -32,22 +32,19 @@ def scrub_sensitive(text: str, api_key: Optional[str] = None) -> str:
 class LLMConfigException(LLMServiceException):
     """Raised when an external API call fails with HTTP 400/401/403/404 client or configuration error."""
 
-    def __init__(self, message: str, status_code: int = 400, details: Optional[Any] = None) -> None:
+    def __init__(
+        self, message: str, status_code: int = 400, details: Optional[Any] = None
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.details = details
         self.telemetry_status = "config_error"
 
-SYSTEM_INSTRUCTION = (
-    "You are the SmartDesk AI Customer Support Assistant. "
-    "Your objective is to provide precise, professional, and empathetic assistance to customers. "
-    "Strict Grounding Rules:\n"
-    "1. Answer the question truthfully using ONLY the provided Knowledge Base context.\n"
-    "2. If the provided context does not contain enough information to answer truthfully, "
-    "explicitly say you do not know and recommend escalating to a human support agent.\n"
-    "3. Never hallucinate features, URLs, or policies not present in the context.\n"
-    "4. Cite sources in your response when referencing specific articles using the format [Doc #ID: Title]."
-)
+
+def default_system_instruction() -> str:
+    """Returns the versioned default system instruction from backend/data/prompts.json."""
+    return prompt_registry.render("default_system_instruction")
+
 
 PLACEHOLDER_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
 INVALID_KEY_COOLDOWN_SECONDS = 3600.0
@@ -167,7 +164,8 @@ class LLMService:
 
                 gai.configure(api_key=self.api_key)
                 self._client = gai.GenerativeModel(
-                    model_name=self.model_name, system_instruction=SYSTEM_INSTRUCTION
+                    model_name=self.model_name,
+                    system_instruction=default_system_instruction(),
                 )
                 self._sdk_type = "generativeai"
                 logger.info("Initialized Google GenerativeAI legacy SDK client.")
@@ -296,11 +294,18 @@ class LLMService:
             return contents
 
         filtered = [
-            turn for turn in contents
-            if not (isinstance(turn, dict) and str(turn.get("role", "")).lower() == "system")
+            turn
+            for turn in contents
+            if not (
+                isinstance(turn, dict) and str(turn.get("role", "")).lower() == "system"
+            )
         ]
 
-        while filtered and isinstance(filtered[-1], dict) and str(filtered[-1].get("role", "")).lower() == "model":
+        while (
+            filtered
+            and isinstance(filtered[-1], dict)
+            and str(filtered[-1].get("role", "")).lower() == "model"
+        ):
             filtered.pop()
 
         return filtered
@@ -322,15 +327,31 @@ class LLMService:
             except (ValueError, TypeError):
                 pass
 
-        if "400" in err_str or "INVALID_ARGUMENT" in err_str or "INVALID_ARGUMENT" in status_name:
+        if (
+            "400" in err_str
+            or "INVALID_ARGUMENT" in err_str
+            or "INVALID_ARGUMENT" in status_name
+        ):
             return 400, err_str
-        if "401" in err_str or "UNAUTHENTICATED" in err_str or "UNAUTHENTICATED" in status_name:
+        if (
+            "401" in err_str
+            or "UNAUTHENTICATED" in err_str
+            or "UNAUTHENTICATED" in status_name
+        ):
             return 401, err_str
-        if "403" in err_str or "PERMISSION_DENIED" in err_str or "PERMISSION_DENIED" in status_name:
+        if (
+            "403" in err_str
+            or "PERMISSION_DENIED" in err_str
+            or "PERMISSION_DENIED" in status_name
+        ):
             return 403, err_str
         if "404" in err_str or "NOT_FOUND" in err_str or "NOT_FOUND" in status_name:
             return 404, err_str
-        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+        if (
+            "429" in err_str
+            or "RESOURCE_EXHAUSTED" in err_str
+            or "quota" in err_str.lower()
+        ):
             return 429, err_str
         if "503" in err_str or "UNAVAILABLE" in err_str:
             return 503, err_str
@@ -363,7 +384,7 @@ class LLMService:
             )
 
         start_time = time.perf_counter()
-        effective_system_prompt = system_prompt or SYSTEM_INSTRUCTION
+        effective_system_prompt = system_prompt or default_system_instruction()
         effective_timeout = (
             self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
         )
@@ -375,17 +396,27 @@ class LLMService:
             try:
                 if self.provider == "ollama":
                     response_text = await asyncio.wait_for(
-                        self._execute_ollama_call(prompt, effective_system_prompt, temperature),
-                        timeout=effective_timeout
+                        self._execute_ollama_call(
+                            prompt, effective_system_prompt, temperature
+                        ),
+                        timeout=effective_timeout,
                     )
                 else:
                     if not self._client:
                         self._init_client()
-                    if not self._client or not self.api_key or self.api_key == "YOUR_GEMINI_API_KEY_HERE":
-                        raise LLMServiceException("Gemini API key is not configured or client failed to initialize.")
+                    if (
+                        not self._client
+                        or not self.api_key
+                        or self.api_key == "YOUR_GEMINI_API_KEY_HERE"
+                    ):
+                        raise LLMServiceException(
+                            "Gemini API key is not configured or client failed to initialize."
+                        )
                     response_text = await asyncio.wait_for(
-                        self._execute_api_call(prompt, effective_system_prompt, temperature),
-                        timeout=effective_timeout
+                        self._execute_api_call(
+                            prompt, effective_system_prompt, temperature
+                        ),
+                        timeout=effective_timeout,
                     )
 
                 elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -393,7 +424,9 @@ class LLMService:
 
             except asyncio.TimeoutError:
                 elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                logger.warning(f"LLM API call timed out after {elapsed_ms}ms (Threshold: {effective_timeout}s, attempt {attempt + 1})")
+                logger.warning(
+                    f"LLM API call timed out after {elapsed_ms}ms (Threshold: {effective_timeout}s, attempt {attempt + 1})"
+                )
                 if attempt < max_retries:
                     attempt += 1
                     await asyncio.sleep(1.0)
@@ -425,13 +458,21 @@ class LLMService:
                         except (ValueError, TypeError):
                             retry_after = None
 
-                    if attempt < max_retries and retry_after is not None and retry_after <= 5.0:
-                        logger.info(f"[Cost-Guard] Honoring Retry-After ({retry_after}s) before retrying...")
+                    if (
+                        attempt < max_retries
+                        and retry_after is not None
+                        and retry_after <= 5.0
+                    ):
+                        logger.info(
+                            f"[Cost-Guard] Honoring Retry-After ({retry_after}s) before retrying..."
+                        )
                         attempt += 1
                         await asyncio.sleep(retry_after)
                         continue
 
-                    cooldown_secs = float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
+                    cooldown_secs = float(
+                        getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60)
+                    )
                     self.cooldown_until = time.time() + cooldown_secs
                     logger.warning(
                         f"[Cost-Guard] Rate limit 429 kích hoạt. Khóa gọi AI trong {int(cooldown_secs)} giây: {clean_err_msg}"
@@ -447,11 +488,18 @@ class LLMService:
                         attempt += 1
                         await asyncio.sleep(1.0)
                         continue
-                    logger.error(f"[LLM Upstream Error] HTTP {status_code} after {attempt + 1} attempts: {clean_err_msg}")
-                    raise LLMServiceException(f"LLM upstream error {status_code}: {clean_err_msg}")
+                    logger.error(
+                        f"[LLM Upstream Error] HTTP {status_code} after {attempt + 1} attempts: {clean_err_msg}"
+                    )
+                    raise LLMServiceException(
+                        f"LLM upstream error {status_code}: {clean_err_msg}"
+                    )
 
                 # Other unexpected exceptions
-                logger.error(f"LLM API execution error after {elapsed_ms}ms: {clean_err_msg}", exc_info=True)
+                logger.error(
+                    f"LLM API execution error after {elapsed_ms}ms: {clean_err_msg}",
+                    exc_info=True,
+                )
                 raise LLMServiceException(f"LLM execution failed: {clean_err_msg}")
 
     async def _execute_ollama_call(
@@ -550,7 +598,10 @@ class LLMService:
 
             def _sync_call() -> Tuple[str, int, int]:
                 from google.genai import types
-                thinking_level_val = getattr(settings, "GEMINI_THINKING_LEVEL", "MINIMAL") or "MINIMAL"
+
+                thinking_level_val = (
+                    getattr(settings, "GEMINI_THINKING_LEVEL", "MINIMAL") or "MINIMAL"
+                )
                 thinking_cfg = types.ThinkingConfig(thinking_level=thinking_level_val)
                 cfg_kwargs: Dict[str, Any] = {
                     "system_instruction": system_prompt,
@@ -624,8 +675,7 @@ class LLMService:
                 generation_config = {"temperature": temperature}
                 sanitized_contents = self._sanitize_contents(clean_prompt)
                 response = self._client.generate_content(
-                    sanitized_contents,
-                    generation_config=generation_config
+                    sanitized_contents, generation_config=generation_config
                 )
                 return (response.text or "").strip()
 
@@ -666,7 +716,7 @@ class LLMService:
         """
         schema_json = json.dumps(response_model.model_json_schema(), ensure_ascii=False)
         structured_instruction = (
-            f"{system_prompt or SYSTEM_INSTRUCTION}\n\n"
+            f"{system_prompt or default_system_instruction()}\n\n"
             f"IMPORTANT: Respond ONLY with valid JSON conforming to this schema:\n{schema_json}"
         )
 
@@ -678,7 +728,9 @@ class LLMService:
                 f"AI provider '{self.provider}' is not configured."
             )
 
-        effective_timeout = self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
+        effective_timeout = (
+            self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
+        )
         max_retries = 1
         attempt = 0
 
@@ -687,7 +739,9 @@ class LLMService:
             try:
                 if self.provider == "ollama":
                     raw_text = await asyncio.wait_for(
-                        self._execute_ollama_call(prompt, structured_instruction, temperature, json_mode=True),
+                        self._execute_ollama_call(
+                            prompt, structured_instruction, temperature, json_mode=True
+                        ),
                         timeout=effective_timeout,
                     )
                 else:
@@ -712,7 +766,9 @@ class LLMService:
                     attempt += 1
                     await asyncio.sleep(1.0)
                     continue
-                raise LLMTimeoutException(f"Structured LLM call timed out after {elapsed_ms}ms")
+                raise LLMTimeoutException(
+                    f"Structured LLM call timed out after {elapsed_ms}ms"
+                )
 
             except (LLMConfigException, LLMServiceException, LLMTimeoutException):
                 raise
@@ -734,11 +790,17 @@ class LLMService:
                             retry_after = float(retry_after)
                         except (ValueError, TypeError):
                             retry_after = None
-                    if attempt < max_retries and retry_after is not None and retry_after <= 5.0:
+                    if (
+                        attempt < max_retries
+                        and retry_after is not None
+                        and retry_after <= 5.0
+                    ):
                         attempt += 1
                         await asyncio.sleep(retry_after)
                         continue
-                    cooldown_secs = float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
+                    cooldown_secs = float(
+                        getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60)
+                    )
                     self.cooldown_until = time.time() + cooldown_secs
                     raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
                 elif status_code in (500, 502, 503, 504):
@@ -746,8 +808,12 @@ class LLMService:
                         attempt += 1
                         await asyncio.sleep(1.0)
                         continue
-                    raise LLMServiceException(f"Structured output upstream error {status_code}: {clean_err_msg}")
-                raise LLMServiceException(f"Structured output call failed: {clean_err_msg}")
+                    raise LLMServiceException(
+                        f"Structured output upstream error {status_code}: {clean_err_msg}"
+                    )
+                raise LLMServiceException(
+                    f"Structured output call failed: {clean_err_msg}"
+                )
 
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
         cleaned_json = self._extract_json_payload(raw_text)
@@ -775,21 +841,351 @@ class LLMService:
                     f"Structured output schema validation failed: {val_err}"
                 )
 
+    def _classified_failure(
+        self, exc: Exception, elapsed_ms: float, operation: str
+    ) -> LLMServiceException:
+        """Maps a provider exception to the Cost-Guard taxonomy (4xx config error, 429 cooldown, other failures)."""
+        status_code, err_msg = self._parse_and_classify_error(exc)
+        clean_err_msg = scrub_sensitive(err_msg, self.api_key)
+        if status_code in (400, 401, 403, 404):
+            logger.error(
+                f"[LLM Config Error] {operation} rejected with HTTP {status_code} after {elapsed_ms}ms: {clean_err_msg}"
+            )
+            return LLMConfigException(clean_err_msg, status_code=status_code)
+        if status_code == 429:
+            cooldown_secs = float(getattr(settings, "RATE_LIMIT_COOLDOWN_SECONDS", 60))
+            self.cooldown_until = time.time() + cooldown_secs
+            logger.warning(
+                f"[Cost-Guard] Rate limit 429 during {operation}. Khóa gọi AI trong {int(cooldown_secs)} giây."
+            )
+            return LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
+        logger.error(f"{operation} failed after {elapsed_ms}ms: {clean_err_msg}")
+        return LLMServiceException(f"{operation} failed: {clean_err_msg}")
+
+    def _ensure_ready(self) -> None:
+        """Raises LLMServiceException when the provider is in cooldown or not configured."""
+        if self.is_in_cooldown():
+            raise LLMServiceException("FREE_TIER_RATE_LIMIT_COOLDOWN")
+        if not self.is_available():
+            raise LLMServiceException(
+                f"AI provider '{self.provider}' is not configured or client failed to initialize."
+            )
+
+    async def select_tool(
+        self,
+        message: str,
+        tools: List[Dict[str, Any]],
+        system_prompt: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Lets the LLM choose at most one tool through native function calling (Capability B - REQ-14).
+
+        Returns:
+            {"name": str, "args": dict} when the model emits a function call, otherwise None.
+        """
+        self._ensure_ready()
+        start_time = time.perf_counter()
+        effective_timeout = (
+            self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
+        )
+        try:
+            if self.provider == "ollama":
+                call = self._select_tool_ollama(message, tools, system_prompt)
+            else:
+                call = self._select_tool_gemini(message, tools, system_prompt)
+            return await asyncio.wait_for(call, timeout=effective_timeout)
+        except asyncio.TimeoutError:
+            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            raise LLMTimeoutException(f"Tool selection timed out after {elapsed_ms}ms")
+        except (LLMServiceException, LLMTimeoutException):
+            raise
+        except Exception as exc:
+            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            raise self._classified_failure(exc, elapsed_ms, "Tool selection")
+
+    async def _select_tool_gemini(
+        self, message: str, tools: List[Dict[str, Any]], system_prompt: str
+    ) -> Optional[Dict[str, Any]]:
+        if self._sdk_type != "genai":
+            raise LLMServiceException(
+                "Native function calling requires the google-genai SDK."
+            )
+        clean_message = redact_pii(message)
+
+        def _sync_call() -> Tuple[Optional[Dict[str, Any]], int, int]:
+            from google.genai import types
+
+            declarations = [
+                types.FunctionDeclaration(
+                    name=t["name"],
+                    description=t["description"],
+                    parameters_json_schema=t["parameters"],
+                )
+                for t in tools
+            ]
+            cfg = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.0,
+                tools=[types.Tool(function_declarations=declarations)],
+                tool_config=types.ToolConfig(
+                    function_calling_config=types.FunctionCallingConfig(mode="AUTO")
+                ),
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True
+                ),
+                thinking_config=types.ThinkingConfig(
+                    thinking_level=getattr(settings, "GEMINI_THINKING_LEVEL", "MINIMAL")
+                    or "MINIMAL"
+                ),
+            )
+            response = self._client.models.generate_content(
+                model=self.model_name, contents=clean_message, config=cfg
+            )
+            usage = getattr(response, "usage_metadata", None)
+            in_tok = int(getattr(usage, "prompt_token_count", 0) or 0) if usage else 0
+            out_tok = (
+                int(getattr(usage, "candidates_token_count", 0) or 0) if usage else 0
+            )
+            calls = getattr(response, "function_calls", None) or []
+            if not calls:
+                return None, in_tok, out_tok
+            first = calls[0]
+            return {"name": first.name, "args": dict(first.args or {})}, in_tok, out_tok
+
+        selected, in_tok, out_tok = await asyncio.to_thread(_sync_call)
+        self._record_token_metrics(
+            clean_message, system_prompt, json.dumps(selected or {}), in_tok, out_tok
+        )
+        return selected
+
+    async def _select_tool_ollama(
+        self, message: str, tools: List[Dict[str, Any]], system_prompt: str
+    ) -> Optional[Dict[str, Any]]:
+        payload: Dict[str, Any] = {
+            "model": self.ollama_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message},
+            ],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t["name"],
+                        "description": t["description"],
+                        "parameters": t["parameters"],
+                    },
+                }
+                for t in tools
+            ],
+            "stream": False,
+            "options": {"temperature": 0.0},
+            "keep_alive": self.ollama_keep_alive,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=self.ollama_timeout) as client:
+                resp = await client.post(
+                    f"{self.ollama_base_url}/api/chat", json=payload
+                )
+        except httpx.ConnectError:
+            raise LLMServiceException(
+                f"Cannot connect to Ollama at {self.ollama_base_url}."
+            )
+        if resp.status_code != 200:
+            raise LLMServiceException(
+                f"Ollama returned HTTP {resp.status_code}: {resp.text}"
+            )
+        data = resp.json()
+        tool_calls = (data.get("message") or {}).get("tool_calls") or []
+        self._record_token_metrics(
+            message,
+            system_prompt,
+            json.dumps(tool_calls),
+            int(data.get("prompt_eval_count", 0) or 0),
+            int(data.get("eval_count", 0) or 0),
+        )
+        if not tool_calls:
+            return None
+        fn = tool_calls[0].get("function") or {}
+        args = fn.get("arguments") or {}
+        if isinstance(args, str):
+            args = json.loads(args or "{}")
+        return {"name": fn.get("name", ""), "args": dict(args)}
+
+    async def stream_generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str],
+        temperature: float,
+        on_token: Callable[[str], None],
+    ) -> Tuple[str, float]:
+        """
+        Streams the answer from the provider token-by-token (REQ-04, REQ-10), invoking on_token for each chunk.
+
+        Returns:
+            Tuple[str, float]: (full_text, latency_ms) once the stream completes.
+        """
+        self._ensure_ready()
+        start_time = time.perf_counter()
+        effective_system_prompt = system_prompt or default_system_instruction()
+        effective_timeout = (
+            self.ollama_timeout if self.provider == "ollama" else self.timeout_seconds
+        )
+        if self.provider != "ollama" and self._sdk_type != "genai":
+            text, latency = await self.generate_response(
+                prompt, effective_system_prompt, temperature
+            )
+            on_token(text)
+            return text, latency
+
+        stop_flag = {"stop": False}
+        try:
+            if self.provider == "ollama":
+                stream_call = self._stream_ollama(
+                    prompt, effective_system_prompt, temperature, on_token, stop_flag
+                )
+            else:
+                stream_call = self._stream_gemini(
+                    prompt, effective_system_prompt, temperature, on_token, stop_flag
+                )
+            text = await asyncio.wait_for(stream_call, timeout=effective_timeout)
+        except asyncio.TimeoutError:
+            stop_flag["stop"] = True
+            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            raise LLMTimeoutException(f"LLM stream timed out after {elapsed_ms}ms")
+        except (LLMServiceException, LLMTimeoutException):
+            stop_flag["stop"] = True
+            raise
+        except Exception as exc:
+            stop_flag["stop"] = True
+            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            raise self._classified_failure(exc, elapsed_ms, "LLM stream")
+
+        if not text.strip():
+            raise LLMServiceException("Empty response returned from LLM provider")
+        return text, round((time.perf_counter() - start_time) * 1000, 2)
+
+    async def _stream_gemini(
+        self,
+        prompt: str,
+        system_prompt: str,
+        temperature: float,
+        on_token: Callable[[str], None],
+        stop_flag: Dict[str, bool],
+    ) -> str:
+        clean_prompt = redact_pii(prompt)
+        loop = asyncio.get_running_loop()
+
+        def _sync_stream() -> Tuple[str, int, int]:
+            from google.genai import types
+
+            cfg = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=temperature,
+                thinking_config=types.ThinkingConfig(
+                    thinking_level=getattr(settings, "GEMINI_THINKING_LEVEL", "MINIMAL")
+                    or "MINIMAL"
+                ),
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True
+                ),
+            )
+            parts: List[str] = []
+            in_tok = out_tok = 0
+            for chunk in self._client.models.generate_content_stream(
+                model=self.model_name,
+                contents=self._sanitize_contents(clean_prompt),
+                config=cfg,
+            ):
+                if stop_flag["stop"]:
+                    break
+                usage = getattr(chunk, "usage_metadata", None)
+                if usage:
+                    in_tok = int(getattr(usage, "prompt_token_count", 0) or in_tok)
+                    out_tok = int(
+                        getattr(usage, "candidates_token_count", 0) or out_tok
+                    )
+                piece = chunk.text or ""
+                if piece:
+                    parts.append(piece)
+                    loop.call_soon_threadsafe(on_token, piece)
+            return "".join(parts), in_tok, out_tok
+
+        text, in_tok, out_tok = await asyncio.to_thread(_sync_stream)
+        self._record_token_metrics(clean_prompt, system_prompt, text, in_tok, out_tok)
+        return text
+
+    async def _stream_ollama(
+        self,
+        prompt: str,
+        system_prompt: str,
+        temperature: float,
+        on_token: Callable[[str], None],
+        stop_flag: Dict[str, bool],
+    ) -> str:
+        payload: Dict[str, Any] = {
+            "model": self.ollama_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "stream": True,
+            "options": {"temperature": temperature},
+            "keep_alive": self.ollama_keep_alive,
+        }
+        parts: List[str] = []
+        in_tok = out_tok = 0
+        try:
+            async with httpx.AsyncClient(timeout=self.ollama_timeout) as client:
+                async with client.stream(
+                    "POST", f"{self.ollama_base_url}/api/chat", json=payload
+                ) as resp:
+                    if resp.status_code != 200:
+                        raise LLMServiceException(
+                            f"Ollama returned HTTP {resp.status_code}"
+                        )
+                    async for line in resp.aiter_lines():
+                        if stop_flag["stop"]:
+                            break
+                        if not line.strip():
+                            continue
+                        data = json.loads(line)
+                        piece = (data.get("message") or {}).get("content", "")
+                        if piece:
+                            parts.append(piece)
+                            on_token(piece)
+                        if data.get("done"):
+                            in_tok = int(data.get("prompt_eval_count", 0) or 0)
+                            out_tok = int(data.get("eval_count", 0) or 0)
+        except httpx.ConnectError:
+            raise LLMServiceException(
+                f"Cannot connect to Ollama at {self.ollama_base_url}. Please ensure Ollama is running."
+            )
+        text = "".join(parts)
+        self._record_token_metrics(prompt, system_prompt, text, in_tok, out_tok)
+        return text
+
     async def generate_response_stream(
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
         temperature: float = 0.2,
     ) -> AsyncGenerator[str, None]:
-        """
-        Yields tokens asynchronously for SSE streaming (REQ-04, REQ-10).
-        """
-        raw_text, _ = await self.generate_response(prompt, system_prompt, temperature)
-        words = raw_text.split(" ")
-        for idx, word in enumerate(words):
-            suffix = " " if idx < len(words) - 1 else ""
-            yield f"{word}{suffix}"
-            await asyncio.sleep(0.005)
+        """Yields provider tokens as they arrive (REQ-04, REQ-10)."""
+        queue: asyncio.Queue = asyncio.Queue()
+        task = asyncio.create_task(
+            self.stream_generate(prompt, system_prompt, temperature, queue.put_nowait)
+        )
+        while not (task.done() and queue.empty()):
+            getter = asyncio.create_task(queue.get())
+            done, _ = await asyncio.wait(
+                {getter, task}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if getter in done:
+                yield getter.result()
+            else:
+                getter.cancel()
+        task.result()
 
 
 llm_service = LLMService()

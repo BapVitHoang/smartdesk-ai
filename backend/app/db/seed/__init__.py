@@ -34,15 +34,15 @@ async def seed_workspaces(session: AsyncSession) -> None:
             industry="IT & SaaS",
             persona_name="SmartDesk Assistant",
             tone_of_voice="Chuyên nghiệp, ngắn gọn, thân thiện và chính xác về mặt kỹ thuật.",
-            business_rules="Hỗ trợ xử lý sự cố tài khoản, phân quyền, tích hợp API, thanh toán định kỳ. Luôn bảo vệ an toàn thông tin khách hàng."
+            business_rules="Hỗ trợ xử lý sự cố tài khoản, phân quyền, tích hợp API, thanh toán định kỳ. Luôn bảo vệ an toàn thông tin khách hàng.",
         ),
         Workspace(
             slug="smilecare",
             name="Nha Khoa Thẩm Mỹ SmileCare",
             industry="Y tế & Nha khoa",
-            persona_name="Bác sĩ SmileCare Bot",
+            persona_name="Trợ lý ảo SmileCare",
             tone_of_voice="Ân cần, chu đáo, đồng cảm, chuyên môn y khoa cao nhưng dễ hiểu.",
-            business_rules="Tư vấn niềng răng, bọc sứ, tẩy trắng, cấy ghép Implant. Báo giá dịch vụ minh bạch. Không đưa ra chỉ định thuốc kháng sinh khi chưa có đơn khám."
+            business_rules="Tư vấn niềng răng, bọc sứ, tẩy trắng, cấy ghép Implant. Báo giá dịch vụ minh bạch. Không đưa ra chỉ định thuốc kháng sinh khi chưa có đơn khám. Luôn nói rõ thông tin chỉ mang tính tham khảo, không thay thế tư vấn của bác sĩ.",
         ),
         Workspace(
             slug="techstore",
@@ -50,7 +50,7 @@ async def seed_workspaces(session: AsyncSession) -> None:
             industry="Bán lẻ thiết bị công nghệ",
             persona_name="TechStore Advisor",
             tone_of_voice="Năng động, nhiệt tình, rõ ràng về thông số kỹ thuật và chính sách.",
-            business_rules="Tư vấn điện thoại, laptop, phụ kiện. Hướng dẫn đổi trả 1 đổi 1 trong 30 ngày nếu lỗi kỹ thuật. Quy định trừ phí phụ kiện nếu mất hộp."
+            business_rules="Tư vấn điện thoại, laptop, phụ kiện. Hướng dẫn đổi trả 1 đổi 1 trong 30 ngày nếu lỗi kỹ thuật. Quy định trừ phí phụ kiện nếu mất hộp.",
         ),
     ]
     for ws in sample_workspaces:
@@ -77,7 +77,7 @@ async def seed_faq(session: AsyncSession) -> None:
                 category=item.get("category", "General"),
                 title=item.get("title", ""),
                 content=item.get("content", ""),
-                source_url=item.get("source_url", "")
+                source_url=item.get("source_url", ""),
             )
             session.add(faq_obj)
 
@@ -88,10 +88,20 @@ async def seed_faq(session: AsyncSession) -> None:
 async def seed_sample_documents(session: AsyncSession) -> None:
     """Seeds sample documents for Workspace 2 and Workspace 3."""
     for ws_id, fname, rel_path in [
-        (2, "nha_khoa_smilecare_bang_gia_dich_vu.txt", "sample_documents/nha_khoa_smilecare_bang_gia_dich_vu.txt"),
-        (3, "dien_may_techstore_chinh_sach_doi_tra.txt", "sample_documents/dien_may_techstore_chinh_sach_doi_tra.txt"),
+        (
+            2,
+            "nha_khoa_smilecare_bang_gia_dich_vu.txt",
+            "sample_documents/nha_khoa_smilecare_bang_gia_dich_vu.txt",
+        ),
+        (
+            3,
+            "dien_may_techstore_chinh_sach_doi_tra.txt",
+            "sample_documents/dien_may_techstore_chinh_sach_doi_tra.txt",
+        ),
     ]:
-        doc_res = await session.execute(select(Document).where(Document.workspace_id == ws_id))
+        doc_res = await session.execute(
+            select(Document).where(Document.workspace_id == ws_id)
+        )
         doc_obj = doc_res.scalars().first()
         if doc_obj:
             if doc_obj.status != "published":
@@ -108,11 +118,13 @@ async def seed_sample_documents(session: AsyncSession) -> None:
                         workspace_id=ws_id,
                         filename=fname,
                         file_bytes=content_bytes,
-                        session=session
+                        session=session,
                     )
                     new_doc.status = "published"
                     await session.commit()
-                    logger.info(f"Seeded and published workspace {ws_id} document {fname}.")
+                    logger.info(
+                        f"Seeded and published workspace {ws_id} document {fname}."
+                    )
                 except Exception as e:
                     logger.warning(f"Error seeding workspace {ws_id} document: {e}")
 
