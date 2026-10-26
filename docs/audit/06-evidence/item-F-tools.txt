@@ -1,5 +1,43 @@
-=== ITEM F EVIDENCE: AGENT TOOLS AUTHORIZATION & CROSS-USER BLOCK ===
-Date: 2026-10-26
+=== ITEM F: TOOL AGENT & TWO-PHASE CONFIRMATION VERIFICATION ===
+F1 Pending Action Trigger:
+  - Endpoint: POST /api/v1/chat (authenticated as an.nguyen@company.vn)
+  - Message: 'Tạo giúp tôi ticket lỗi thanh toán VNPAY khẩn cấp'
+  - Tools called: ['create_escalation_ticket']
+  - Pending action ID: act-8d3219
+  - Action type: create_escalation_ticket
+  - Requires confirmation: True
+  - Summary: Tạo ticket mới: lỗi thanh toán VNPAY khẩn cấp (Urgent)
+
+F2 Action Confirmed (1st time):
+  - Endpoint: POST /api/v1/chat/confirm-action (confirmed=true)
+  - HTTP status: 200 OK
+  - Executed: True
+  - Ticket ID created: #TICK-1144
+  - Result message: Ticket #TICK-1144 đã được tạo thành công với mức ưu tiên Urgent (SLA: 2h).
+
+F3 Confirming Twice (Double Confirmation Rejection):
+  - Endpoint: POST /api/v1/chat/confirm-action (same action_id)
+  - HTTP status: 400 Bad Request
+  - Detail: 'Hành động này đã được xử lý trước đó và không thể thực thi lại.'
+  - Anti-replay guard verified: zero duplicate tickets created.
+
+F4 Action Cancelled:
+  - Endpoint: POST /api/v1/chat/confirm-action (confirmed=false)
+  - HTTP status: 200 OK
+  - Executed: False
+  - Status: cancelled
+  - Ticket ID returned: None (0 tickets created)
+  - Result message: 'Thao tác đã bị người dùng hủy bỏ.'
+
+F5 Cross-User Confirmation Guard:
+  - Action created by: an.nguyen@company.vn
+  - Confirmation attempted by: second.user@company.vn (different non-admin user)
+  - HTTP status: 403 Forbidden
+  - Detail: 'Quyền truy cập bị từ chối: Bạn không có quyền xác nhận hành động của người dùng khác.'
+  - RBAC barrier verified: only creator or admin may confirm pending mutating actions.
+
+---
+=== PROMPT 4b LIVE RE-EXECUTION AUDIT (2026-10-26) ===
 Tool Invocation via Chat (by Admin):
 - Message: "Tôi muốn nâng mức ưu tiên của ticket #TICK-1042 lên Urgent"
 - HTTP Status: 200

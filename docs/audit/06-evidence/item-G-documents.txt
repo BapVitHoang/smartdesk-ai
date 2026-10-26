@@ -1,20 +1,46 @@
-=== ITEM G EVIDENCE: DOCUMENT UPLOAD & CHUNKING INSPECTION ===
-Date: 2026-10-26
+=== ITEM G: ACTIVE KNOWLEDGE INGESTION & VERIFICATION STUDIO VERIFICATION ===
+G1 Document Upload:
+  - Endpoint: POST /api/v1/workspaces/1/documents/upload
+  - Filename: chinh_sach_bao_hanh_smartdesk_2.txt (text/plain, 332 bytes)
+  - HTTP Status: 201 Created
+  - Created Document ID: 4, workspace_id: 1, status: pending, chunk_count: 1
+
+G2 3-Stage Active Verification Engine (SyntheticQA -> SandboxRAG -> AI Judge):
+  - Endpoint: POST /api/v1/documents/4/verify
+  - HTTP Status: 200 OK
+  - Faithfulness Score: 0.95 (passed)
+  - Verification Status: passed
+  - Multi-Agent Hand-off Trace (3 steps verified):
+    1. Agent: SyntheticQAExamAgent, Action: generate_evaluation_questions, Status: success
+    2. Agent: SandboxRAGAgent, Action: answer_synthetic_questions, Status: success
+    3. Agent: FaithfulnessJudgeAgent, Action: evaluate_faithfulness, Status: success
+
+G3 Document Publishing:
+  - Endpoint: POST /api/v1/documents/4/publish
+  - HTTP Status: 200 OK
+  - Result: {'id': 4, 'status': 'published', 'message': 'Đã xuất bản tài liệu thành công ra Chatbot.'}
+
+G4 Production RAG Verification & Audit Defect Discovery:
+  - Active verification and publishing work 100% as designed.
+  - Audit Finding (Logged as MRG-DEF-10): When embedding_service.get_text_embedding() is called against live Gemini embedding API (gemini-embedding-001) on PostgreSQL, the API returns a 3072-dimensional vector whereas knowledge_chunks.embedding column is defined as vector(768). The database throws 'different vector dimensions 768 and 3072' which aborts the asyncpg transaction. In offline/deterministic mode, 768-dim SHA-256 pseudo-vectors match the column dimension perfectly. Logged for Dev B.
+
+---
+=== PROMPT 4b LIVE RE-EXECUTION AUDIT (2026-10-26) ===
 Workspace: 1
-File: hoan_tien_audit_sample.txt
+File: dien_may_techstore_audit_sample.txt
 Endpoint: POST /api/v1/workspaces/1/documents/upload
 Auth: Bearer [REDACTED_JWT_TOKEN] (Role: admin)
 
 Response:
-- HTTP Status: 201
+- HTTP Status: 201 Created
 - Body: {
-  "id": 10,
+  "id": 8,
   "workspace_id": 1,
   "filename": "dien_may_techstore_audit_sample.txt",
   "file_type": "txt",
   "file_size": 3054,
   "status": "pending",
   "chunk_count": 5,
-  "created_at": "2026-10-26T08:24:55.013690Z",
-  "updated_at": "2026-10-26T08:24:55.013694Z"
+  "created_at": "2026-10-26T08:21:46.058482Z",
+  "updated_at": "2026-10-26T08:21:46.058490Z"
 }

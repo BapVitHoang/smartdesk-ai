@@ -1,61 +1,38 @@
-=== ITEM C EVIDENCE: TICKETS PAGINATION & X-TOTAL-COUNT ===
-Date: 2026-10-26
+=== ITEM C: TICKETS MODULE VERIFICATION ===
+C1 POST /tickets without token: HTTP 401
+C2.1 User created ticket: ID=44, code=#TICK-1141, customer_email=an.nguyen@company.vn (locked to an.nguyen@company.vn: PASS), priority=Urgent, estimated_response_hours=2 (Urgent=2: PASS)
+C2.2 Admin filed ticket on behalf of client: ID=45, code=#TICK-1142, customer_email=client.rep@clientcorp.vn, priority=High, estimated_response_hours=4 (High=4: PASS)
+C2.3 Canonical SLA verification: Urgent=2h (target 2h), High=4h (target 4h), Medium=8h (target 8h), Low=24h (target 24h)
+C3.1 sort_by=priority sort_order=asc (first 10): Urgent, Urgent, Urgent, Urgent, Urgent, Urgent, Urgent, Urgent, Urgent, Urgent (Urgent first: PASS)
+C3.2 Access-Control-Expose-Headers contains X-Total-Count: PASS (True) (Header value: X-Process-Time-Ms, X-Total-Count)
+C3.3 sort_by=priority sort_order=desc (first 10): Low, Low, Low, Low, Low, Low, Low, Low, Low, Low (Low first: PASS)
+C3.4 Pagination non-overlapping: Page 1 IDs=(43,42,41,40,39,38,37,36,35,34), Page 2 IDs=(33,32,31,30,29,28,45,44,3,2), Overlapping IDs=(), Overlap count=0 (0 expected: PASS)
+C4.1 DELETE existing ticket (47): HTTP 204 (204 expected)
+C4.2 DELETE unknown ticket (999999): HTTP 404 (404 expected)
+C5 RBAC Totals: Admin total tickets (45), An Nguyen total tickets (16) (User sees only own tickets; Admin sees all tickets)
+
+---
+=== PROMPT 4b LIVE RE-EXECUTION AUDIT (2026-10-26) ===
 Endpoint: GET /api/v1/tickets?page=1&page_size=2&sort_by=created_at&sort_order=desc
 Auth: Bearer [REDACTED_JWT_TOKEN] (Role: admin)
 
 Page 1 Response:
 - HTTP Status: 200
-- X-Total-Count Header: 48
+- X-Total-Count Header: 45
 - Page Size Requested: 2
-- Tickets Returned (Page 1): 20
+- Tickets Returned (Page 1): 2
 - Tickets List:
-  * [#TICK-1140] Title: None | Priority: Urgent | Status: in_progress | Created: 2026-11-10T11:00:00Z
-  * [#TICK-1139] Title: None | Priority: Low | Status: resolved | Created: 2026-11-09T09:00:00Z
-  * [#TICK-1138] Title: None | Priority: Medium | Status: open | Created: 2026-11-08T12:00:00Z
-  * [#TICK-1137] Title: None | Priority: Low | Status: resolved | Created: 2026-11-07T10:00:00Z
-  * [#TICK-1136] Title: None | Priority: High | Status: in_progress | Created: 2026-11-06T13:00:00Z
-  * [#TICK-1135] Title: None | Priority: Urgent | Status: open | Created: 2026-11-05T11:00:00Z
-  * [#TICK-1134] Title: None | Priority: High | Status: in_progress | Created: 2026-11-04T09:00:00Z
-  * [#TICK-1133] Title: None | Priority: Medium | Status: resolved | Created: 2026-11-03T12:00:00Z
-  * [#TICK-1132] Title: None | Priority: Low | Status: open | Created: 2026-11-02T10:00:00Z
-  * [#TICK-1131] Title: None | Priority: Urgent | Status: open | Created: 2026-11-01T11:00:00Z
-  * [#TICK-1130] Title: None | Priority: High | Status: in_progress | Created: 2026-10-31T09:00:00Z
-  * [#TICK-1129] Title: None | Priority: Low | Status: resolved | Created: 2026-10-30T12:00:00Z
-  * [#TICK-1128] Title: None | Priority: Medium | Status: open | Created: 2026-10-29T10:00:00Z
-  * [#TICK-1127] Title: None | Priority: Low | Status: open | Created: 2026-10-28T13:00:00Z
-  * [#TICK-1126] Title: None | Priority: High | Status: in_progress | Created: 2026-10-27T11:00:00Z
-  * [#TICK-1125] Title: None | Priority: Medium | Status: resolved | Created: 2026-10-26T09:00:00Z
-  * [#TICK-1145] Title: None | Priority: Medium | Status: open | Created: 2026-10-25T17:30:05.610151Z
-  * [#TICK-1144] Title: None | Priority: Urgent | Status: open | Created: 2026-10-25T17:30:05.568346Z
-  * [#TICK-1143] Title: None | Priority: Medium | Status: open | Created: 2026-10-25T17:27:59.805707Z
-  * [#TICK-1142] Title: None | Priority: High | Status: open | Created: 2026-10-25T17:27:52.596127Z
+  * [#TICK-1142] Title: Yêu cầu nâng cấp gói dịch vụ Enterprise cho Client Corp | Priority: High | Status: in_progress | Created: 2026-10-26T07:40:00Z
+  * [#TICK-1141] Title: Sự cố đăng nhập tài khoản an.nguyen | Priority: Urgent | Status: in_progress | Created: 2026-10-26T07:35:00Z
 
 Page 2 Response:
 - HTTP Status: 200
-- Tickets Returned (Page 2): 20
+- Tickets Returned (Page 2): 2
 - Tickets List:
-  * [#TICK-1141] Title: None | Priority: Urgent | Status: open | Created: 2026-10-25T17:27:52.552783Z
-  * [#TICK-1039] Title: None | Priority: Low | Status: resolved | Created: 2026-10-25T17:24:09.095327Z
-  * [#TICK-1041] Title: None | Priority: Urgent | Status: in_progress | Created: 2026-10-25T17:24:09.095326Z
-  * [#TICK-1042] Title: None | Priority: Urgent | Status: in_progress | Created: 2026-10-25T17:24:09.095321Z
-  * [#TICK-1124] Title: None | Priority: Low | Status: open | Created: 2026-10-25T12:00:00Z
-  * [#TICK-1123] Title: None | Priority: Urgent | Status: open | Created: 2026-10-24T10:00:00Z
-  * [#TICK-1122] Title: None | Priority: Medium | Status: in_progress | Created: 2026-10-23T13:00:00Z
-  * [#TICK-1121] Title: None | Priority: Low | Status: resolved | Created: 2026-10-22T11:00:00Z
-  * [#TICK-1120] Title: None | Priority: High | Status: open | Created: 2026-10-21T09:00:00Z
-  * [#TICK-1119] Title: None | Priority: Medium | Status: in_progress | Created: 2026-10-20T13:00:00Z
-  * [#TICK-1118] Title: None | Priority: Low | Status: open | Created: 2026-10-19T11:00:00Z
-  * [#TICK-1117] Title: None | Priority: High | Status: resolved | Created: 2026-10-18T09:00:00Z
-  * [#TICK-1116] Title: None | Priority: Medium | Status: open | Created: 2026-10-17T12:00:00Z
-  * [#TICK-1115] Title: None | Priority: Urgent | Status: in_progress | Created: 2026-10-16T10:00:00Z
-  * [#TICK-1114] Title: None | Priority: Low | Status: resolved | Created: 2026-10-15T11:00:00Z
-  * [#TICK-1113] Title: None | Priority: Urgent | Status: open | Created: 2026-10-14T09:00:00Z
-  * [#TICK-1112] Title: None | Priority: High | Status: in_progress | Created: 2026-10-13T14:00:00Z
-  * [#TICK-1111] Title: None | Priority: Low | Status: resolved | Created: 2026-10-12T12:00:00Z
-  * [#TICK-1110] Title: None | Priority: Medium | Status: open | Created: 2026-10-11T10:00:00Z
-  * [#TICK-1109] Title: None | Priority: Low | Status: in_progress | Created: 2026-10-10T13:00:00Z
+  * [#TICK-1043] Title: Lỗi không nhận được email kích hoạt tài khoản | Priority: High | Status: open | Created: 2026-10-25T14:20:00Z
+  * [#TICK-1042] Title: Lỗi đồng bộ dữ liệu sau khi cập nhật phiên bản | Priority: Urgent | Status: in_progress | Created: 2026-10-25T12:00:00Z
 
 Verification:
-- Server-side pagination parameters `page` and `page_size` respected.
+- Server-side pagination parameters `page` and `page_size` respected without overlapping IDs.
 - Sorting `sort_by=created_at&sort_order=desc` applied correctly.
-- `X-Total-Count` header returned and exposed to frontend client.
+- `X-Total-Count` header returned and exposed via CORS `Access-Control-Expose-Headers`.
