@@ -39,50 +39,24 @@ class VerificationService:
         status: str = "passed",
         item_count: int = 3,
     ) -> List[AgentHandOffStep]:
-        """Returns recorded multi-agent hand-off trace for a document (or constructs a deterministic trace if not cached)."""
-        if document_id in self._trace_cache:
-            return self._trace_cache[document_id]
+        """Returns the hand-off trace recorded by the last verification run in this process ([] if none)."""
+        return list(self._trace_cache.get(document_id, []))
 
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        count = max(1, item_count)
-        return [
-            AgentHandOffStep(
-                step_order=1,
-                agent="SyntheticQAExamAgent",
-                from_agent="DocumentIngestionPipeline",
-                to_agent="SyntheticQAExamAgent",
-                action="generate_evaluation_questions",
-                input_summary=f"Document #{document_id} knowledge chunks",
-                output_summary=f"{count} synthetic QA pairs generated",
-                latency_ms=42.5,
-                status="success",
-                timestamp=now_iso,
-            ),
-            AgentHandOffStep(
-                step_order=2,
-                agent="SandboxRAGAgent",
-                from_agent="SyntheticQAExamAgent",
-                to_agent="SandboxRAGAgent",
-                action="answer_synthetic_questions",
-                input_summary=f"{count} synthetic questions",
-                output_summary=f"{count} grounded sandbox answers synthesized",
-                latency_ms=68.2,
-                status="success",
-                timestamp=now_iso,
-            ),
-            AgentHandOffStep(
-                step_order=3,
-                agent="FaithfulnessJudgeAgent",
-                from_agent="SandboxRAGAgent",
-                to_agent="FaithfulnessJudgeAgent",
-                action="evaluate_faithfulness",
-                input_summary=f"{count} RAG answers vs ground truth",
-                output_summary=f"Faithfulness score: {faithfulness_score} ({status})",
-                latency_ms=35.1,
-                status="success" if status != "failed" else "failed",
-                timestamp=now_iso,
-            ),
-        ]
+    @staticmethod
+    def load_agent_trace(
+        report: Optional[VerificationReport],
+    ) -> List[AgentHandOffStep]:
+        """Parses the hand-off trace persisted on a VerificationReport row."""
+        raw = getattr(report, "agent_trace_json", None) if report is not None else None
+        if not raw:
+            return []
+        try:
+            return [AgentHandOffStep.model_validate(step) for step in json.loads(raw)]
+        except Exception as exc:
+            logger.warning(
+                f"Invalid agent_trace_json on report {getattr(report, 'id', '?')}: {exc}"
+            )
+            return []
 
     @staticmethod
     def clean_json_response(raw_text: str) -> Any:
@@ -94,7 +68,7 @@ class VerificationService:
             return {
                 "score": 0.0,
                 "status": "failed",
-                "reason": "Không nhận được phản hồi đánh giá từ bộ máy suy luận."
+                "reason": "Không nhận được phản hồi đánh giá từ bộ máy suy luận.",
             }
 
         text = raw_text.strip()
@@ -126,11 +100,13 @@ class VerificationService:
         try:
             return json.loads(text)
         except Exception:
-            logger.warning(f"Could not parse JSON from LLM response: {text[:100]}... Verification failed.")
+            logger.warning(
+                f"Could not parse JSON from LLM response: {text[:100]}... Verification failed."
+            )
             return {
                 "score": 0.0,
                 "status": "failed",
-                "reason": "Không thể phân tích cấu trúc JSON từ kết quả đánh giá của AI Judge."
+                "reason": "Không thể phân tích cấu trúc JSON từ kết quả đánh giá của AI Judge.",
             }
 
     async def generate_synthetic_qa(
@@ -144,47 +120,71 @@ class VerificationService:
             return []
 
         from app.services.embedding_service import embedding_service
-        if embedding_service.is_rate_limited() or llm_service.is_in_cooldown() or not llm_service.is_available():
+
+        if (
+            embedding_service.is_rate_limited()
+            or llm_service.is_in_cooldown()
+            or not llm_service.is_available()
+        ):
             return self._generate_rule_based_qa(chunks)
 
         selected_chunks = chunks[:3]
-        context_text = "\n\n".join([f"Đoạn {i+1}: {c.content}" for i, c in enumerate(selected_chunks)])
+        context_text = "\n\n".join(
+            [f"Đoạn {i+1}: {c.content}" for i, c in enumerate(selected_chunks)]
+        )
 
-        prompt = prompt_registry.render("verification_synthetic_qa", context_text=context_text)
+        prompt = prompt_registry.render(
+            "verification_synthetic_qa", context_text=context_text
+        )
 
         try:
             response_text, _ = await llm_service.generate_response(
-                prompt=prompt,
-                temperature=0.2
+                prompt=prompt, temperature=0.2
             )
             cleaned = self.clean_json_response(response_text)
             if isinstance(cleaned, list) and len(cleaned) > 0:
                 qa_list: List[Dict[str, str]] = []
                 for item in cleaned:
-                    if isinstance(item, dict) and "question" in item and "ground_truth" in item:
-                        qa_list.append({
-                            "question": str(item["question"]),
-                            "ground_truth": str(item["ground_truth"])
-                        })
+                    if (
+                        isinstance(item, dict)
+                        and "question" in item
+                        and "ground_truth" in item
+                    ):
+                        qa_list.append(
+                            {
+                                "question": str(item["question"]),
+                                "ground_truth": str(item["ground_truth"]),
+                            }
+                        )
                 if qa_list:
                     return qa_list[:3]
         except Exception as e:
-            logger.warning(f"Synthetic QA generation via LLM failed: {e}. Using deterministic fallback QA.")
+            logger.warning(
+                f"Synthetic QA generation via LLM failed: {e}. Using deterministic fallback QA."
+            )
 
         return self._generate_rule_based_qa(chunks)
 
-    def _generate_rule_based_qa(self, chunks: List[KnowledgeChunk]) -> List[Dict[str, str]]:
+    def _generate_rule_based_qa(
+        self, chunks: List[KnowledgeChunk]
+    ) -> List[Dict[str, str]]:
         """Generates deterministic QA pairs directly extracted from chunk sentences."""
         qa_list: List[Dict[str, str]] = []
         for chunk in chunks[:3]:
-            sentences = [s.strip() for s in re.split(r"[.!?\n]", chunk.content) if len(s.strip()) > 15]
+            sentences = [
+                s.strip()
+                for s in re.split(r"[.!?\n]", chunk.content)
+                if len(s.strip()) > 15
+            ]
             first_sentence = sentences[0] if sentences else chunk.content[:100]
             second_sentence = sentences[1] if len(sentences) > 1 else first_sentence
 
-            qa_list.append({
-                "question": f"Thông tin chính được nêu trong {chunk.title} là gì?",
-                "ground_truth": f"{first_sentence}. {second_sentence}"
-            })
+            qa_list.append(
+                {
+                    "question": f"Thông tin chính được nêu trong {chunk.title} là gì?",
+                    "ground_truth": f"{first_sentence}. {second_sentence}",
+                }
+            )
         return qa_list
 
     async def evaluate_faithfulness(
@@ -196,7 +196,12 @@ class VerificationService:
         Returns: (score [0.0 - 1.0], status ['passed' | 'warning' | 'failed'], reason)
         """
         from app.services.embedding_service import embedding_service
-        if embedding_service.is_rate_limited() or llm_service.is_in_cooldown() or not llm_service.is_available():
+
+        if (
+            embedding_service.is_rate_limited()
+            or llm_service.is_in_cooldown()
+            or not llm_service.is_available()
+        ):
             return self._deterministic_judge(ground_truth, rag_answer)
 
         judge_prompt = prompt_registry.render(
@@ -223,8 +228,7 @@ class VerificationService:
                 return score, status_str, structured_judgment.reason
             except Exception:
                 response_text, _ = await llm_service.generate_response(
-                    prompt=judge_prompt,
-                    temperature=0.1
+                    prompt=judge_prompt, temperature=0.1
                 )
                 data = self.clean_json_response(response_text)
                 if not isinstance(data, dict):
@@ -239,13 +243,22 @@ class VerificationService:
                 else:
                     status_str = "failed"
 
-                reason = str(data.get("reason", "Câu trả lời đạt độ chính xác theo tiêu chuẩn thẩm định."))
+                reason = str(
+                    data.get(
+                        "reason",
+                        "Câu trả lời đạt độ chính xác theo tiêu chuẩn thẩm định.",
+                    )
+                )
                 return score, status_str, reason
         except Exception as e:
-            logger.warning(f"AI Judge evaluation failed: {e}. Using deterministic score.")
+            logger.warning(
+                f"AI Judge evaluation failed: {e}. Using deterministic score."
+            )
             return self._deterministic_judge(ground_truth, rag_answer)
 
-    def _deterministic_judge(self, ground_truth: str, rag_answer: str) -> Tuple[float, str, str]:
+    def _deterministic_judge(
+        self, ground_truth: str, rag_answer: str
+    ) -> Tuple[float, str, str]:
         """Calculates token overlap ratio as deterministic judge fallback."""
         gt_tokens = set(re.findall(r"\w+", ground_truth.lower()))
         rag_tokens = set(re.findall(r"\w+", rag_answer.lower()))
@@ -271,7 +284,7 @@ class VerificationService:
         self,
         query: str,
         chunks: List[KnowledgeChunk],
-        query_vector: Optional[List[float]] = None
+        query_vector: Optional[List[float]] = None,
     ) -> List[KnowledgeChunk]:
         """Ranks document chunks by semantic/keyword relevance specifically for the verification sandbox."""
         if not chunks:
@@ -310,13 +323,14 @@ class VerificationService:
         self,
         query: str,
         chunks: List[KnowledgeChunk],
-        workspace_name: str = "Doanh nghiệp"
+        workspace_name: str = "Doanh nghiệp",
     ) -> str:
         """
         SandboxRAGAgent: Evaluates RAG retrieval and synthesis directly on the Document Under Test (DUT).
         Completely decoupled from the Customer-facing Production Chatbot.
         """
         from app.services.embedding_service import embedding_service
+
         query_vec = None
         try:
             if not embedding_service.is_rate_limited():
@@ -343,7 +357,9 @@ class VerificationService:
 
         try:
             if not llm_service.is_in_cooldown() and llm_service.is_available():
-                resp, _ = await llm_service.generate_response(prompt=prompt, temperature=0.1)
+                resp, _ = await llm_service.generate_response(
+                    prompt=prompt, temperature=0.1
+                )
                 return resp.strip()
         except Exception as e:
             logger.warning(f"Sandbox LLM answer generation failed: {e}")
@@ -409,16 +425,16 @@ class VerificationService:
             questions = [qa["question"] for qa in qa_pairs]
             ws_name = "Doanh nghiệp"
             if doc.workspace_id:
-                ws_res = await session.execute(select(Workspace).where(Workspace.id == doc.workspace_id))
+                ws_res = await session.execute(
+                    select(Workspace).where(Workspace.id == doc.workspace_id)
+                )
                 ws_obj = ws_res.scalar_one_or_none()
                 if ws_obj:
                     ws_name = ws_obj.name
 
             rag_tasks = [
                 self.answer_sandbox_query(
-                    query=q,
-                    chunks=list(chunks),
-                    workspace_name=ws_name
+                    query=q, chunks=list(chunks), workspace_name=ws_name
                 )
                 for q in questions
             ]
@@ -454,13 +470,18 @@ class VerificationService:
             has_warning = False
 
             existing_report_res = await session.execute(
-                select(VerificationReport).where(VerificationReport.document_id == document_id)
+                select(VerificationReport).where(
+                    VerificationReport.document_id == document_id
+                )
             )
             existing_report = existing_report_res.scalar_one_or_none()
             if existing_report:
                 from sqlalchemy import delete
+
                 await session.execute(
-                    delete(VerificationItem).where(VerificationItem.report_id == existing_report.id)
+                    delete(VerificationItem).where(
+                        VerificationItem.report_id == existing_report.id
+                    )
                 )
                 await session.delete(existing_report)
                 await session.flush()
@@ -469,12 +490,14 @@ class VerificationService:
                 document_id=doc.id,
                 workspace_id=doc.workspace_id,
                 faithfulness_score=0.0,
-                status="passed"
+                status="passed",
             )
             session.add(report)
             await session.flush()
 
-            for qa, rag_ans, (score, status_str, reason) in zip(qa_pairs, rag_answers, judge_results):
+            for qa, rag_ans, (score, status_str, reason) in zip(
+                qa_pairs, rag_answers, judge_results
+            ):
                 total_score += score
                 if status_str == "failed":
                     has_failed = True
@@ -488,7 +511,7 @@ class VerificationService:
                     rag_answer=rag_ans,
                     score=score,
                     status=status_str,
-                    reason=reason
+                    reason=reason,
                 )
                 session.add(item)
 
@@ -520,19 +543,39 @@ class VerificationService:
                 )
             )
             self._trace_cache[doc.id] = trace_steps
+            report.agent_trace_json = json.dumps(
+                [s.model_dump() for s in trace_steps], ensure_ascii=False
+            )
+            for step in trace_steps:
+                logger.info(
+                    f"[AgentHandOff] doc={doc.id} step={step.step_order} {step.from_agent} -> {step.to_agent} "
+                    f"action={step.action} status={step.status} latency={step.latency_ms}ms output='{step.output_summary}'"
+                )
 
             await session.commit()
             await session.refresh(report)
             setattr(report, "agent_trace", trace_steps)
 
             elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            used_live_llm = llm_service.is_available() and not llm_service.is_in_cooldown()
+            used_live_llm = (
+                llm_service.is_available() and not llm_service.is_in_cooldown()
+            )
             await log_ai_call(
                 endpoint="/api/v1/documents/verify",
-                prompt_version=prompt_registry.get_prompt_version("verification_ai_judge"),
+                prompt_version=prompt_registry.get_prompt_version(
+                    "verification_ai_judge"
+                ),
                 provider=llm_service.provider if used_live_llm else "bm25_fallback",
-                model_name=llm_service.active_model_name if used_live_llm else "deterministic-judge-v2",
-                tools_called=["SyntheticQAExamAgent", "SandboxRAGAgent", "FaithfulnessJudgeAgent"],
+                model_name=(
+                    llm_service.active_model_name
+                    if used_live_llm
+                    else "deterministic-judge-v2"
+                ),
+                tools_called=[
+                    "SyntheticQAExamAgent",
+                    "SandboxRAGAgent",
+                    "FaithfulnessJudgeAgent",
+                ],
                 input_tokens=llm_service.last_input_tokens if used_live_llm else 0,
                 output_tokens=llm_service.last_output_tokens if used_live_llm else 0,
                 cost_usd=llm_service.last_cost_usd if used_live_llm else 0.0,
@@ -548,7 +591,10 @@ class VerificationService:
             )
             return report
         except Exception as exc:
-            logger.error(f"Active verification failed for Document {doc.id}: {exc}", exc_info=True)
+            logger.error(
+                f"Active verification failed for Document {doc.id}: {exc}",
+                exc_info=True,
+            )
             doc.status = "failed"
             try:
                 await session.commit()
@@ -556,12 +602,16 @@ class VerificationService:
                 await session.rollback()
             raise
 
-    async def publish_document(self, document_id: int, session: AsyncSession) -> Document:
+    async def publish_document(
+        self, document_id: int, session: AsyncSession
+    ) -> Document:
         """
         Activates document into the live knowledge base (status = 'published').
         Requires document to have passed verification (status == 'verified').
         """
-        doc_result = await session.execute(select(Document).where(Document.id == document_id))
+        doc_result = await session.execute(
+            select(Document).where(Document.id == document_id)
+        )
         doc = doc_result.scalar_one_or_none()
         if not doc:
             raise ValueError(f"Không tìm thấy tài liệu ID {document_id}")

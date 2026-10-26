@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
     AsyncSession,
     async_sessionmaker,
-    AsyncEngine
+    AsyncEngine,
 )
 from sqlalchemy import select
 
@@ -48,7 +48,7 @@ def create_engine_and_factory(url: str, **custom_kwargs):
         class_=AsyncSession,
         expire_on_commit=False,
         autocommit=False,
-        autoflush=False
+        autoflush=False,
     )
     return eng, factory
 
@@ -81,40 +81,90 @@ async def init_db() -> None:
     from app.models.knowledge import FAQItem, KnowledgeChunk  # noqa: F401
     from app.models.workspace import Workspace  # noqa: F401
     from app.models.document import Document  # noqa: F401
-    from app.models.verification import VerificationReport, VerificationItem  # noqa: F401
+    from app.models.verification import (
+        VerificationReport,
+        VerificationItem,
+    )  # noqa: F401
     from app.models.user import User  # noqa: F401
     from app.models.ai_usage import AIUsageLog  # noqa: F401
 
     def _migrate_sqlite_columns(sync_conn):
         try:
-            ticket_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(tickets)").fetchall()]
+            ticket_cols = [
+                row[1]
+                for row in sync_conn.exec_driver_sql(
+                    "PRAGMA table_info(tickets)"
+                ).fetchall()
+            ]
             if ticket_cols and "workspace_id" not in ticket_cols:
-                sync_conn.exec_driver_sql("ALTER TABLE tickets ADD COLUMN workspace_id INTEGER DEFAULT 1")
-            
-            kc_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(knowledge_chunks)").fetchall()]
+                sync_conn.exec_driver_sql(
+                    "ALTER TABLE tickets ADD COLUMN workspace_id INTEGER DEFAULT 1"
+                )
+
+            kc_cols = [
+                row[1]
+                for row in sync_conn.exec_driver_sql(
+                    "PRAGMA table_info(knowledge_chunks)"
+                ).fetchall()
+            ]
             if kc_cols:
                 if "workspace_id" not in kc_cols:
-                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN workspace_id INTEGER DEFAULT 1")
+                    sync_conn.exec_driver_sql(
+                        "ALTER TABLE knowledge_chunks ADD COLUMN workspace_id INTEGER DEFAULT 1"
+                    )
                 if "document_id" not in kc_cols:
-                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN document_id INTEGER")
+                    sync_conn.exec_driver_sql(
+                        "ALTER TABLE knowledge_chunks ADD COLUMN document_id INTEGER"
+                    )
                 if "chunk_index" not in kc_cols:
-                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN chunk_index INTEGER DEFAULT 0")
+                    sync_conn.exec_driver_sql(
+                        "ALTER TABLE knowledge_chunks ADD COLUMN chunk_index INTEGER DEFAULT 0"
+                    )
                 if "page_number" not in kc_cols:
-                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN page_number INTEGER DEFAULT 1")
+                    sync_conn.exec_driver_sql(
+                        "ALTER TABLE knowledge_chunks ADD COLUMN page_number INTEGER DEFAULT 1"
+                    )
 
-            user_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()]
+            user_cols = [
+                row[1]
+                for row in sync_conn.exec_driver_sql(
+                    "PRAGMA table_info(users)"
+                ).fetchall()
+            ]
             if user_cols:
                 if "password_hash" not in user_cols:
-                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)")
+                    sync_conn.exec_driver_sql(
+                        "ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"
+                    )
                 if "is_active" not in user_cols:
-                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1")
+                    sync_conn.exec_driver_sql(
+                        "ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"
+                    )
+
+            report_cols = [
+                row[1]
+                for row in sync_conn.exec_driver_sql(
+                    "PRAGMA table_info(verification_reports)"
+                ).fetchall()
+            ]
+            if report_cols and "agent_trace_json" not in report_cols:
+                sync_conn.exec_driver_sql(
+                    "ALTER TABLE verification_reports ADD COLUMN agent_trace_json TEXT"
+                )
         except Exception as mig_err:
             logger.warning(f"SQLite auto-migration notice: {mig_err}")
 
     def _migrate_postgres_columns(sync_conn):
         try:
-            sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
-            sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE")
+            sync_conn.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)"
+            )
+            sync_conn.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"
+            )
+            sync_conn.exec_driver_sql(
+                "ALTER TABLE verification_reports ADD COLUMN IF NOT EXISTS agent_trace_json TEXT"
+            )
         except Exception as mig_err:
             logger.warning(f"PostgreSQL auto-migration notice: {mig_err}")
 
@@ -123,19 +173,24 @@ async def init_db() -> None:
         async with engine.begin() as conn:
             if "postgresql" in engine.url.drivername:
                 from sqlalchemy import text
+
                 await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             await conn.run_sync(Base.metadata.create_all)
             if "sqlite" in engine.url.drivername:
                 await conn.run_sync(_migrate_sqlite_columns)
             elif "postgresql" in engine.url.drivername:
                 await conn.run_sync(_migrate_postgres_columns)
-        logger.info(f"Database schema synchronized successfully on {engine.url.drivername}.")
+        logger.info(
+            f"Database schema synchronized successfully on {engine.url.drivername}."
+        )
     except Exception as e:
         logger.warning(
             f"Primary database connection failed ({e}). "
             f"Falling back to local async SQLite: {settings.FALLBACK_SQLITE_URL}"
         )
-        engine, async_session_factory = create_engine_and_factory(settings.FALLBACK_SQLITE_URL)
+        engine, async_session_factory = create_engine_and_factory(
+            settings.FALLBACK_SQLITE_URL
+        )
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             await conn.run_sync(_migrate_sqlite_columns)
@@ -144,8 +199,11 @@ async def init_db() -> None:
     # 2. Seed initial data via modular db/seed package
     try:
         from app.db.seed import seed_all
+
         async with async_session_factory() as session:
             await seed_all(session)
     except Exception as e:
-        logger.error(f"Error during database initialization/seeding: {e}", exc_info=True)
+        logger.error(
+            f"Error during database initialization/seeding: {e}", exc_info=True
+        )
         # For non-fatal database initialization failure, allow fallback

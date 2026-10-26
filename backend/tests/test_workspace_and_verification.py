@@ -29,7 +29,7 @@ async def test_create_and_list_workspaces(client: AsyncClient):
         "industry": "Bất động sản & Nhà ở",
         "persona_name": "Tư vấn viên GreenLand",
         "tone_of_voice": "Lịch thiệp, đáng tin cậy và tận tình.",
-        "business_rules": "Cung cấp thông tin dự án, bảng giá căn hộ, chính sách ngân hàng."
+        "business_rules": "Cung cấp thông tin dự án, bảng giá căn hộ, chính sách ngân hàng.",
     }
     create_resp = await client.post("/api/v1/workspaces", json=new_ws)
     assert create_resp.status_code == 201
@@ -51,11 +51,17 @@ async def test_document_upload_and_chunking(client: AsyncClient):
         "3. Tẩy trắng răng bằng công nghệ Laser White: Giá 2.500.000 VNĐ một liệu trình 60 phút, bật từ 2 đến 3 tông màu."
     )
     files = {
-        "file": ("bang_gia_nha_khoa.txt", io.BytesIO(sample_text.encode("utf-8")), "text/plain")
+        "file": (
+            "bang_gia_nha_khoa.txt",
+            io.BytesIO(sample_text.encode("utf-8")),
+            "text/plain",
+        )
     }
 
     # Upload to workspace 2 (SmileCare)
-    upload_resp = await client.post("/api/v1/workspaces/2/documents/upload", files=files)
+    upload_resp = await client.post(
+        "/api/v1/workspaces/2/documents/upload", files=files
+    )
     assert upload_resp.status_code == 201
     doc_data = upload_resp.json()
     assert doc_data["filename"] == "bang_gia_nha_khoa.txt"
@@ -83,11 +89,17 @@ async def test_document_verification_pipeline(client: AsyncClient):
         "Nếu máy bị trầy xước màn hình hoặc cấn móp, áp dụng mức khấu trừ 15% giá trị đơn hàng."
     )
     files = {
-        "file": ("chinh_sach_doi_tra.txt", io.BytesIO(sample_text.encode("utf-8")), "text/plain")
+        "file": (
+            "chinh_sach_doi_tra.txt",
+            io.BytesIO(sample_text.encode("utf-8")),
+            "text/plain",
+        )
     }
 
     # Upload to workspace 3 (TechStore)
-    upload_resp = await client.post("/api/v1/workspaces/3/documents/upload", files=files)
+    upload_resp = await client.post(
+        "/api/v1/workspaces/3/documents/upload", files=files
+    )
     assert upload_resp.status_code == 201
     doc_id = upload_resp.json()["id"]
 
@@ -104,11 +116,19 @@ async def test_document_verification_pipeline(client: AsyncClient):
     assert report["faithfulness_score"] >= 0.0
     assert report["status"] in ["passed", "warning", "failed"]
     assert len(report["items"]) > 0
+    assert [s["agent"] for s in report["agent_trace"]] == [
+        "SyntheticQAExamAgent",
+        "SandboxRAGAgent",
+        "FaithfulnessJudgeAgent",
+    ]
 
     # Get verification report
-    get_report_resp = await client.get(f"/api/v1/documents/{doc_id}/verification-report")
+    get_report_resp = await client.get(
+        f"/api/v1/documents/{doc_id}/verification-report"
+    )
     assert get_report_resp.status_code == 200
     assert get_report_resp.json()["id"] == report["id"]
+    assert get_report_resp.json()["agent_trace"] == report["agent_trace"]
 
     # Publish Document
     pub_resp = await client.post(f"/api/v1/documents/{doc_id}/publish")
@@ -120,6 +140,7 @@ async def test_document_verification_pipeline(client: AsyncClient):
 def test_clean_json_response_fail_closed():
     """Verify that unparseable or empty responses fail closed with score 0.0 and status failed."""
     from app.services.verification_service import verification_service
+
     res1 = verification_service.clean_json_response("")
     assert res1["status"] == "failed"
     assert res1["score"] == 0.0
@@ -135,7 +156,7 @@ async def test_rag_workspace_isolation(client: AsyncClient):
     # Query default workspace
     chat_payload = {
         "message": "Tôi muốn biết quy trình xử lý lỗi đăng nhập?",
-        "workspace_id": 1
+        "workspace_id": 1,
     }
     resp1 = await client.post("/api/v1/chat", json=chat_payload)
     assert resp1.status_code == 200
@@ -146,7 +167,7 @@ async def test_rag_workspace_isolation(client: AsyncClient):
     # Query smilecare workspace
     chat_payload_sc = {
         "message": "Chi phí niềng răng mắc cài là bao nhiêu?",
-        "workspace_id": 2
+        "workspace_id": 2,
     }
     resp2 = await client.post("/api/v1/chat", json=chat_payload_sc)
     assert resp2.status_code == 200
@@ -164,14 +185,16 @@ async def test_ticket_creation_with_workspace(client: AsyncClient):
         "category": "Billing",
         "priority": "High",
         "subject": "Tư vấn gói niềng răng trả góp 0%",
-        "description": "Tôi muốn đăng ký khám tư vấn niềng răng mắc cài và thủ tục trả góp 12 tháng tại cơ sở SmileCare."
+        "description": "Tôi muốn đăng ký khám tư vấn niềng răng mắc cài và thủ tục trả góp 12 tháng tại cơ sở SmileCare.",
     }
     resp = await client.post("/api/v1/tickets", json=ticket_data)
     assert resp.status_code == 201
     data = resp.json()
     assert data["workspace_id"] == 2
     assert data["ticket_code"].startswith("#TICK-")
-    assert "SmileCare" in data["ai_draft_reply"] or "Quỳnh Như" in data["ai_draft_reply"]
+    assert (
+        "SmileCare" in data["ai_draft_reply"] or "Quỳnh Như" in data["ai_draft_reply"]
+    )
 
 
 @pytest.mark.asyncio
@@ -182,7 +205,7 @@ async def test_cost_guard_circuit_breaker_on_429(client: AsyncClient):
 
     chat_payload = {
         "message": "Làm thế nào để đổi mật khẩu tài khoản?",
-        "workspace_id": 1
+        "workspace_id": 1,
     }
     resp = await client.post("/api/v1/chat", json=chat_payload)
     assert resp.status_code == 200

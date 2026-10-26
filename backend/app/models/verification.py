@@ -28,7 +28,9 @@ class VerificationReport(Base):
     workspace_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("workspaces.id"), index=True, nullable=False
     )
-    faithfulness_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    faithfulness_score: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.0
+    )
     status: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
@@ -38,8 +40,15 @@ class VerificationReport(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
+    agent_trace_json: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        doc="JSON list of AgentHandOffStep recorded by the verification run",
+    )
 
-    document: Mapped["Document"] = relationship("Document", back_populates="verification_report")
+    document: Mapped["Document"] = relationship(
+        "Document", back_populates="verification_report"
+    )
     items: Mapped[List["VerificationItem"]] = relationship(
         "VerificationItem", back_populates="report", cascade="all, delete-orphan"
     )
@@ -69,7 +78,11 @@ class VerificationItem(Base):
     )
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    report: Mapped["VerificationReport"] = relationship("VerificationReport", back_populates="items")
+    report: Mapped["VerificationReport"] = relationship(
+        "VerificationReport", back_populates="items"
+    )
 
     def __repr__(self) -> str:
-        return f"<VerificationItem id={self.id} score={self.score} status={self.status}>"
+        return (
+            f"<VerificationItem id={self.id} score={self.score} status={self.status}>"
+        )

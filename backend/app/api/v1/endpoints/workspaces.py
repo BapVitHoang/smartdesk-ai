@@ -22,17 +22,25 @@ router = APIRouter()
 
 
 @router.get("", response_model=List[WorkspaceResponse], summary="List all workspaces")
-async def list_workspaces(db: AsyncSession = Depends(get_db)) -> List[WorkspaceResponse]:
+async def list_workspaces(
+    db: AsyncSession = Depends(get_db),
+) -> List[WorkspaceResponse]:
     """Retrieve all available workspace profiles."""
     result = await db.execute(select(Workspace).order_by(Workspace.id))
     workspaces = result.scalars().all()
     return [WorkspaceResponse.model_validate(w) for w in workspaces]
 
 
-@router.post("", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED, summary="Create workspace")
+@router.post(
+    "",
+    response_model=WorkspaceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create workspace",
+)
 async def create_workspace(
     payload: WorkspaceCreate,
-    db: AsyncSession = Depends(get_db)
+    _admin: User = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
 ) -> WorkspaceResponse:
     """Create a new domain workspace."""
     # Prompt injection guardrail on persona and rules
@@ -46,7 +54,7 @@ async def create_workspace(
             if is_suspicious:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"PROMPT_SECURITY_VIOLATION: Trường {field_name} chứa ký tự hoặc mẫu độc hại ({reason})."
+                    detail=f"PROMPT_SECURITY_VIOLATION: Trường {field_name} chứa ký tự hoặc mẫu độc hại ({reason}).",
                 )
 
     # Check if slug already exists
@@ -54,7 +62,7 @@ async def create_workspace(
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Slug '{payload.slug}' đã tồn tại trong hệ thống."
+            detail=f"Slug '{payload.slug}' đã tồn tại trong hệ thống.",
         )
 
     ws = Workspace(
@@ -63,7 +71,7 @@ async def create_workspace(
         industry=payload.industry,
         persona_name=payload.persona_name,
         tone_of_voice=payload.tone_of_voice,
-        business_rules=payload.business_rules
+        business_rules=payload.business_rules,
     )
     db.add(ws)
     await db.commit()
@@ -74,8 +82,7 @@ async def create_workspace(
 
 @router.get("/{id}", response_model=WorkspaceResponse, summary="Get workspace details")
 async def get_workspace(
-    id: int,
-    db: AsyncSession = Depends(get_db)
+    id: int, db: AsyncSession = Depends(get_db)
 ) -> WorkspaceResponse:
     """Get workspace details by ID."""
     result = await db.execute(select(Workspace).where(Workspace.id == id))
@@ -83,7 +90,7 @@ async def get_workspace(
     if not ws:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Không tìm thấy Workspace với ID {id}."
+            detail=f"Không tìm thấy Workspace với ID {id}.",
         )
     return WorkspaceResponse.model_validate(ws)
 
@@ -92,7 +99,8 @@ async def get_workspace(
 async def update_workspace(
     id: int,
     payload: WorkspaceUpdate,
-    db: AsyncSession = Depends(get_db)
+    _admin: User = Depends(require_role("admin")),
+    db: AsyncSession = Depends(get_db),
 ) -> WorkspaceResponse:
     """Update persona, tone of voice, or business rules of a workspace."""
     result = await db.execute(select(Workspace).where(Workspace.id == id))
@@ -100,18 +108,22 @@ async def update_workspace(
     if not ws:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Không tìm thấy Workspace với ID {id}."
+            detail=f"Không tìm thấy Workspace với ID {id}.",
         )
 
     update_data = payload.model_dump(exclude_unset=True)
     for field, val in update_data.items():
         if val is not None:
-            if isinstance(val, str) and field in {"persona_name", "tone_of_voice", "business_rules"}:
+            if isinstance(val, str) and field in {
+                "persona_name",
+                "tone_of_voice",
+                "business_rules",
+            }:
                 is_suspicious, reason = check_prompt_injection(val)
                 if is_suspicious:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"PROMPT_SECURITY_VIOLATION: Trường {field} chứa ký tự hoặc mẫu độc hại ({reason})."
+                        detail=f"PROMPT_SECURITY_VIOLATION: Trường {field} chứa ký tự hoặc mẫu độc hại ({reason}).",
                     )
             setattr(ws, field, val)
 
@@ -125,18 +137,18 @@ async def update_workspace(
     "/{id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete workspace",
-    description="Deletes a workspace by ID (restricted to admin). Default workspace ID 1 cannot be deleted."
+    description="Deletes a workspace by ID (restricted to admin). Default workspace ID 1 cannot be deleted.",
 )
 async def delete_workspace(
     id: int,
     admin_user: User = Depends(require_role("admin")),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> None:
     """Deletes a workspace by ID. Blocks deletion of default workspace (ID=1)."""
     if id == 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Không thể xóa Workspace mặc định (ID 1)."
+            detail="Không thể xóa Workspace mặc định (ID 1).",
         )
 
     result = await db.execute(select(Workspace).where(Workspace.id == id))
@@ -144,11 +156,10 @@ async def delete_workspace(
     if not ws:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Không tìm thấy Workspace với ID {id}."
+            detail=f"Không tìm thấy Workspace với ID {id}.",
         )
 
     await db.delete(ws)
     await db.commit()
     logger.info(f"Deleted workspace ID={id} slug={ws.slug}")
     return None
-

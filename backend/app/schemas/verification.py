@@ -37,10 +37,11 @@ class VerificationReportResponse(BaseModel):
 
     @model_validator(mode="after")
     def populate_agent_trace_if_empty(self) -> "VerificationReportResponse":
-        """Automatically attaches the 3-agent hand-off trace from VerificationService when serialized."""
+        """Falls back to the trace recorded in this process when the report row has none persisted."""
         if not self.agent_trace:
             try:
                 from app.services.verification_service import verification_service
+
                 self.agent_trace = verification_service.get_agent_trace(
                     document_id=self.document_id,
                     faithfulness_score=self.faithfulness_score,

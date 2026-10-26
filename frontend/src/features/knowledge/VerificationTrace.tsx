@@ -23,46 +23,14 @@ export const VerificationTrace: React.FC<VerificationTraceProps> = ({ report }) 
   const isPassed = report.status === 'passed';
   const isWarning = report.status === 'warning';
 
-  // Fallback 3-agent trace if not explicitly provided by backend
-  const defaultAgentTraces: AgentTraceStep[] = [
-    {
-      agent: 'Fact Checker Agent',
-      action: 'Đối chiếu tính chuẩn xác của các thực thể và thông số kỹ thuật với đoạn văn bản gốc.',
-      status: isPassed ? 'success' : isWarning ? 'skipped' : 'failed',
-      latency_ms: 320,
-      input_summary: 'Ground truth chunks & candidate RAG answers',
-      output_summary: isPassed
-        ? '100% các câu khẳng định khớp với dữ liệu gốc, không phát hiện hallucination.'
-        : 'Phát hiện một số diễn giải chưa hoàn toàn sát với tài liệu nguồn.',
-    },
-    {
-      agent: 'Completeness Auditor Agent',
-      action: 'Kiểm tra độ đầy đủ của thông tin, điều kiện áp dụng và các ngoại lệ quan trọng.',
-      status: isPassed || isWarning ? 'success' : 'failed',
-      latency_ms: 280,
-      input_summary: 'Target document scope & FAQ requirements',
-      output_summary: 'Đã bao quát toàn bộ các bước thao tác, mã lỗi và lưu ý bảo mật cần thiết.',
-    },
-    {
-      agent: 'Tone & Policy Checker Agent',
-      action: 'Thẩm định văn phong hỗ trợ khách hàng, tuân thủ chính sách bảo mật và giọng điệu thương hiệu.',
-      status: 'success',
-      latency_ms: 190,
-      input_summary: 'Persona guidelines & Workspace business rules',
-      output_summary: 'Văn phong chuẩn mực, trung lập, lịch sự và không chứa thông tin nhạy cảm.',
-    },
-  ];
-
-  const traces: AgentTraceStep[] =
-    report.agent_trace && report.agent_trace.length > 0
-      ? report.agent_trace
-      : defaultAgentTraces;
+  const traces: AgentTraceStep[] = report.agent_trace ?? [];
 
   const getAgentIcon = (agentName: string) => {
-    if (agentName.toLowerCase().includes('fact')) {
+    const name = agentName.toLowerCase();
+    if (name.includes('synthetic') || name.includes('qa')) {
       return <FileSearch className="w-4 h-4 text-indigo-600" />;
     }
-    if (agentName.toLowerCase().includes('complete') || agentName.toLowerCase().includes('auditor')) {
+    if (name.includes('sandbox') || name.includes('rag')) {
       return <UserCheck className="w-4 h-4 text-violet-600" />;
     }
     return <MessageSquare className="w-4 h-4 text-emerald-600" />;
@@ -78,10 +46,10 @@ export const VerificationTrace: React.FC<VerificationTraceProps> = ({ report }) 
           </div>
           <div>
             <h4 className="font-bold text-slate-800 text-xs sm:text-sm">
-              Quy Trình Sát Hạch Đa Tác Tử (3-Agent Multi-Verification Trace)
+              Nhật ký sát hạch của 3 tác tử AI
             </h4>
             <p className="text-[11px] text-slate-500">
-              Kiểm định tự động bởi 3 tác tử AI độc lập trước khi phê duyệt tài liệu vào Knowledge Base
+              Kết quả chỉ áp dụng cho bộ câu hỏi đã kiểm tra; vẫn nên đọc lại tài liệu trước khi xuất bản.
             </p>
           </div>
         </div>
@@ -95,9 +63,15 @@ export const VerificationTrace: React.FC<VerificationTraceProps> = ({ report }) 
               : 'bg-rose-50 text-rose-800 border-rose-200'
           }`}
         >
-          {scorePct}% Faithfulness ({report.status.toUpperCase()})
+          Độ trung thực {scorePct}% ({isPassed ? 'Đạt' : isWarning ? 'Cần xem lại' : 'Không đạt'})
         </span>
       </div>
+
+      {traces.length === 0 && (
+        <p className="text-xs text-slate-500">
+          Chưa có nhật ký sát hạch cho tài liệu này. Bấm “Sát hạch AI” để chạy lại quy trình 3 tác tử.
+        </p>
+      )}
 
       {/* 3-Agent Trace Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -118,17 +92,17 @@ export const VerificationTrace: React.FC<VerificationTraceProps> = ({ report }) 
                 {isSuccess ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    Passed
+                    Đạt
                   </span>
                 ) : isFailed ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
                     <XCircle className="w-3 h-3 text-rose-600" />
-                    Failed
+                    Không đạt
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                     <AlertTriangle className="w-3 h-3 text-amber-500" />
-                    Warning
+                    Cần xem lại
                   </span>
                 )}
               </div>

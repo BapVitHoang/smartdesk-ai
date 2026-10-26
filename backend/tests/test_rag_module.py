@@ -38,7 +38,9 @@ def test_prompt_registry_loads_versioned_templates() -> None:
     )
     assert "SmartDesk Bot" in rendered
     assert "SmartDesk Cloud" in rendered
-    assert prompt_registry.get_prompt_version("rag_customer_support").startswith("rag_customer_support@v")
+    assert prompt_registry.get_prompt_version("rag_customer_support").startswith(
+        "rag_customer_support@v"
+    )
 
 
 def test_agent_tool_registry_registration_and_default_tools() -> None:
@@ -48,7 +50,10 @@ def test_agent_tool_registry_registration_and_default_tools() -> None:
         ToolDefinition(
             name="lookup_ticket_status",
             description="Look up ticket status by #TICK-XXXX code.",
-            parameters_schema={"type": "object", "properties": {"ticket_code": {"type": "string"}}},
+            parameters_schema={
+                "type": "object",
+                "properties": {"ticket_code": {"type": "string"}},
+            },
             requires_confirmation=False,
         )
     )
@@ -81,14 +86,14 @@ def test_bm25_fallback_with_custom_chunks_workspace_2() -> None:
             "doc_id": "doc-2-chk-1",
             "title": "Bảng giá nha khoa SmileCare",
             "content": "Dịch vụ tẩy trắng răng Laser Whitening trọn gói 2.500.000 VNĐ.",
-            "source_url": "/workspaces/2/docs/1"
+            "source_url": "/workspaces/2/docs/1",
         }
     ]
     res = fallback_service.match_faq(
         query="Chi phí tẩy trắng răng bao nhiêu?",
         workspace_id=2,
         workspace_name="Nha Khoa SmileCare",
-        docs=custom_chunks
+        docs=custom_chunks,
     )
     assert res["is_fallback"] is True
     assert "tẩy trắng răng" in res["response"].lower()
@@ -134,7 +139,9 @@ async def test_ticket_copilot_service_single_call_fallback() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_tool_router_creates_pending_confirmation_for_mutating_actions() -> None:
+async def test_agent_tool_router_creates_pending_confirmation_for_mutating_actions() -> (
+    None
+):
     """Verify mutating tool requests create a PendingAction requiring explicit user confirmation."""
     create_route = await detect_and_route_tool(
         query="Tạo giúp tôi ticket lỗi VNPAY mức Urgent",
@@ -160,8 +167,35 @@ async def test_agent_tool_router_creates_pending_confirmation_for_mutating_actio
 
 
 def test_verification_service_multi_agent_trace_generation() -> None:
-    """Verify VerificationService returns 3-step multi-agent hand-off trace (Capability E - REQ-17)."""
-    trace = verification_service.get_agent_trace(document_id=99, faithfulness_score=0.94, status="passed", item_count=3)
+    """Verify the 3-step hand-off trace is read from the persisted report and never fabricated (Capability E - REQ-17)."""
+    import json
+    from types import SimpleNamespace
+
+    assert verification_service.get_agent_trace(document_id=987654) == []
+
+    steps = [
+        AgentHandOffStep(
+            step_order=i + 1,
+            agent=name,
+            from_agent=src,
+            to_agent=name,
+            action="act",
+            input_summary="in",
+            output_summary="out",
+            latency_ms=1.0,
+            status="success",
+            timestamp="2026-01-01T00:00:00Z",
+        ).model_dump()
+        for i, (src, name) in enumerate(
+            [
+                ("DocumentIngestionPipeline", "SyntheticQAExamAgent"),
+                ("SyntheticQAExamAgent", "SandboxRAGAgent"),
+                ("SandboxRAGAgent", "FaithfulnessJudgeAgent"),
+            ]
+        )
+    ]
+    report = SimpleNamespace(id=1, agent_trace_json=json.dumps(steps))
+    trace = verification_service.load_agent_trace(report)
     assert len(trace) == 3
     assert isinstance(trace[0], AgentHandOffStep)
     assert [step.agent for step in trace] == [
