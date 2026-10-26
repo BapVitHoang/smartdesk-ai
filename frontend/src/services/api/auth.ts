@@ -29,6 +29,16 @@ export async function loginDemo(email: string): Promise<AuthTokenResponse> {
   }
 
   const data: AuthTokenResponse = await res.json();
+  if (!data.user) {
+    const userEmail = (data as any).email || 'user@smartdesk.ai';
+    data.user = {
+      id: 1,
+      email: userEmail,
+      full_name: (data as any).full_name || userEmail.split('@')[0],
+      role: ((data as any).role as any) || 'user',
+      is_active: true,
+    };
+  }
   setAuthToken(data.access_token);
   return data;
 }
@@ -50,6 +60,16 @@ export async function loginWithGoogle(idToken: string): Promise<AuthTokenRespons
   }
 
   const data: AuthTokenResponse = await res.json();
+  if (!data.user) {
+    const userEmail = (data as any).email || 'user@smartdesk.ai';
+    data.user = {
+      id: 1,
+      email: userEmail,
+      full_name: (data as any).full_name || userEmail.split('@')[0],
+      role: ((data as any).role as any) || 'user',
+      is_active: true,
+    };
+  }
   setAuthToken(data.access_token);
   return data;
 }
