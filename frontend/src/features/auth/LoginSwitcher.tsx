@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, LogIn, LogOut, ShieldCheck, ArrowLeftRight } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { loginDemo, logout, getCurrentUser } from '../../services/api';
+import { GoogleSignInButton } from './GoogleSignInButton';
 
 interface LoginSwitcherProps {
   currentUser?: UserType | null;
@@ -36,7 +37,7 @@ export const LoginSwitcher: React.FC<LoginSwitcherProps> = ({
       if (onUserChanged) onUserChanged(auth.user);
       if (onToast) {
         onToast(
-          `Đã chuyển sang vai trò ${auth.user.role === 'admin' ? 'QUẢN TRỊ VIÊN (Admin)' : 'KHÁCH HÀNG (User)'} (${auth.user.full_name})`,
+          `Đã chuyển sang vai trò ${auth.user.role === 'admin' ? 'Quản trị viên' : 'Khách hàng'} (${auth.user.full_name})`,
           'success'
         );
       }
@@ -110,6 +111,13 @@ export const LoginSwitcher: React.FC<LoginSwitcherProps> = ({
         </div>
       ) : (
         <div className="flex items-center gap-1.5">
+          <GoogleSignInButton
+            onSignedIn={(user) => {
+              setUserState(user);
+              if (onUserChanged) onUserChanged(user);
+            }}
+            onToast={onToast}
+          />
           <button
             disabled={isLoading}
             onClick={() => handleDemoLogin('admin@smartdesk.ai')}
