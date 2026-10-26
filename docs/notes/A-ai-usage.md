@@ -48,7 +48,7 @@
 
 ### Session 4: Gemini 3.5 400 INVALID_ARGUMENT Root Cause Fix, Circuit Breaker & Audit Gaps (`llm_service.py`, `rag_service.py`, `agent_tools.py`)
 - **Date:** 2026-10-23
-- **AI Tool Used:** Google Antigravity Coding Assistant (Dev A)
+- **AI Tool Used:** Google Antigravity Coding Assistant
 - **Key Prompt:** *"Investigate live generateContent 400 INVALID_ARGUMENT on gemini-3.5-flash-lite, bisect SDK parameters, classify errors (400/401/403/404 as config_error with 0 retries and 0 cooldown, 429 with Retry-After, 5xx with limited retry), address audit gaps (PII redaction before LLM call, two-phase confirmation lifecycle, customer ticket scoping, refusal citations), and run live evaluation."*
 - **Manual Verification & Changes:**
   - Ran live parameter bisect on `google-genai 2.24.0` against model `gemini-3.5-flash-lite`.
