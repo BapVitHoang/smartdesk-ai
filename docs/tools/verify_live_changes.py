@@ -40,7 +40,7 @@ def run_scratch_scenarios():
         with open(prompt_path, "w", encoding="utf-8") as f:
             json.dump(prompt_data, f, ensure_ascii=False, indent=2)
 
-        cmd1 = [sys.executable, "-m", "pytest", os.path.join(scratch_backend, "tests", "test_rag_module.py"), "-k", "test_prompt_registry_loads_versioned_templates", "-q"]
+        cmd1 = [sys.executable, "-m", "pytest", os.path.join(scratch_backend, "tests", "test_rag_module.py"), f"--rootdir={scratch_backend}", "-k", "test_prompt_registry_loads_versioned_templates", "-q"]
         proc1 = subprocess.run(cmd1, env=env, capture_output=True, text=True)
         results["scenario_1"] = {
             "exit_code": proc1.returncode,
@@ -62,7 +62,7 @@ def run_scratch_scenarios():
         with open(config_path, "w", encoding="utf-8") as f:
             f.write(cfg_text)
 
-        cmd2 = [sys.executable, "-m", "pytest", os.path.join(scratch_backend, "tests", "test_workspace_and_verification.py"), "-k", "test_clean_json_response_fail_closed", "-q"]
+        cmd2 = [sys.executable, "-m", "pytest", os.path.join(scratch_backend, "tests", "test_workspace_and_verification.py"), f"--rootdir={scratch_backend}", "-k", "test_clean_json_response_fail_closed", "-q"]
         proc2 = subprocess.run(cmd2, env=env, capture_output=True, text=True)
         results["scenario_2"] = {
             "exit_code": proc2.returncode,
@@ -84,7 +84,7 @@ def run_scratch_scenarios():
         with open(schema_path, "w", encoding="utf-8") as f:
             f.write(schema_text)
 
-        cmd3 = [sys.executable, "-m", "pytest", os.path.join(scratch_backend, "tests", "test_rag_module.py"), "-k", "test_structured_output_schemas_and_category_alias_normalization", "-q"]
+        cmd3 = [sys.executable, "-m", "pytest", os.path.join(scratch_backend, "tests", "test_rag_module.py"), f"--rootdir={scratch_backend}", "-k", "test_structured_output_schemas_and_category_alias_normalization", "-q"]
         proc3 = subprocess.run(cmd3, env=env, capture_output=True, text=True)
         results["scenario_3"] = {
             "exit_code": proc3.returncode,
