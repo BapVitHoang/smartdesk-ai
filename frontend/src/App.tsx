@@ -157,7 +157,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-slate-100 text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
+    <div className="flex flex-col h-screen overflow-hidden bg-slate-200 text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
       {/* Toast Notification Container */}
       {toast && (
         <div
@@ -180,20 +180,18 @@ export default function App() {
         </div>
       )}
 
-      {/* Header & System States Bar */}
+      {/* Header */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         openTicketsCount={openTicketsCount}
-        demoState={demoState}
-        setDemoState={setDemoState}
         onToast={showToast}
         currentUser={currentUser}
         onUserChanged={handleUserChanged}
       />
 
       {/* Main Screen Viewport */}
-      <main className="flex-1 overflow-hidden flex flex-col bg-slate-100">
+      <main className="flex-1 overflow-hidden flex flex-col bg-slate-200">
         {activeTab === 'chat' && (
           <ChatView
             chatMessages={chatMessages}

@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Building2,
   CheckCircle2,
+  ChevronDown,
 } from 'lucide-react';
 import { 
   ChatMessage, 
@@ -29,6 +30,7 @@ import {
   DemoState
 } from '../types';
 import { getRagResponse } from '../data';
+import { ChatMarkdown } from '../features/chat/ChatMarkdown';
 import { 
   sendChatMessage, 
   streamChatMessage, 
@@ -69,6 +71,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [articleLoading, setArticleLoading] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const [articleData, setArticleData] = useState<KnowledgeArticle | null>(null);
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
+  const workspaceMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(event.target as Node)) {
+        setIsWorkspaceMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     async function loadWs() {
@@ -111,7 +125,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     const slug = currentWorkspace?.slug;
     const ind = (currentWorkspace?.industry || '').toLowerCase();
     if (slug === 'smilecare' || ind.includes('nha khoa') || ind.includes('y tế')) {
-      return 'Hỏi Bác sĩ SmileCare về bảng giá, niềng răng, cấy implant, đặt lịch hẹn...';
+      return 'Hỏi trợ lý ảo SmileCare về bảng giá, niềng răng, cấy implant, đặt lịch hẹn...';
     }
     if (slug === 'techstore' || ind.includes('bán lẻ') || ind.includes('điện máy')) {
       return 'Hỏi TechStore về đổi trả 30 ngày, bảo hành IMEI, phụ kiện...';
@@ -144,7 +158,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       const article = await getKnowledgeArticle(docId, onToast);
       setArticleData(article);
     } catch {
-      onToast('Không thể tải bài viết tri thức.', 'warning');
+      onToast('Không mở được tài liệu nguồn. Vui lòng thử lại sau ít phút.', 'warning');
     } finally {
       setArticleLoading(false);
     }
@@ -348,66 +362,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   return (
-    <div id="screen-chatbot" className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 flex flex-col h-full overflow-hidden relative">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col flex-1 overflow-hidden">
-        
-        {/* Chat Header */}
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/70">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-100">
-                <Bot className="w-5 h-5" />
-              </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-bold text-slate-800 text-sm sm:text-base">
-                  {currentWorkspace?.persona_name || "SmartDesk RAG Assistant"}
-                </h2>
-                <span className="bg-indigo-100 text-indigo-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
-                  {currentWorkspace?.industry || "Enterprise RAG"}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">
-                {currentWorkspace?.tone_of_voice || "Tra cứu tự động từ dữ liệu tri thức được kiểm định"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Workspace Selector */}
-            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
-              <Building2 className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-[11px] font-semibold text-slate-600">Lĩnh vực:</span>
-              <select
-                value={currentWorkspaceId}
-                onChange={(e) => setCurrentWorkspaceId?.(Number(e.target.value))}
-                className="text-xs font-bold text-indigo-700 bg-transparent focus:outline-none cursor-pointer"
-              >
-                {workspaces.map((ws) => (
-                  <option key={ws.id} value={ws.id}>
-                    {ws.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* One-Click Escalation Button */}
-            <button
-              id="btn-escalate-from-chat"
-              onClick={() => handleEscalateWithContext('High')}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300/80 font-medium text-xs transition-colors shadow-xs cursor-pointer"
-              title="Chuyển sang biểu mẫu gửi Ticket với nội dung được điền sẵn"
-            >
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Gửi Ticket</span>
-            </button>
-          </div>
-        </div>
+    <div id="screen-chatbot" className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 flex flex-col h-full overflow-hidden relative">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+      <div className="bg-white border border-slate-300 rounded-2xl shadow-sm flex flex-col flex-1 min-w-0 overflow-hidden">
 
         {/* Chat Messages List */}
-        <div id="chat-messages-container" className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar bg-slate-50/40">
+        <div id="chat-messages-container" className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar bg-slate-100">
           {chatMessages.map((msg, idx) => (
             <div
               key={msg.id || idx}
@@ -425,13 +385,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 className={`rounded-2xl p-4 text-sm shadow-xs ${
                   msg.sender === 'user'
                     ? 'bg-indigo-600 text-white rounded-tr-none'
-                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none space-y-3'
+                    : 'bg-indigo-50 border border-indigo-200 text-slate-800 rounded-tl-none space-y-3'
                 }`}
               >
                 {msg.is_fallback && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-300/80 text-amber-800 text-xs font-semibold w-fit">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>Chế độ Dự phòng (Deterministic Fallback Active)</span>
+                    <span>AI đang tạm gián đoạn — câu trả lời lấy từ bộ câu hỏi thường gặp nên có thể chưa sát ý bạn. Bấm “Gửi yêu cầu hỗ trợ” để gặp nhân viên.</span>
                   </div>
                 )}
 
@@ -449,12 +409,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   </div>
                 )}
 
-                <div className="leading-relaxed font-normal whitespace-pre-wrap">
-                  {msg.text}
-                  {isBotTyping && idx === chatMessages.length - 1 && msg.sender === 'bot' && (
-                    <span className="inline-block w-1.5 h-4 ml-1 bg-indigo-600 animate-pulse align-middle" />
-                  )}
-                </div>
+                {msg.sender === 'user' ? (
+                  <div className="leading-relaxed font-normal whitespace-pre-wrap">{msg.text}</div>
+                ) : (
+                  <div className="leading-relaxed font-normal">
+                    <ChatMarkdown text={msg.text} />
+                    {isBotTyping && idx === chatMessages.length - 1 && (
+                      <span className="inline-block w-1.5 h-4 ml-1 bg-indigo-600 animate-pulse align-middle" />
+                    )}
+                  </div>
+                )}
 
                 {msg.pending_action && msg.pending_action.requires_confirmation && (
                   <div className="p-3.5 my-2.5 rounded-xl bg-slate-50 border border-indigo-200/90 shadow-2xs space-y-2.5">
@@ -546,13 +510,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                      <span>Câu hỏi cần hỗ trợ chuyên sâu. Khuyến nghị tạo phiếu hỗ trợ kỹ thuật:</span>
+                      <span>Câu hỏi cần nhân viên hỗ trợ thêm. Bạn có thể gửi yêu cầu hỗ trợ kèm nội dung cuộc trò chuyện:</span>
                     </div>
                     <button
                       onClick={() => handleEscalateWithContext('Urgent')}
                       className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-xs shrink-0 shadow-xs transition-colors cursor-pointer"
                     >
-                      Leo thang sự cố (Gửi Ticket ưu tiên)
+                      Gửi yêu cầu hỗ trợ ưu tiên
                     </button>
                   </div>
                 )}
@@ -560,7 +524,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 {msg.sender === 'bot' && (
                   <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                     <div className="flex items-center gap-2">
-                      <span>Was this helpful?</span>
+                      <span>Câu trả lời này có hữu ích không?</span>
                       <button
                         onClick={() => handleFeedback(idx, 'thumb_up')}
                         className={`p-1.5 rounded-md hover:bg-slate-100 transition-colors flex items-center gap-1 ${
@@ -587,7 +551,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       onClick={() => handleEscalateWithContext('High')}
                       className="text-indigo-600 hover:text-indigo-800 font-medium underline inline-flex items-center gap-1 cursor-pointer"
                     >
-                      <span>Chưa giải quyết được? Gửi Ticket ngay</span>
+                      <span>Chưa giải quyết được? Gửi yêu cầu hỗ trợ</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -630,7 +594,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
 
         {/* Suggestion Chips */}
-        <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-2 overflow-x-auto text-xs text-slate-600">
+        <div className="px-4 py-2 bg-slate-200 border-t border-slate-300 flex items-center gap-2 overflow-x-auto text-xs text-slate-700">
           <span className="font-semibold text-slate-400 shrink-0 text-[11px] flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-indigo-500" />
             Gợi ý câu hỏi:
@@ -654,10 +618,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <input
               id="chat-query-input"
               type="text"
+              aria-label="Nhập câu hỏi cho trợ lý AI"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder={getPlaceholderText()}
-              className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-800 placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-100 border border-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-900 placeholder:text-slate-500"
             />
           </div>
           <button
@@ -674,6 +639,97 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <Send className="w-4 h-4" />
           </button>
         </form>
+        <p className="px-4 pb-3 -mt-1 bg-white text-[11px] text-slate-500">
+          Trợ lý AI trả lời dựa trên tài liệu của doanh nghiệp và có thể sai. Hãy kiểm tra nguồn trích dẫn hoặc gửi yêu cầu hỗ trợ khi cần.
+        </p>
+      </div>
+
+        <aside className="bg-white border border-slate-300 rounded-2xl shadow-sm p-4 flex flex-col gap-4 lg:w-72 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="relative shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-100">
+                <Bot className="w-5 h-5" />
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base truncate">
+                {currentWorkspace?.persona_name || "SmartDesk RAG Assistant"}
+              </h2>
+              <span className="inline-block mt-0.5 bg-indigo-100 text-indigo-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                {currentWorkspace?.industry || "Enterprise RAG"}
+              </span>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-500 leading-relaxed">
+            {currentWorkspace?.tone_of_voice || "Tra cứu tự động từ dữ liệu tri thức được kiểm định"}
+          </p>
+
+          {/* Workspace Selector */}
+          <div className="flex flex-col gap-1.5 bg-slate-100 px-3 py-2.5 rounded-xl border border-slate-300">
+            <div className="flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[11px] font-semibold text-slate-600">Lĩnh vực:</span>
+            </div>
+            <div className="relative" ref={workspaceMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsWorkspaceMenuOpen((open) => !open)}
+                aria-haspopup="listbox"
+                aria-expanded={isWorkspaceMenuOpen}
+                className="w-full flex items-center justify-between gap-2 text-sm font-semibold text-indigo-700 bg-white border border-slate-400 hover:border-indigo-500 rounded-lg pl-3 pr-2.5 py-2 shadow-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors cursor-pointer"
+              >
+                <span className="truncate">{currentWorkspace?.name ?? ''}</span>
+                <ChevronDown
+                  className={`w-4 h-4 text-indigo-500 shrink-0 transition-transform ${isWorkspaceMenuOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {isWorkspaceMenuOpen && (
+                <ul
+                  role="listbox"
+                  className="absolute z-20 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg py-1 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+                >
+                  {workspaces.map((ws) => {
+                    const isSelected = ws.id === currentWorkspaceId;
+                    return (
+                      <li key={ws.id} role="option" aria-selected={isSelected}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrentWorkspaceId?.(ws.id);
+                            setIsWorkspaceMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-600' : 'bg-transparent'}`}
+                          ></span>
+                          <span className="truncate">{ws.name}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {/* One-Click Escalation Button */}
+          <button
+            id="btn-escalate-from-chat"
+            onClick={() => handleEscalateWithContext('High')}
+            className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300/80 font-medium text-xs transition-colors shadow-xs cursor-pointer"
+            title="Mở biểu mẫu gửi yêu cầu hỗ trợ với nội dung được điền sẵn"
+          >
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>Gửi yêu cầu hỗ trợ</span>
+          </button>
+        </aside>
       </div>
 
       {/* MODAL XEM TOÀN VĂN TÀI LIỆU FAQ / CITATION (Feature 2) */}

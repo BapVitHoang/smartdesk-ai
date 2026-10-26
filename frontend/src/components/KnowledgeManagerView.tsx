@@ -285,10 +285,10 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
   }
 
   return (
-    <div className="flex-1 bg-slate-50 overflow-y-auto">
+    <div className="flex-1 bg-slate-200 overflow-y-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* VIEW TITLE & WORKSPACE BAR */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+        <div className="bg-white rounded-2xl border border-slate-300 p-5 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2.5">
@@ -297,7 +297,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                    Trung Tâm Quản Trị Tri Thức &amp; Sát Hạch AI (Active Verification Studio)
+                    Quản lý tri thức và sát hạch AI
                   </h2>
                   <p className="text-xs text-slate-500">
                     Nạp tài liệu động (.pdf, .txt, .md), chia đoạn thông minh, và kiểm định chất lượng RAG trước khi công bố.
@@ -308,7 +308,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
 
             {/* Workspace Dropdown & Add Button */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+              <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-400">
                 <Building2 className="w-4 h-4 text-slate-500" />
                 <span className="text-xs font-semibold text-slate-700">Lĩnh vực:</span>
                 <select
@@ -337,7 +337,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
 
         {/* SECTION 1: WORKSPACE PERSONA & BUSINESS RULES CONFIGURATION */}
         {selectedWorkspace && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-300 p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-indigo-600" />
@@ -367,8 +367,8 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
                   type="text"
                   value={personaName}
                   onChange={(e) => setPersonaName(e.target.value)}
-                  placeholder="Ví dụ: Bác sĩ SmileCare Bot"
-                  className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50"
+                  placeholder="Ví dụ: Trợ lý ảo SmileCare"
+                  className="w-full text-xs px-3 py-2 rounded-xl border border-slate-400 bg-slate-100 text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 focus:bg-white transition-colors"
                 />
               </div>
 
@@ -381,7 +381,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
                   value={toneOfVoice}
                   onChange={(e) => setToneOfVoice(e.target.value)}
                   placeholder="Ví dụ: Ân cần, chu đáo, đồng cảm, chuyên môn cao..."
-                  className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50"
+                  className="w-full text-xs px-3 py-2 rounded-xl border border-slate-400 bg-slate-100 text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 focus:bg-white transition-colors"
                 />
               </div>
             </div>
@@ -395,9 +395,9 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
                 value={businessRules}
                 onChange={(e) => setBusinessRules(e.target.value)}
                 placeholder="Ví dụ: Hướng dẫn chính sách đổi trả 1 đổi 1 trong 30 ngày. Không kê đơn thuốc kháng sinh trực tuyến..."
-                className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50"
+                className="w-full text-xs px-3 py-2 rounded-xl border border-slate-400 bg-slate-100 text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 focus:bg-white transition-colors"
               />
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-slate-600 mt-1">
                 Các quy tắc này được Dynamic Prompt Builder tự động ráp vào chỉ dẫn hệ thống của Chatbot và AI Copilot Draft.
               </p>
             </div>
@@ -405,7 +405,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
         )}
 
         {/* SECTION 2: DOCUMENT UPLOAD & INGESTION DROPZONE */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+        <div className="bg-white rounded-2xl border border-slate-300 p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Upload className="w-4 h-4 text-indigo-600" />
@@ -418,7 +418,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
 
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/40 hover:bg-indigo-50/70 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2"
+            className="border-2 border-dashed border-indigo-400 hover:border-indigo-600 bg-indigo-100/70 hover:bg-indigo-100 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2"
           >
             <input
               type="file"
@@ -430,7 +430,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
             {isUploading ? (
               <div className="flex items-center gap-2 text-indigo-600 font-semibold text-xs">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Đang bóc tách văn bản, chia đoạn và tính vector embedding (Throttled Free-Tier Guard)...</span>
+                <span>Đang xử lý tài liệu (trích nội dung, chia đoạn, tạo chỉ mục tìm kiếm). Việc này có thể mất vài phút…</span>
               </div>
             ) : (
               <>
@@ -449,7 +449,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
         </div>
 
         {/* SECTION 3: DOCUMENTS TABLE & ACTIVE VERIFICATION STATUS */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-indigo-600" />
@@ -473,7 +473,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                <thead className="bg-slate-200 text-slate-800 font-semibold border-b border-slate-300">
                   <tr>
                     <th className="py-3 px-4">Tên tài liệu</th>
                     <th className="py-3 px-4">Định dạng</th>
@@ -483,11 +483,11 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
                     <th className="py-3 px-4 text-right">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-200">
                   {documents.map((doc) => {
                     const isVerifying = isVerifyingId === doc.id;
                     return (
-                      <tr key={doc.id} className="hover:bg-slate-50/70 transition-colors">
+                      <tr key={doc.id} className="odd:bg-white even:bg-slate-100 hover:bg-indigo-50 transition-colors">
                         <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-2">
                           <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
                           <span className="truncate max-w-xs">{doc.filename}</span>
@@ -605,7 +605,7 @@ export const KnowledgeManagerView: React.FC<KnowledgeManagerViewProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-sm tracking-tight">
-                    Báo Cáo Sát Hạch Tri Thức (Active Knowledge Verification)
+                    Báo cáo sát hạch tri thức
                   </h3>
                   <p className="text-[11px] text-indigo-200">
                     Tài liệu: {activeDoc?.filename}

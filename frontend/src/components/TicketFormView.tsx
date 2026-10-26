@@ -8,7 +8,6 @@ import {
   Send, 
   Loader2,
   HelpCircle,
-  ShieldCheck,
   Check,
   Sparkles,
   Building2
@@ -180,10 +179,9 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
 
   const handleInputChange = (field: keyof TicketFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    if (formTouched[field]) {
-      const error = validateField(field, value);
-      setFormErrors((prev) => ({ ...prev, [field]: error }));
-    }
+    setFormTouched((prev) => ({ ...prev, [field]: true }));
+    const error = validateField(field, value);
+    setFormErrors((prev) => ({ ...prev, [field]: error }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -247,14 +245,18 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
         // Warning toast already shown by createTicket
         return;
       }
-      onToast(err?.detail || 'Không thể tạo ticket. Vui lòng kiểm tra kết nối!', 'error');
+      onToast(
+        err?.detail ||
+          'Chưa gửi được yêu cầu vì không kết nối được máy chủ. Nội dung bạn nhập vẫn được giữ, hãy kiểm tra mạng rồi bấm Gửi lại.',
+        'error'
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div id="screen-ticket-form" className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+    <div id="screen-ticket-form" className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar bg-slate-200">
       <div className="max-w-4xl mx-auto space-y-6">
         
         {/* Top Context Notification */}
@@ -264,7 +266,7 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Gửi Phiếu Hỗ Trợ Kỹ Thuật (Escalate Ticket)</h2>
+              <h2 className="text-base font-bold text-slate-900">Gửi yêu cầu hỗ trợ</h2>
               <p className="text-xs text-slate-600 mt-0.5">
                 Khi AI Chatbot không giải quyết được triệt để, thông tin sẽ được chuyển thẳng tới hàng đợi của bộ phận chuyên trách.
               </p>
@@ -275,7 +277,7 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
             onClick={() => setActiveTab('agent')}
             className="text-xs font-semibold text-indigo-700 bg-white hover:bg-indigo-50 px-3.5 py-2 rounded-lg border border-indigo-200 transition-colors shadow-xs whitespace-nowrap inline-flex items-center gap-1.5"
           >
-            <span>Xem Hàng Đợi Ticket</span>
+            <span>Xem hàng đợi yêu cầu</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -288,8 +290,8 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
                 <AlertCircle className="w-4 h-4 text-amber-600" />
               </span>
               <div>
-                <span className="font-bold">Yêu cầu xác thực tài khoản (REQ-SEC-03): </span>
-                <span>Hệ thống yêu cầu đăng nhập trước khi gửi phiếu hỗ trợ. Vui lòng chọn tài khoản ở góc trên bên phải (Demo User / Demo Admin) để tiếp tục.</span>
+                <span className="font-bold">Bạn cần đăng nhập để gửi yêu cầu hỗ trợ. </span>
+                <span>Chọn đăng nhập bằng Google hoặc tài khoản demo ở góc trên bên phải để tiếp tục.</span>
               </div>
             </div>
             <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-amber-200/80 text-amber-900 text-[11px] font-semibold shrink-0">
@@ -316,58 +318,6 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
           </div>
         )}
 
-        {/* BANNER TÓM TẮT QUY TẮC KIỂM TRA (Form Validation Rules Guide) */}
-        <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2">
-              <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 font-bold text-xs">
-                <ShieldCheck className="w-4 h-4" />
-              </span>
-              <h4 className="font-bold text-slate-900 text-sm">
-                Bảng Quy Tắc Kiểm Tra Tính Hợp Lệ (Validation Rules Guide)
-              </h4>
-            </div>
-            <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-              Kiểm tra OnBlur &amp; OnSubmit
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-600">
-            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1">
-              <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
-                Họ tên &amp; Email
-              </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                <strong>Họ tên:</strong> Bắt buộc, tối thiểu 2 ký tự.<br />
-                <strong>Email:</strong> Bắt buộc, đúng chuẩn RFC (<code className="text-indigo-600 font-mono">user@example.com</code>).
-              </p>
-            </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1">
-              <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
-                Danh mục &amp; Ưu tiên
-              </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                <strong>Danh mục:</strong> Chọn 1 trong 4 danh mục hỗ trợ.<br />
-                <strong>Ưu tiên:</strong> 4 pills (Low, Med, High, Urgent) kèm SLA tương ứng.
-              </p>
-            </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1">
-              <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
-                Tiêu đề &amp; Nội dung
-              </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                <strong>Tiêu đề:</strong> Từ 5 đến 120 ký tự.<br />
-                <strong>Mô tả:</strong> Tối thiểu 15 ký tự, tối đa 2000 ký tự có bộ đếm trực quan.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Success Banner if Ticket Created with SLA Commitment */}
         {ticketCreatedSuccess && (
           <div id="ticket-success-alert" className="bg-emerald-50 border border-emerald-300 rounded-2xl p-5 shadow-xs flex items-start justify-between">
@@ -377,7 +327,7 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
               </div>
               <div>
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <h3 className="font-bold text-emerald-950 text-base">Gửi Ticket Thành Công!</h3>
+                  <h3 className="font-bold text-emerald-950 text-base">Đã gửi yêu cầu hỗ trợ</h3>
                   <span className="font-mono bg-emerald-200/80 text-emerald-900 font-bold text-xs px-2.5 py-0.5 rounded-md border border-emerald-300">
                     {ticketCreatedSuccess.ticket_code || `#${ticketCreatedSuccess.id}`}
                   </span>
@@ -451,8 +401,8 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
         )}
 
         {/* Main Ticket Form Card */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center">
+        <div className="bg-white border border-slate-300 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-300 bg-slate-100 flex justify-between items-center">
             <div>
               <h3 className="font-bold text-slate-800 text-sm sm:text-base">Biểu mẫu yêu cầu hỗ trợ (Support Ticket Form)</h3>
               <p className="text-xs text-slate-500">Các trường đánh dấu (*) là bắt buộc và được kiểm tra hợp lệ tức thì onBlur &amp; onSubmit.</p>
@@ -464,7 +414,7 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
 
           <form onSubmit={handleSubmit} noValidate className="p-6 space-y-5">
             {/* Không gian làm việc (Workspace Tenant) */}
-            <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="p-3 bg-indigo-100/70 border border-indigo-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
                   <Building2 className="w-4 h-4" />
@@ -482,7 +432,7 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
                 id="ticket-workspace"
                 value={formData.workspace_id || currentWorkspaceId || 1}
                 onChange={(e) => setFormData((prev) => ({ ...prev, workspace_id: Number(e.target.value) }))}
-                className="text-xs font-semibold px-3 py-2 rounded-lg border border-indigo-200 bg-white text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-xs"
+                className="text-xs font-semibold px-3 py-2 rounded-lg border border-slate-400 bg-slate-100 text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:bg-white cursor-pointer shadow-xs"
               >
                 {workspaces.map((ws) => (
                   <option key={ws.id} value={ws.id}>
@@ -512,8 +462,8 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
                   onBlur={() => handleBlur('fullName')}
                   className={`w-full px-3.5 py-2.5 text-sm rounded-xl border focus:outline-none transition-all ${
                     formTouched.fullName && formErrors.fullName
-                      ? 'border-rose-500 bg-rose-50/30 text-slate-900 focus:ring-2 focus:ring-rose-400 focus:border-rose-500'
-                      : 'border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-800'
+                      ? 'border-rose-500 bg-rose-50 text-slate-900 focus:ring-2 focus:ring-rose-400 focus:border-rose-500'
+                      : 'border-slate-400 bg-slate-100 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900 placeholder:text-slate-500'
                   }`}
                 />
                 {formTouched.fullName && formErrors.fullName && (
@@ -538,8 +488,8 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
                   onBlur={() => handleBlur('email')}
                   className={`w-full px-3.5 py-2.5 text-sm rounded-xl border focus:outline-none transition-all ${
                     formTouched.email && formErrors.email
-                      ? 'border-rose-500 bg-rose-50/30 text-slate-900 focus:ring-2 focus:ring-rose-400 focus:border-rose-500'
-                      : 'border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-800'
+                      ? 'border-rose-500 bg-rose-50 text-slate-900 focus:ring-2 focus:ring-rose-400 focus:border-rose-500'
+                      : 'border-slate-400 bg-slate-100 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900 placeholder:text-slate-500'
                   }`}
                 />
                 {formTouched.email && formErrors.email && (
@@ -566,8 +516,8 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
                   onBlur={() => handleBlur('category')}
                   className={`w-full px-3.5 py-2.5 text-sm rounded-xl border transition-all focus:outline-none ${
                     formTouched.category && formErrors.category
-                      ? 'border-rose-500 bg-rose-50/30 text-slate-900 focus:ring-2 focus:ring-rose-400'
-                      : 'border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-800'
+                      ? 'border-rose-500 bg-rose-50 text-slate-900 focus:ring-2 focus:ring-rose-400'
+                      : 'border-slate-400 bg-slate-100 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900'
                   }`}
                 >
                   <option value="Authentication">Authentication (Đăng nhập, 2FA, OTP, Phân quyền)</option>
@@ -597,11 +547,11 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
                 <div className="grid grid-cols-4 gap-2">
                   {(['Low', 'Medium', 'High', 'Urgent'] as TicketPriority[]).map((lvl) => {
                     const isSelected = formData.priority === lvl;
-                    let colorClass = 'text-slate-600 border-slate-200 bg-white hover:bg-slate-50';
+                    let colorClass = 'text-slate-700 border-slate-400 bg-slate-100 hover:bg-slate-200';
                     if (isSelected) {
-                      if (lvl === 'Low') colorClass = 'bg-blue-50 text-blue-700 border-blue-400 font-bold shadow-xs';
+                      if (lvl === 'Low') colorClass = 'bg-slate-50 text-slate-700 border-slate-400 font-bold shadow-xs';
                       if (lvl === 'Medium') colorClass = 'bg-amber-50 text-amber-700 border-amber-400 font-bold shadow-xs';
-                      if (lvl === 'High') colorClass = 'bg-orange-50 text-orange-700 border-orange-400 font-bold shadow-xs';
+                      if (lvl === 'High') colorClass = 'bg-amber-50 text-amber-700 border-amber-400 font-bold shadow-xs';
                       if (lvl === 'Urgent') colorClass = 'bg-rose-50 text-rose-700 border-rose-500 font-bold ring-2 ring-rose-400 shadow-xs';
                     }
                     return (
@@ -651,8 +601,8 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
                 maxLength={120}
                 className={`w-full px-3.5 py-2.5 text-sm rounded-xl border focus:outline-none transition-all ${
                   formTouched.subject && formErrors.subject
-                    ? 'border-rose-500 bg-rose-50/30 text-slate-900 focus:ring-2 focus:ring-rose-400 focus:border-rose-500'
-                    : 'border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-800'
+                    ? 'border-rose-500 bg-rose-50 text-slate-900 focus:ring-2 focus:ring-rose-400 focus:border-rose-500'
+                    : 'border-slate-400 bg-slate-100 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900 placeholder:text-slate-500'
                 }`}
               />
               {formTouched.subject && formErrors.subject && (
@@ -691,8 +641,8 @@ export const TicketFormView: React.FC<TicketFormViewProps> = ({
                 onBlur={() => handleBlur('message')}
                 className={`w-full px-3.5 py-2.5 text-sm rounded-xl border focus:outline-none transition-all ${
                   formTouched.message && formErrors.message
-                    ? 'border-rose-500 bg-rose-50/30 text-slate-900 focus:ring-2 focus:ring-rose-400 focus:border-rose-500'
-                    : 'border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-800'
+                    ? 'border-rose-500 bg-rose-50 text-slate-900 focus:ring-2 focus:ring-rose-400 focus:border-rose-500'
+                    : 'border-slate-400 bg-slate-100 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900 placeholder:text-slate-500'
                 }`}
               />
               {formTouched.message && formErrors.message && (

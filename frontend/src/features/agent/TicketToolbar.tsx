@@ -36,11 +36,8 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
   return (
     <>
       {/* Header bar */}
-      <div className="p-4 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between shrink-0">
-        <div>
-          <h2 className="font-bold text-slate-900 text-sm sm:text-base">Hàng đợi Ticket (Triage Queue)</h2>
-          <p className="text-xs text-slate-500">Phân loại &amp; gán nhãn tự động bởi SmartDesk</p>
-        </div>
+      <div className="px-3 py-2 border-b border-slate-300 bg-slate-100 flex items-center justify-between shrink-0">
+        <h2 className="font-bold text-slate-900 text-xs sm:text-sm">Hàng đợi yêu cầu hỗ trợ</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={onRefresh}
@@ -50,14 +47,14 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-600' : ''}`} />
           </button>
-          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">
-            {demoState === 'empty' ? 0 : ticketCount} tickets
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+            {demoState === 'empty' ? 0 : ticketCount} yêu cầu
           </span>
         </div>
       </div>
 
       {/* Search, Category Filter & Sorting Dropdown */}
-      <div className="p-3 bg-white border-b border-slate-200 space-y-2 shrink-0">
+      <div className="px-3 py-2 bg-white border-b border-slate-200 space-y-1.5 shrink-0">
         <div className="relative flex items-center">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
           <input
@@ -66,7 +63,7 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Tìm theo mã ticket (#TICK), tên, tiêu đề..."
-            className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all text-slate-800 placeholder:text-slate-400"
+            className="w-full pl-8 pr-7 py-1 text-[11px] bg-slate-100 border border-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all text-slate-900 placeholder:text-slate-500"
           />
           {searchTerm && (
             <button
@@ -88,7 +85,7 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
               id="agent-ticket-category-select"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full text-[11px] py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 font-medium cursor-pointer transition-colors"
+              className="w-full text-[10px] py-1 px-2 bg-slate-100 border border-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white text-slate-900 font-medium cursor-pointer transition-colors"
             >
               <option value="all">Tất cả danh mục</option>
               <option value="Authentication">Authentication</option>
@@ -104,7 +101,7 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
               id="agent-ticket-sort-select"
               value={sortBy}
               onChange={(e) => setSortBy && setSortBy(e.target.value as TicketSortField)}
-              className="w-full text-[11px] py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 font-medium cursor-pointer transition-colors"
+              className="w-full text-[10px] py-1 px-2 bg-slate-100 border border-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white text-slate-900 font-medium cursor-pointer transition-colors"
             >
               <option value="created_at">Mới nhất (Date)</option>
               <option value="priority">Mức ưu tiên (Priority)</option>
@@ -116,7 +113,7 @@ export const TicketToolbar: React.FC<TicketToolbarProps> = ({
       </div>
 
       {/* Filter Quick Tabs (Status / Urgency) */}
-      <div className="px-3 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1.5 shrink-0 text-xs">
+      <div className="px-2.5 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center gap-1.5 shrink-0 text-[11px]">
         <button
           onClick={() => setFilterType('all')}
           className={`px-2.5 py-1 rounded-lg font-medium text-xs transition-all cursor-pointer ${

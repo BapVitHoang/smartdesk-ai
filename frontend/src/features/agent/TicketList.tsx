@@ -18,7 +18,7 @@ export const TicketList: React.FC<TicketListProps> = ({
   onRetry,
 }) => {
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2.5 bg-slate-50/30">
+    <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2.5 bg-slate-200">
       {/* 1. LOADING STATE (Skeleton Loaders) */}
       {demoState === 'loading' && (
         <div className="space-y-3 p-1">
@@ -46,9 +46,9 @@ export const TicketList: React.FC<TicketListProps> = ({
             <Inbox className="w-8 h-8" />
           </div>
           <div>
-            <h4 className="font-bold text-slate-800 text-sm">Chưa có ticket nào trong hàng đợi</h4>
+            <h4 className="font-bold text-slate-800 text-sm">Chưa có yêu cầu hỗ trợ nào phù hợp</h4>
             <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-              Hiện tại tất cả các yêu cầu từ khách hàng đều đã được AI giải quyết hoặc agent xử lý hoàn tất.
+              Hàng đợi đang trống hoặc không có yêu cầu khớp bộ lọc. Hãy đổi bộ lọc hoặc bấm Làm mới.
             </p>
           </div>
           <button
@@ -56,7 +56,7 @@ export const TicketList: React.FC<TicketListProps> = ({
             className="px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Làm mới hàng đợi (Refresh)</span>
+            <span>Làm mới</span>
           </button>
         </div>
       )}
@@ -69,9 +69,9 @@ export const TicketList: React.FC<TicketListProps> = ({
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="font-bold text-rose-900 text-sm">Không thể tải dữ liệu từ máy chủ</h4>
+              <h4 className="font-bold text-rose-900 text-sm">Không tải được danh sách yêu cầu</h4>
               <p className="text-xs text-rose-700 mt-1">
-                (Simulated Network Error 503) – Đường truyền gateway gặp gián đoạn tạm thời.
+                Không kết nối được máy chủ. Kiểm tra mạng rồi bấm Thử lại. Nếu vẫn lỗi, hãy báo quản trị viên.
               </p>
             </div>
             <button
@@ -79,7 +79,7 @@ export const TicketList: React.FC<TicketListProps> = ({
               className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs transition-colors inline-flex items-center gap-1.5 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Thử lại (Retry Connection)</span>
+              <span>Thử lại</span>
             </button>
           </div>
         </div>
@@ -90,14 +90,20 @@ export const TicketList: React.FC<TicketListProps> = ({
         tickets.length > 0 ? (
           tickets.map((t) => {
             const isSelected = selectedTicket?.id === t.id;
+            const cardTone =
+              t.status === 'Open'
+                ? 'bg-sky-50 border-sky-300 hover:bg-sky-100/70'
+                : t.status === 'Pending'
+                ? 'bg-amber-50 border-amber-300 hover:bg-amber-100/70'
+                : t.status === 'Resolved'
+                ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100/70'
+                : 'bg-white border-slate-200 hover:bg-slate-50';
             return (
               <div
                 key={t.id}
                 onClick={() => onSelectTicket(t)}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer text-left ${
-                  isSelected
-                    ? 'bg-indigo-50/80 border-indigo-400 shadow-xs ring-1 ring-indigo-300'
-                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer text-left ${cardTone} ${
+                  isSelected ? 'shadow-xs ring-2 ring-indigo-500' : ''
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-1.5">

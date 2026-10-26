@@ -47,6 +47,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
   const [agentSending, setAgentSending] = useState(false);
   const [isRegeneratingDraft, setIsRegeneratingDraft] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (selectedTicket) {
@@ -117,6 +118,18 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
   const totalPages = Math.max(1, Math.ceil(effectiveTotal / pageSize));
   const paginatedTickets = sortedTickets.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  // Real list state; the header preview switcher (dev builds only) can still force a state for demos.
+  const listState: UIState =
+    demoState !== 'success'
+      ? demoState
+      : isRefreshing && tickets.length === 0
+        ? 'loading'
+        : loadFailed && tickets.length === 0
+          ? 'error'
+          : filteredTickets.length === 0
+            ? 'empty'
+            : 'success';
+
   const handleRefreshTickets = async () => {
     setIsRefreshing(true);
     try {
@@ -146,9 +159,11 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
           setSelectedTicket(fresh[0]);
         }
       }
-      onToast('Đã cập nhật danh sách ticket từ máy chủ!', 'success');
+      onToast('Đã cập nhật danh sách yêu cầu từ máy chủ.', 'success');
+      setLoadFailed(false);
     } catch {
-      onToast('Không thể làm mới danh sách ticket.', 'warning');
+      setLoadFailed(true);
+      onToast('Không làm mới được danh sách yêu cầu. Kiểm tra kết nối rồi thử lại.', 'warning');
     } finally {
       setIsRefreshing(false);
     }
@@ -166,7 +181,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
         setSelectedTicket(remaining.length > 0 ? remaining[0] : null);
       }
     } catch (err: any) {
-      onToast(err?.detail || err?.message || `Không thể xóa ticket #${ticketId}.`, 'error');
+      onToast(err?.detail || err?.message || `Không xóa được yêu cầu #${ticketId}. Vui lòng thử lại.`, 'error');
     }
   };
 
@@ -207,16 +222,16 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
       setAgentReplyText(updated.draftReply);
       setSelectedTicket(updated);
       onUpdateTicketStatus(selectedTicket.id, selectedTicket.status, updated.draftReply);
-      onToast(`Đã tạo lại AI Draft thành công từ Copilot cho #${selectedTicket.id}!`, 'success');
+      onToast(`Đã tạo lại bản nháp AI cho #${selectedTicket.id}.`, 'success');
     } catch {
-      onToast('Không thể tạo lại AI Draft. Vui lòng thử lại.', 'error');
+      onToast('Chưa tạo lại được bản nháp AI. Vui lòng thử lại sau ít giây.', 'error');
     } finally {
       setIsRegeneratingDraft(false);
     }
   };
 
   return (
-    <div id="screen-agent-dashboard" className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
+    <div id="screen-agent-dashboard" className="flex-1 flex flex-col h-full overflow-hidden bg-slate-200">
       {/* Thanh điều hướng chế độ xem: Hàng đợi Ticket vs Giám sát AI Telemetry */}
       <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
@@ -257,7 +272,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
       </div>
 
       {dashboardView === 'telemetry' ? (
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 bg-slate-50/50">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6">
           <div className="max-w-6xl mx-auto">
             <TelemetryPanel onToast={onToast} />
           </div>
@@ -276,7 +291,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
               sortBy={sortBy}
               setSortBy={setSortBy}
               ticketCount={filteredTickets.length}
-              demoState={demoState}
+              demoState={listState}
               isRefreshing={isRefreshing}
               onRefresh={handleRefreshTickets}
             />
@@ -285,7 +300,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
               tickets={paginatedTickets}
               selectedTicket={selectedTicket}
               onSelectTicket={setSelectedTicket}
-              demoState={demoState}
+              demoState={listState}
               onRetry={async () => {
                 setDemoState('success');
                 await handleRefreshTickets();
@@ -296,7 +311,7 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
             {totalPages > 1 && (
               <div className="p-2.5 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
                 <span>
-                  Trang <strong>{currentPage}</strong> / {totalPages} (Tổng cộng {effectiveTotal} tickets từ X-Total-Count)
+                  Trang <strong>{currentPage}</strong> / {totalPages} (Tổng cộng {effectiveTotal} yêu cầu)
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -319,10 +334,10 @@ export const AgentDashboardView: React.FC<AgentDashboardViewProps> = ({
           </div>
 
           {/* CỘT PHẢI: CHI TIẾT TICKET, XÓA TICKET & AI SUGGESTED DRAFT REPLY */}
-          <div className="flex-1 bg-slate-50/50 flex flex-col h-full overflow-y-auto custom-scrollbar p-4 sm:p-6">
+          <div className="flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-4 sm:p-6">
             <TicketDetail
               selectedTicket={selectedTicket}
-              demoState={demoState}
+              demoState={listState}
               agentReplyText={agentReplyText}
               setAgentReplyText={setAgentReplyText}
               isRegeneratingDraft={isRegeneratingDraft}
