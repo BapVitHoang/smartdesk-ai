@@ -6,9 +6,11 @@ import { Workspace } from '../../types';
 import { INITIAL_WORKSPACES } from '../../data';
 import {
   API_BASE_URL,
+  ApiError,
   ToastNotifier,
   notifyFallback,
   fetchWithTimeout,
+  getAuthHeaders,
 } from './client';
 
 let localFallbackWorkspaces: Workspace[] = [...INITIAL_WORKSPACES];
@@ -31,25 +33,30 @@ export async function createWorkspace(
   payload: Partial<Workspace>,
   onToast?: ToastNotifier
 ): Promise<Workspace> {
+  const toastFn = onToast || notifyFallback;
   try {
+    const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/workspaces`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       },
       4000
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
+      throw new ApiError(res.status, err.detail || `Lỗi tạo workspace: HTTP ${res.status}`);
     }
     const data: Workspace = await res.json();
     localFallbackWorkspaces.push(data);
     return data;
   } catch (error: any) {
-    const toastFn = onToast || notifyFallback;
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi tạo doanh nghiệp: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
     toastFn(`Tạo doanh nghiệp cục bộ: ${error.message || ''}`, 'warning');
     const newWs: Workspace = {
       id: Date.now(),
@@ -71,20 +78,33 @@ export async function updateWorkspace(
   payload: Partial<Workspace>,
   onToast?: ToastNotifier
 ): Promise<Workspace> {
+  const toastFn = onToast || notifyFallback;
   try {
+    const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/workspaces/${id}`,
       {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       },
       4000
     );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch {
-    const toastFn = onToast || notifyFallback;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.detail || `Lỗi cập nhật workspace: HTTP ${res.status}`);
+    }
+    const updated: Workspace = await res.json();
+    const idx = localFallbackWorkspaces.findIndex((w) => w.id === id);
+    if (idx !== -1) {
+      localFallbackWorkspaces[idx] = updated;
+    }
+    return updated;
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi cập nhật doanh nghiệp: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
     toastFn('Đã cập nhật thông số doanh nghiệp (Chế độ Ngoại tuyến).', 'info');
     const idx = localFallbackWorkspaces.findIndex((w) => w.id === id);
     if (idx !== -1) {

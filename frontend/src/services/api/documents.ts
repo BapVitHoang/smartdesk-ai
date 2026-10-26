@@ -19,6 +19,7 @@ import {
   ToastNotifier,
   notifyFallback,
   fetchWithTimeout,
+  getAuthHeaders,
 } from './client';
 
 let localFallbackDocuments: DocumentItem[] = [...INITIAL_DOCUMENTS];
@@ -153,26 +154,32 @@ export async function uploadDocument(
   file: File,
   onToast?: ToastNotifier
 ): Promise<DocumentItem> {
+  const toastFn = onToast || notifyFallback;
   try {
     const formData = new FormData();
     formData.append('file', file);
+    const headers = getAuthHeaders();
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/workspaces/${workspaceId}/documents/upload`,
       {
         method: 'POST',
+        headers,
         body: formData,
       },
       12000
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
+      throw new ApiError(res.status, err.detail || `HTTP ${res.status}`);
     }
     const doc: DocumentItem = await res.json();
     localFallbackDocuments.unshift(doc);
     return doc;
   } catch (error: any) {
-    const toastFn = onToast || notifyFallback;
+    if (error instanceof ApiError) {
+      toastFn(error.detail || `Lỗi tải tài liệu: HTTP ${error.statusCode}`, 'warning');
+      throw error;
+    }
     toastFn(`Ngoại tuyến: Lưu tạm tệp ${file.name} vào kho cục bộ.`, 'warning');
     const mockDoc: DocumentItem = {
       id: Date.now(),
@@ -199,9 +206,10 @@ export async function deleteDocument(
 ): Promise<boolean> {
   const toastFn = onToast || notifyFallback;
   try {
+    const headers = getAuthHeaders();
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/documents/${documentId}`,
-      { method: 'DELETE' },
+      { method: 'DELETE', headers },
       4000
     );
     if (!res.ok) {
@@ -229,9 +237,10 @@ export async function verifyDocument(
 ): Promise<VerificationReport> {
   const toastFn = onToast || notifyFallback;
   try {
+    const headers = getAuthHeaders();
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/documents/${documentId}/verify`,
-      { method: 'POST' },
+      { method: 'POST', headers },
       15000
     );
     if (!res.ok) {
@@ -285,9 +294,10 @@ export async function publishDocument(
 ): Promise<boolean> {
   const toastFn = onToast || notifyFallback;
   try {
+    const headers = getAuthHeaders();
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/documents/${documentId}/publish`,
-      { method: 'POST' },
+      { method: 'POST', headers },
       4000
     );
     if (!res.ok) {
