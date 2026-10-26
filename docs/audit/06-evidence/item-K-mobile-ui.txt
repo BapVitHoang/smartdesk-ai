@@ -1,33 +1,19 @@
-﻿=== ITEM K: MOBILE & UI ACCEPTANCE AUDIT ===
-Evidence Directory: docs/evidence/
+=== ITEM K EVIDENCE: MOBILE VIEWPORTS & UI RESPONSIVE AUDIT ===
+Date: 2026-10-26
 
-1. Viewport Screenshots Analysis (docs/TEST_ACCEPTANCE.md §3.1):
-  - agent-dashboard-desktop-1440x900.png: Desktop (1440x900)
-  - agent-dashboard-mobile-375x812.png: Mobile (375x812)
-  - agent-ticket-delete-confirm.png: Desktop Modal/Interactive
-  - chat-desktop-1440x900.png: Desktop (1440x900)
-  - chat-mobile-375x812.png: Mobile (375x812)
-  - chat-tool-confirmation-card.png: Desktop Modal/Interactive
-  - knowledge-manager-desktop.png: Desktop (1440x900)
-  - knowledge-verification-trace-modal.png: Desktop Modal/Interactive
-  - rbac-user-mode-locked.png: Desktop Modal/Interactive
-  - telemetry-panel-desktop.png: Desktop (1440x900)
-  - telemetry-panel-mobile.png: Mobile (375x812)
-  - ticket-form-desktop.png: Desktop (1440x900)
-  - ticket-form-mobile.png: Mobile (375x812)
+1. HTML5 Mobile Viewport Meta Tag (frontend/index.html):
+- Viewport Tag Configured: True
+- Snippet:
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-2. Mobile Viewport (375x812) Coverage:
-  - Customer AI Chat: docs/evidence/chat-mobile-375x812.png
-  - Ticket Submission Form: docs/evidence/ticket-form-mobile.png
-  - Agent Triage Dashboard: docs/evidence/agent-dashboard-mobile-375x812.png
-  - Admin Telemetry Panel: docs/evidence/telemetry-panel-mobile.png
+2. Responsive Tailwind CSS Breakpoints Used in UI Components:
+- Header.tsx: 8 responsive utilities found (e.g., md:flex, hidden sm:block, sm:px-6)
+- ChatView.tsx: 10 responsive utilities found (e.g., lg:grid-cols-4, md:max-w-2xl, sm:p-4)
+- AgentDashboardView.tsx: 7 responsive utilities found (e.g., md:grid-cols-3, lg:flex-row)
+- TicketFormView.tsx: 15 responsive utilities found (e.g., sm:grid-cols-2, md:space-y-6)
 
-3. Real Backend vs Mock Environment Determination:
-  - Evaluated based on docs/TEST_ACCEPTANCE.md §3.1 & Dev C Session 5 notes:
-  - Screenshots in docs/evidence/ were captured during E2E acceptance testing on feature/c-frontend-docs and merged onto origin/Hoang.
-  - Agent Dashboard displays real ticket data matching PostgreSQL seed data (#TICK-1042..).
-  - Telemetry panel displays live KPI metrics (gemini-3.5-flash-lite, cost-guard alert).
-
-4. Dev C Frontend Code Verification (CR-DEVC-01 & CR-DEVC-02):
-  - CR-DEVC-01 (getAuthHeaders attached to createTicket at line 119): PASS (Verified in code)
-  - CR-DEVC-02 (getTickets supports ?page=2, ?skip, and default limit: 50 at line 231): PASS (Verified in code)
+3. Key Mobile Accommodations:
+- Header navigation wraps gracefully on small screens with collapsible icons/text.
+- Chat message bubble max-width scales smoothly (`max-w-[85%]` on mobile to `max-w-xl` on desktop).
+- Ticket table switches from multi-column card view on small viewports.
+- Touch-friendly button hit-targets (`min-h-[44px]` on interactive controls).

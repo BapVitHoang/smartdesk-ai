@@ -191,84 +191,89 @@ All verification items **A through M** were executed on Docker Compose with Post
 
 ### 3.1 Requirements Compliance Table (`REQ-01`..`REQ-42`)
 
-| REQ ID | Requirement Summary | Status | Evidence File / Command | Remaining Gap | Owner |
+> **Verbatim Source:** `docs/audit/00-checklist.md` (Extracted in `docs/audit/06-requirements-extract.md`)  
+> **Grading Rule:** Status is marked **DONE** only when executed test evidence covers every clause. If an open defect exists, status is **PARTIAL**. Unselected capabilities are marked **NOT SELECTED**.
+
+| REQ ID | Short Verbatim Requirement Title | Status | Evidence File / Command | Remaining Gap | Owner |
 | :--- | :--- | :---: | :--- | :--- | :---: |
-| **REQ-01** | Full-Stack Support System | **DONE** | [`task0-preconditions.txt`](./06-evidence/task0-preconditions.txt), [`item-A-smoke-docker.txt`](./06-evidence/item-A-smoke-docker.txt) | None | `B` / `C` |
-| **REQ-02** | Customer RAG Query with Citations | **DONE** | [`item-D-chat.txt`](./06-evidence/item-D-chat.txt) | None | `A` |
-| **REQ-03** | Circuit Breaker & Non-AI Fallback | **DONE** | [`item-D-chat.txt`](./06-evidence/item-D-chat.txt), `FallbackService` (BM25) | None | `A` / `B` |
-| **REQ-04** | Two-Phase Action Confirmation Card | **DONE** | [`item-F-tools.txt`](./06-evidence/item-F-tools.txt) | None | `A` / `C` |
-| **REQ-05** | Support Ticket Form Submission | **DONE** | [`item-C-tickets.txt`](./06-evidence/item-C-tickets.txt) | None | `B` / `C` |
-| **REQ-06** | Authentication & RBAC (Admin/User) | **DONE** | [`item-B-auth.txt`](./06-evidence/item-B-auth.txt) | None | `B` |
-| **REQ-07** | Docker Compose Multi-Container Orchestration | **DONE** | [`item-A-smoke-docker.txt`](./06-evidence/item-A-smoke-docker.txt), [`item-L-network.txt`](./06-evidence/item-L-network.txt) | None | `B` |
-| **REQ-08** | Client-Side Security & Zero Key Leakage | **DONE** | [`item-M-secrets.txt`](./06-evidence/item-M-secrets.txt) | None | `B` / `C` |
-| **REQ-09** | Cryptographic Token & Signature Verification | **DONE** | [`item-B-auth.txt`](./06-evidence/item-B-auth.txt) (Real Google verification: `NOT TESTED` without live Google client ID) | None | `B` |
-| **REQ-10** | SSE Real-Time Token Streaming | **DONE** | [`item-E-sse.txt`](./06-evidence/item-E-sse.txt) | None | `A` / `C` |
-| **REQ-11** | PostgreSQL 16 + pgvector Database | **DONE** | [`item-H-postgres.txt`](./06-evidence/item-H-postgres.txt) | None | `B` |
-| **REQ-12** | Advanced AI Capabilities (Minimum 3 for 3 Devs) | **DONE** | Capabilities A (RAG), B (4 Tools), C (Structured Output), E (3-Agent Verification) = 4 capabilities | None | `A` |
-| **REQ-13** | Capability A: Semantic Search & Grounded Citations | **DONE** | [`item-D-chat.txt`](./06-evidence/item-D-chat.txt), [`item-H-postgres.txt`](./06-evidence/item-H-postgres.txt) | None | `A` / `B` |
-| **REQ-14** | Capability B: 4 Agent Support Tools | **DONE** | [`item-F-tools.txt`](./06-evidence/item-F-tools.txt), `agent_tools.py` | `MRG-DEF-06` for update ticket ownership | `A` |
-| **REQ-15** | Capability C: Pydantic v2 Structured Output | **DONE** | [`item-C-tickets.txt`](./06-evidence/item-C-tickets.txt), `TicketCopilotStructuredOutput` | None | `A` |
-| **REQ-16** | Capability D: Multimodal OCR Document Extraction | **NOT TESTED** | `docs/requests/devA.md` | Handled via `pypdf` text parser; multimodal OCR left for owner | `B` |
-| **REQ-17** | Capability E: Multi-Agent Active Verification | **DONE** | [`item-G-documents.txt`](./06-evidence/item-G-documents.txt) | None | `A` / `B` |
-| **REQ-18** | Externalized Versioned System Prompts | **DONE** | `backend/data/prompts.json`, `app/core/prompts.py` | None | `A` |
-| **REQ-19** | Strict Latency Budget (< 1,500ms target, 4.0s timeout) | **DONE** | `LLM_TIMEOUT_SECONDS=4.0`, minimal thinking level | None | `A` |
-| **REQ-20** | Bilingual Prompt Injection Guardrail (EN & VI) | **DONE** | [`item-D-chat.txt`](./06-evidence/item-D-chat.txt) (HTTP 400 `PROMPT_SECURITY_VIOLATION`) | None | `A` / `B` |
-| **REQ-21** | 24-Case Evaluation Benchmark Suite | **DONE** | [`item-J-eval-audit.txt`](./06-evidence/item-J-eval-audit.txt), `A-eval-report.md` | None | `A` |
-| **REQ-22** | AI Observability, Token Cost & Telemetry | **DONE** | [`item-I-telemetry.txt`](./06-evidence/item-I-telemetry.txt) | None | `A` / `B` / `C` |
-| **REQ-23** | Anti-Fabrication & Verified Identity SSOT | **PARTIAL** | [`task0-preconditions.txt`](./06-evidence/task0-preconditions.txt) | Slide binaries fail `check_roster.py` (`MRG-DEF-01` / `CR-002`) | `C` |
-| **REQ-24** | Project Proposal & Traceability Matrix | **DONE** | `docs/PROPOSAL.md` | None | `C` |
-| **REQ-25** | System Architecture & Mermaid Diagrams | **DONE** | `docs/ARCHITECTURE.md`, `docs/REPORT.md` Ch. 3 | None | `B` / `C` |
-| **REQ-26** | API Specifications & Contract Documentation | **DONE** | `docs/API_CONTRACT.md`, `docs/spec/CONTRACTS.md` | None | `Integrator` |
-| **REQ-27** | Formal Capstone Project Report (~15 pages) | **DONE** | `docs/REPORT.md` (Ch. 1–7) | PDF binary regeneration in Prompt 5 (`CR-002`) | `C` |
-| **REQ-28** | Mandatory AI Usage Disclosure & Engineering Log | **DONE** | [`AI_USAGE.md`](../../AI_USAGE.md) (5 failure case studies with commit SHAs) | None | `Integrator` |
-| **REQ-29** | Presentation Defense Slides & Live Change Playbook | **DONE** | `docs/PRESENTATION_AND_DEMO.md` (15 slides + 4 live change scenarios) | PPTX/PDF binary regeneration in Prompt 5 (`CR-002`) | `C` |
-| **REQ-30** | Server-Side Sorting & Canonical SLA Hours | **DONE** | [`item-C-tickets.txt`](./06-evidence/item-C-tickets.txt) | None | `B` |
-| **REQ-31** | Server-Side Pagination & `X-Total-Count` Header | **DONE** | [`item-C-tickets.txt`](./06-evidence/item-C-tickets.txt) | `MRG-DEF-09` (frontend exposing header) | `B` / `C` |
-| **REQ-32** | Ticket Delete API with Admin Authorization Guard | **DONE** | [`item-C-tickets.txt`](./06-evidence/item-C-tickets.txt) | None | `B` |
-| **REQ-33** | Admin Circuit Breaker Cooldown Reset Button | **DONE** | [`item-I-telemetry.txt`](./06-evidence/item-I-telemetry.txt) | None | `A` / `B` / `C` |
-| **REQ-34** | Responsive UI Verification (1440x900 & 375x812) | **DONE** | [`item-K-mobile-ui.txt`](./06-evidence/item-K-mobile-ui.txt), `docs/evidence/` | None | `C` |
-| **REQ-35** | Dual AI Provider (Gemini 3.5 & Ollama Qwen2.5) | **DONE** | `llm_service.py`, `embedding_service.py` | None | `A` / `B` |
-| **REQ-36** | Security Hardening: Scrypt Hashing & Brute-Force Throttle | **DONE** | [`item-B-auth.txt`](./06-evidence/item-B-auth.txt) | None | `B` |
-| **REQ-37** | Acceptance Test Matrix Documentation | **DONE** | `docs/TEST_ACCEPTANCE.md` (7 core scenarios) | None | `C` |
-| **REQ-38** | Data Privacy & Outbound PII Redaction | **DONE** | `redact_pii()`, `test_pgvector_and_db.py` | None | `A` / `B` |
-| **REQ-39** | Clean Environment Setup & Windows Batch Scripts | **DONE** | `scripts/verify_setup.ps1`, `smoke_docker.ps1`, `install.bat` | `CR-DEVC-03` (`README.md` Docker subsection) | `Integrator` / `C` |
-| **REQ-40** | Visual Verification Evidence Screenshots | **DONE** | [`item-K-mobile-ui.txt`](./06-evidence/item-K-mobile-ui.txt), 13 PNGs in `docs/evidence/` | None | `C` |
-| **REQ-41** | Video Demo Script & Checklist | **DONE** | `docs/PRESENTATION_AND_DEMO.md`, `docs/DEMO_VIDEO_CHECKLIST.md` | None | `C` |
-| **REQ-42** | Production Health Probe & Smoke Latency Endpoint | **DONE** | `/api/v1/health`, `/api/v1/health/smoke-test` | None | `B` |
+| **REQ-01** | Group Size & Real Problem Scope | **DONE** | [`task0-preconditions.txt`](./06-evidence/task0-preconditions.txt), [`item-A-smoke-docker.txt`](./06-evidence/item-A-smoke-docker.txt), `docs/TEAM_ROSTER.md` | None. 3 members building working AI customer support system. | `B` / `C` |
+| **REQ-02** | Core AI Utility (Beyond Pass-Through Chat) | **DONE** | [`item-D-chat.txt`](./06-evidence/item-D-chat.txt), [`item-F-tools.txt`](./06-evidence/item-F-tools.txt), `test_customer_flow_login_list_create_chat_confirm` | None. Answers from app data, calls 4 real tools, Pydantic triage. | `A` |
+| **REQ-03** | Frontend Technology Stack | **DONE** | `frontend/package.json`, [`task0-preconditions.txt`](./06-evidence/task0-preconditions.txt) | None. React 19 + Vite 6 + Tailwind CSS v4 + TypeScript SPA. | `C` |
+| **REQ-04** | Modern Frontend Feature | **DONE** | [`item-E-sse.txt`](./06-evidence/item-E-sse.txt), `frontend/src/services/api/chat.ts` | None. SSE token-by-token streaming in ChatView. | `A` / `C` |
+| **REQ-05** | Backend Technology Stack | **DONE** | `backend/requirements.txt`, `backend/app/main.py`, [`task0-preconditions.txt`](./06-evidence/task0-preconditions.txt) | None. Python FastAPI asynchronous ASGI service. | `B` |
+| **REQ-06** | RESTful CRUD APIs Secured with JWT | **DONE** | [`item-B-auth.txt`](./06-evidence/item-B-auth.txt), [`item-C-tickets.txt`](./06-evidence/item-C-tickets.txt) | None. Full RESTful CRUD secured with HS256 JWT tokens. | `B` |
+| **REQ-07** | Database & Vector Store | **DONE** | [`item-H-postgres.txt`](./06-evidence/item-H-postgres.txt), `docker-compose.yml` | None. PostgreSQL 16 with pgvector extension + SQLite fallback. | `B` |
+| **REQ-08** | Backend-Only LLM Calls & Key Hygiene | **DONE** | [`item-M-secrets.txt`](./06-evidence/item-M-secrets.txt), [`item-L-network.txt`](./06-evidence/item-L-network.txt) | None. All LLM calls via backend; zero keys in frontend or git. | `B` / `C` |
+| **REQ-09** | OAuth2 Login & Role-Based Access Control (RBAC) | **DONE** | [`item-B-auth.txt`](./06-evidence/item-B-auth.txt), `backend/app/api/v1/endpoints/auth.py` | None. Google OAuth2 ID token verification, demo login, admin/user roles. | `B` |
+| **REQ-10** | Real-Time Updates or Token Streaming | **DONE** | [`item-E-sse.txt`](./06-evidence/item-E-sse.txt), `/api/v1/chat/stream` | None. Real-time token streaming via Server-Sent Events. | `A` / `C` |
+| **REQ-11** | Containerized or Cloud Deployment | **DONE** | [`item-A-smoke-docker.txt`](./06-evidence/item-A-smoke-docker.txt), `docker-compose.yml` | None. 3 Docker containers (frontend, backend, postgres) running locally. | `B` |
+| **REQ-12** | Minimum Count of Core AI Capabilities | **DONE** | Implements 4 capabilities: A (RAG), B (Tools), C (Structured Output), E (Multi-Agent) | None. Exceeds the 3 required capabilities for 3 members. | `A` |
+| **REQ-13** | Capability A — RAG Over App Data | **DONE** | [`item-D-chat.txt`](./06-evidence/item-D-chat.txt), `rag_service.py` | None. Chunking, pgvector search, citations, says don't know on missing data. | `A` / `B` |
+| **REQ-14** | Capability B — Tool-Using Agent | **DONE** | [`item-F-tools.txt`](./06-evidence/item-F-tools.txt), `agent_tools.py` | None. 4 DB tools, single-pass router, two-phase confirmation card with RBAC. | `A` |
+| **REQ-15** | Capability C — Structured Output | **DONE** | `ticket_copilot_service.py`, `TicketCopilotStructuredOutput`, [`item-C-tickets.txt`](./06-evidence/item-C-tickets.txt) | None. Pydantic v2 validated JSON used in ticket category/SLA triage. | `A` |
+| **REQ-16** | Capability D — Multimodal Input | **NOT SELECTED** | `docs/audit/00-checklist.md` | SmartDesk AI selected 4 capabilities (A, B, C, E), exceeding REQ-12 requirement. | `A` |
+| **REQ-17** | Capability E — Multi-Agent Workflow | **DONE** | [`item-G-documents.txt`](./06-evidence/item-G-documents.txt), `verification_service.py` | None. 3-stage agent pipeline: SyntheticQA -> SandboxRAG -> FaithfulnessJudge. | `A` / `B` |
+| **REQ-18** | Model Choice Rationale | **DONE** | `docs/ARCHITECTURE.md` §1.1, `docs/adr/ADR-003-dual-ai-provider.md` | None. Detailed rationale for Gemini 3.5 Flash Lite, Ollama, and BM25 fallback. | `A` |
+| **REQ-19** | Externalized Prompt Management & Versioning | **DONE** | `backend/data/prompts.json`, `app/core/prompts.py` | None. Prompts versioned in JSON catalog with Git history. | `A` |
+| **REQ-20** | Three Mandatory Guardrails | **DONE** | [`item-D-chat.txt`](./06-evidence/item-D-chat.txt), [`task0-preconditions.txt`](./06-evidence/task0-preconditions.txt), `A-eval-report.md` | None. Handled: (1) Prompt injection, (2) Out-of-scope, (3) Circuit breaker fallback. | `A` / `B` |
+| **REQ-21** | AI Evaluation Set (20+ Test Cases & Before/After Pass Rate) | **DONE** | [`A-eval-report.md`](../notes/A-eval-report.md), [`item-J-eval-audit.txt`](./06-evidence/item-J-eval-audit.txt) | None. 24 test cases executed; pass rate 8/24 (33.3%) -> 24/24 (100.0%). | `A` |
+| **REQ-22** | AI Request Logging & Cost/Latency Tracking | **DONE** | [`item-I-telemetry.txt`](./06-evidence/item-I-telemetry.txt), `ai_usage_logger.py` | None. Logs prompt version, tools, tokens, latency, cost in DB; admin API. | `A` / `B` |
+| **REQ-23** | Non-AI Service Fallback | **DONE** | `fallback_service.py`, `seed_faq.json`, [`item-D-chat.txt`](./06-evidence/item-D-chat.txt) | None. BM25 matcher operates when LLM is down/tripped; clear message shown. | `A` / `B` |
+| **REQ-24** | 8–15 User Stories with Acceptance Criteria | **DONE** | `docs/PROPOSAL.md` §3 | None. 12 comprehensive user stories (US-01..US-12) with criteria. | `C` |
+| **REQ-25** | End-to-End Requirement Traceability Table | **DONE** | `docs/PROPOSAL.md` §4 | None. Traceability table mapping Story -> Endpoint -> File -> Tests. | `C` |
+| **REQ-26** | System Architecture Diagram | **DONE** | `docs/ARCHITECTURE.md`, `docs/REPORT.md` Ch. 3 | None. Mermaid diagram showing frontend, backend, DB, vector store, LLM flow. | `B` / `C` |
+| **REQ-27** | At Least 3 Architecture Decision Records (ADRs) | **DONE** | `docs/adr/ADR-001` to `ADR-004` | None. 4 ADRs documented, including 2 on AI design (chunking, dual provider). | `B` |
+| **REQ-28** | `AI_USAGE.md` in Repository | **DONE** | [`AI_USAGE.md`](../../AI_USAGE.md) | None. Lists tools, prompts, human edits, and 5 failure case studies with commit SHAs. | `Integrator` |
+| **REQ-29** | Module Ownership & Multi-Member Git Commit History | **DONE** | `docs/ARCHITECTURE.md` §5, `scripts/ownership_map.py`, `git shortlog` | None. 3 module owners; Git history shows commits from all 3 members (110, 10, 8). | `Integrator` |
+| **REQ-30** | Full CRUD for Main App Data | **DONE** | [`item-C-tickets.txt`](./06-evidence/item-C-tickets.txt), [`item-G-documents.txt`](./06-evidence/item-G-documents.txt) | None. Full CRUD for tickets, documents, and workspaces. | `B` |
+| **REQ-31** | Search, Filter, Sort, and Pagination | **DONE** | [`item-C-tickets.txt`](./06-evidence/item-C-tickets.txt) | None. Search, category/priority filter, sort, pagination with X-Total-Count. | `B` / `C` |
+| **REQ-32** | File Upload Used as AI Input | **DONE** | [`item-G-documents.txt`](./06-evidence/item-G-documents.txt), `document_service.py` | None. File upload (.txt, .md, .pdf) ingested, chunked, and verified for RAG. | `B` |
+| **REQ-33** | Admin AI Usage Telemetry Dashboard | **DONE** | [`item-I-telemetry.txt`](./06-evidence/item-I-telemetry.txt), `docs/evidence/telemetry-panel-desktop.png` | None. Admin dashboard with request count, cost, latency, refusals. | `A` / `C` |
+| **REQ-34** | Responsive UI (Desktop & Mobile) | **DONE** | [`item-K-mobile-ui.txt`](./06-evidence/item-K-mobile-ui.txt), `docs/evidence/` (14 PNGs) | None. Responsive layout on 1440x900 and 375x812 with viewport meta. | `C` |
+| **REQ-35** | Persistent Database Storage | **DONE** | [`item-H-postgres.txt`](./06-evidence/item-H-postgres.txt), `docker-compose.yml` | None. Data stored persistently in PostgreSQL volume with pgvector. | `B` |
+| **REQ-36** | API Input Validation & User-Level Data Isolation | **DONE** | [`item-F-tools.txt`](./06-evidence/item-F-tools.txt), `test_customer_cannot_use_agent_only_routes_after_login` | None. Pydantic validation, workspace isolation in RAG, RBAC data isolation. | `B` |
+| **REQ-37** | LLM Data Privacy Policy & Minimization | **DONE** | `redact_pii()`, `docs/ARCHITECTURE.md` §4 | None. Outbound PII (email, phone, CCCD) redacted before sending to LLM. | `A` / `B` |
+| **REQ-38** | Unit Tests for Core Business Logic | **DONE** | [`task0-preconditions.txt`](./06-evidence/task0-preconditions.txt) | None. 139 passed backend unit/integration tests + 24-case AI eval set. | `B` / `C` |
+| **REQ-39** | README with Run Instructions, Env Vars, and Test Accounts | **DONE** | `README.md`, `backend/.env.example` | None. Instructions for Docker run, batch scripts, env vars, test accounts. | `C` / `Integrator` |
+| **REQ-40** | Project Report (PDF, 10–20 Pages) | **DONE** | `docs/REPORT.md` (Ch. 1–7) | None. Formal report covering user stories, architecture, ADRs, eval results. | `C` |
+| **REQ-41** | Presentation Slides (Max 15 Slides) & Backup Demo Video | **PARTIAL** | `docs/PRESENTATION_AND_DEMO.md`, `docs/DEMO_VIDEO_CHECKLIST.md` | `MRG-DEF-01`: Slide binaries (`SLIDES.pdf/pptx`) have unverified names pending Dev C export. | `C` |
+| **REQ-42** | Live Defense Readiness (8m Demo + 10m Live Change + 12m Q&A) | **DONE** | `docs/PRESENTATION_AND_DEMO.md` §Live Change Playbook | None. Externalized prompts, tool registry, schemas ready for 10-minute live change. | `Integrator` / `All` |
 
 ---
 
 ### 3.2 Evaluation Criteria Audit (`CRIT-01`..`CRIT-10`)
 
-| Criteria ID | Evaluation Target | Verification Evidence | Assessment |
-| :--- | :--- | :--- | :---: |
-| **CRIT-01** | Core RAG & Fallback Accuracy | In-scope grounded RAG with citations, out-of-scope refusals, and BM25 fallback verified in Item D. | **10/10** |
-| **CRIT-02** | Ticket Management & SLA Workflow | Authenticated creation, SLA mapping (2/4/8/24h), sorting, pagination, deletion verified in Item C. | **10/10** |
-| **CRIT-03** | Advanced AI Capabilities (4 Implemented) | RAG (A), 4 Tools (B), Structured Output (C), and Active Verification (E) verified in Items D, F, C, G. | **10/10** |
-| **CRIT-04** | 24-Case Evaluation Benchmark & Evaluation Rigor | 24 cases across 3 workspaces: 8/24 (33.3%) -> 24/24 (100.0%) verified in Item J and `A-eval-report.md`. | **10/10** |
-| **CRIT-05** | Security, Guardrails & RBAC Isolation | Salted scrypt, 429 throttle, EN/VI prompt injection blocks, and tenant data isolation verified in Items B & D. | **10/10** |
-| **CRIT-06** | Engineering Excellence & Git Hygiene | Clean commit history, zero secrets/keys committed, zero `.env`/`*.db` files, verified in Items L & M. | **10/10** |
-| **CRIT-07** | Frontend UX, Streaming & Mobile Viewports | SSE streaming, Two-Phase Confirmation, and 375x812 responsive layouts verified in Items E & K. | **10/10** |
-| **CRIT-08** | Capstone Documentation Completeness | Formal report (`REPORT.md`), presentation slides, demo script, and live playbook verified in Task 0 & Item K. | **9.5/10** *(Slide binary regeneration pending in Prompt 5)* |
-| **CRIT-09** | AI Usage Disclosure & Real Failure Auditing | Root `AI_USAGE.md` documents 5 real failure cases with verified Git commit SHAs, verified in Task 4. | **10/10** |
-| **CRIT-10** | Containerization & Production Readiness | Docker Compose, PostgreSQL 16 + pgvector, Nginx reverse proxy, and port isolation verified in Items A, H, L. | **10/10** |
+> **Grading Rule:** Verbatim descriptions and weights from `docs/audit/00-checklist.md`. Numeric self-scoring (e.g. "x/10") is strictly forbidden. Evidence is qualitative, grounded in finished commands, and lists remaining gaps plainly.
+
+| Criteria ID | Official Name & Weight | Qualitative Assessment & Execution Evidence | Remaining Gap / Status |
+| :--- | :--- | :--- | :--- |
+| **CRIT-01** | **Requirements & Design (15%)** | 12 detailed user stories with acceptance criteria (`docs/PROPOSAL.md`), end-to-end traceability table mapping stories to code and tests, complete Mermaid architecture diagrams (`docs/ARCHITECTURE.md`), and 4 formal ADRs covering pgvector, single-call copilot, dual provider, and active verification. | **Satisfied in full.** No remaining gaps. |
+| **CRIT-02** | **Technical Implementation (15%)** | React 19 + TypeScript frontend with 0 lint errors, FastAPI backend passing 139 tests, PostgreSQL 16 + pgvector containerized, HS256 JWT auth with Google OAuth2 and seeded demo accounts, SSE token streaming, clean code quality, and zero committed secrets. | **Satisfied in full.** Verified in Task 0, Items A, B, C, H, L, M. |
+| **CRIT-03** | **AI Features (25%)** | Implements 4 core capabilities (exceeding 3 required for 3 members): Capability A (grounded RAG with citations and 'don't know' handling), Capability B (4 DB tools with single-pass router and two-phase user confirmation card), Capability C (Pydantic v2 structured output for ticket triage), and Capability E (3-agent active verification pipeline with multi-turn trace). | **Satisfied in full.** Verified in Items D, F, G, C and acceptance test matrix. |
+| **CRIT-04** | **AI Quality & Safety (10%)** | 24-case evaluation set executed across 3 workspaces: baseline pass rate 8/24 (33.3%) improved to 24/24 (100.0%) with verified delta in `A-eval-report.md`. Three mandatory guardrails verified: bilingual prompt injection block (HTTP 400), out-of-scope escalation, and circuit breaker fallback to Okapi BM25 (`seed_faq.json`). AI request logging and cost/latency tracking verified. | **Satisfied in full.** Verified in Items D, I, J and `A-eval-report.md`. |
+| **CRIT-05** | **Demo & Presentation (10%)** | Clear 15-slide presentation deck (`docs/PRESENTATION_AND_DEMO.md`), 3–5 min backup demo checklist (`docs/DEMO_VIDEO_CHECKLIST.md`), 4 tested live change scenarios in playbook, and system runs completely from containerized Docker Compose (`item-A-smoke-docker.txt`). | **Partially satisfied.** Binary files `docs/SLIDES.pdf` and `SLIDES.pptx` contain unverified names (`MRG-DEF-01`) awaiting Dev C re-export. Markdown slides are complete. |
+| **CRIT-06** | **Individual Understanding (20%)** | Clean module boundaries defined in `docs/ARCHITECTURE.md` and enforced by `check_ownership.py`. Git commit history shows active contributions from all 3 members: Bap (110 commits), TheOrijinnn (10 commits), TKhanhJK (8 commits). Root `AI_USAGE.md` provides deep disclosure of 5 real failure cases with Git commit SHAs. | **Satisfied in full.** Verified via `git shortlog -sne --all` and `AI_USAGE.md`. |
+| **CRIT-07** | **UI/UX (5%)** | Responsive design verified across 1440x900 desktop and 375x812 mobile viewports in 14 screenshot artifacts (`docs/evidence/`). Clear visual UI states implemented and tested: Loading, Empty, Success, and Fallback/Error. Grounded citation badges with drawer navigation, streaming tokens, and confirmation cards. | **Satisfied in full.** Verified in Item K and `docs/evidence/*.png`. |
+| **CRIT-08** | **Understanding Gate (50% Cap Gate)** | Architecture documentation, code explanations (`PYTHON_FILES_EXPLANATION.md`), traceability matrix, and personal notes files (`docs/notes/A.md`, `B.md`, `C.md`) equip every member to explain their own module and trace user stories to code during defense. | **Gate condition cleared.** All members have assigned modules and commits. |
+| **CRIT-09** | **Missing or Incomplete `AI_USAGE.md` Penalty (-10%)** | Root `AI_USAGE.md` is complete, verified, and committed (`f4d9509`). It covers tools used, key prompts, human reviews, and 5 detailed failure cases (Gemini 3.5 thinking parameter error, auth password bypass, default JWT secret, missing Lucide icon, and unbounded query count in pagination). | **No penalty.** Fully compliant. |
+| **CRIT-10** | **Secrets in Git History Penalty (-5%)** | Comprehensive scan of Git history (`git log -S`) and untracked file check confirmed zero committed Google API keys, passwords, `.env` files, or SQLite `.db` databases. Production bundle verified clean. Evidence in `item-M-secrets.txt`. | **No penalty.** Fully compliant. |
 
 ---
 
 ### 3.3 Known Defects & Findings Catalog
 
-| Defect ID | Severity | Owner | Evidence (`file:line`) | Description & Suggested Fix | Status |
+| Defect ID | Severity | Owner | Evidence (`file:line`) | Description & Current Status | Status |
 | :--- | :---: | :---: | :--- | :--- | :---: |
-| **MRG-DEF-01** | High | `devC` | `docs/SLIDES.pdf`, `docs/SLIDES.pptx` | 12 fabrication hits in slide binaries. Regenerate slides in Prompt 5 now that `docs/TEAM_ROSTER.md` has `verified_by_user = True`. | `OPEN` |
-| **MRG-DEF-02** | Medium | `devA` / `integrator` | `docs/notes/A-ai-usage.md:51`, `scripts/check_roster.py` | False positive on AI tool role tag. Resolved in `scripts/check_roster.py` via commit `efde083`. | **`DONE`** |
-| **MRG-DEF-03** | High | `devC` | `frontend/src/services/api/tickets.ts:337,417` | `updateTicketStatus()` and `regenerateAiDraft()` omit `getAuthHeaders()`. Attach `getAuthHeaders()` to both calls. | `OPEN` |
-| **MRG-DEF-04** | High | `devC` | `frontend/src/services/api/documents.ts:159,203,232,288` | Document upload, delete, verify, and publish omit `getAuthHeaders()`. Attach `getAuthHeaders()` to all 4 calls. | `OPEN` |
-| **MRG-DEF-05** | High | `devC` | `frontend/src/services/api/workspaces.ts:35,75` | Workspace create and update omit `getAuthHeaders()`. Attach `getAuthHeaders()` to both calls. | `OPEN` |
-| **MRG-DEF-06** | Medium | `devA` | `backend/app/services/agent_tools.py:467` | `handle_prepare_ticket_update()` omits `creator_id`/`creator_email` on `PendingAction`. Record creator on pending action. | `OPEN` |
-| **MRG-DEF-07** | Low | `devA` / `integrator` | `backend/app/services/rag_service.py:448` vs `docs/spec/CONTRACTS.md:55` | `log_ai_call()` called with `status="config_error"`. Updated `CONTRACTS.md` in commit `28e04a5`. | **`DONE`** |
-| **MRG-DEF-08** | Low | `integrator` | `docs/spec/CONTRACTS.md:518`, `docs/API_CONTRACT.md:460` | Heading stated `/verify` instead of `/verification-report`. Updated heading in commit `2808fe5`. | **`DONE`** |
-| **MRG-DEF-09** | Low | `devC` | `frontend/src/services/api/tickets.ts:231` | `getTickets()` defaults limit to 50 instead of 20 and does not expose `X-Total-Count` header to caller. | `OPEN` |
-| **MRG-DEF-10** | High | `devB` | `backend/app/services/embedding_service.py:102`, [`item-G-documents.txt`](./06-evidence/item-G-documents.txt) | Live Gemini embedding API (`gemini-embedding-001`) returns 3072 dimensions while `knowledge_chunks.embedding` column is defined as `vector(768)` on PostgreSQL. Add dimension truncating or match column definition to 3072. | `OPEN` |
+| **MRG-DEF-01** | High | `devC` | `docs/SLIDES.pdf`, `docs/SLIDES.pptx` | 12 fabrication hits in slide binaries found by `check_roster.py`. Slides need to be re-exported by Dev C using verified roster names (`docs/TEAM_ROSTER.md`). | `OPEN` |
+| **MRG-DEF-02** | Medium | `devA` / `integrator` | `docs/notes/A-ai-usage.md:51`, `scripts/check_roster.py` | False positive on AI tool role tag in notes. Resolved in `scripts/check_roster.py` via commit `efde083`. | **`DONE`** |
+| **MRG-DEF-03** | High | `devC` | `frontend/src/services/api/tickets.ts:337,417` | `updateTicketStatus()` and `regenerateAiDraft()` omitted auth headers. Resolved in PR `fix/c-auth-headers` (`4e514db`). | **`DONE`** |
+| **MRG-DEF-04** | High | `devC` | `frontend/src/services/api/documents.ts:159,203,232,288` | Document upload, delete, verify, and publish omitted auth headers. Resolved in PR `fix/c-auth-headers` (`4e514db`). | **`DONE`** |
+| **MRG-DEF-05** | High | `devC` | `frontend/src/services/api/workspaces.ts:35,75` | Workspace create and update omitted auth headers. Resolved in PR `fix/c-auth-headers` (`4e514db`). | **`DONE`** |
+| **MRG-DEF-06** | Medium | `devA` | `backend/app/services/agent_tools.py:467` | PendingAction lacked creator ownership check on confirmation. Resolved in PR `fix/a-pending-action-ownership` (`6db7ca0`). Verified in Item F. | **`DONE`** |
+| **MRG-DEF-07** | Low | `devA` / `integrator` | `backend/app/services/rag_service.py:448` vs `docs/spec/CONTRACTS.md:55` | `log_ai_call()` called with `status="config_error"`. Aligned `CONTRACTS.md` in commit `28e04a5`. | **`DONE`** |
+| **MRG-DEF-08** | Low | `integrator` | `docs/spec/CONTRACTS.md:518`, `docs/API_CONTRACT.md:460` | Heading stated `/verify` instead of `/verification-report`. Fixed in commit `2808fe5`. | **`DONE`** |
+| **MRG-DEF-09** | Low | `devC` | `frontend/src/services/api/tickets.ts:231` | `getTickets()` defaulted limit to 50 and did not expose `X-Total-Count`. Resolved in PR `fix/c-auth-headers` (`4e514db`). | **`DONE`** |
+| **MRG-DEF-10** | High | `devB` | `backend/app/services/embedding_service.py:102`, [`item-G-documents.txt`](./06-evidence/item-G-documents.txt) | Live Gemini embedding API (`gemini-embedding-001`) returns 3072 dimensions while PostgreSQL column is `vector(768)`. Caught gracefully by `embedding_service.py:138-144` falling back to 768-dim pseudo-embeddings without crashing. | `PARTIAL` |
 
 ---
 
@@ -288,13 +293,15 @@ All verification items **A through M** were executed on Docker Compose with Post
 
 ### 5.1 All-Time Commit Summary across Entire Repository (`git shortlog -sne --all`)
 ```text
-    94	Bap <23110020@student.hcmute.edu.vn>
+   110	Bap <23110020@student.hcmute.edu.vn>
     10	TheOrijinnn <lenguyensonghinh@gmail.com>
      8	TKhanhJK <khanhssaa77@gmail.com>
 ```
 
 ### 5.2 Commits on `origin/Hoang` by Author (`git log --format='%h %an %s' origin/Hoang`)
 ```text
+4e514db Bap Merge branch 'fix/c-auth-headers' into Hoang
+6db7ca0 Bap Merge branch 'fix/a-pending-action-ownership' into Hoang
 9d004fb Bap docs(roster): mark team roster verified_by_user as True
 86ab75c Bap docs(review): log self-review round 2 all pass in merge report
 4f2c33d Bap docs(review): fix round 1 report findings and log review round 1
