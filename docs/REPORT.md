@@ -50,15 +50,19 @@ Trong kỷ nguyên số, bộ phận Chăm sóc Khách hàng (Customer Support) 
 Dự án được thực hiện bởi nhóm 3 thành viên theo phân quyền module cụ thể:
 - **Ngô Việt Hoàng (MSSV: 23110020) — Dev B & Integrator ([`@BapVitHoang`](https://github.com/BapVitHoang)):**
   - Chịu trách nhiệm: Nền tảng Backend, Kiến trúc cơ sở dữ liệu (PostgreSQL 16 pgvector & SQLite fallback), Xác thực OAuth2/JWT & phân quyền RBAC, Quản trị Ticket CRUD, Docker Compose và quản trị các tệp hợp đồng dùng chung (Frozen Contracts).
-  - Đóng góp Git: 114 commits trên nhánh hiện tại (`docs/final-documents`), 124 commits trên toàn bộ repository.
+  - Đóng góp Git: 121 commits trên nhánh `master` (commit `4f03542`), 121 commits trên toàn bộ repository.
 - **Lê Nguyên (MSSV: 23110043) — Dev A ([`@TheOrijinnn`](https://github.com/TheOrijinnn)):**
   - Chịu trách nhiệm: Lõi trí tuệ nhân tạo (AI Engine), Pipeline RAG, Trích xuất dữ liệu cấu trúc Pydantic v2 (Single-call Structured Output), 4 Agent Tools với cơ chế Thẻ xác nhận 2 pha, Hàng rào bảo vệ Prompt Injection song ngữ và Bộ dữ liệu đánh giá 24 test cases.
-  - Đóng góp Git: 9 commits trên nhánh hiện tại, 10 commits trên toàn bộ repository.
+  - Đóng góp Git: 9 commits trên nhánh `master`, 10 commits trên toàn bộ repository.
 - **Tống Gia Khánh (MSSV: 23110032) — Dev C ([`@TKhanh`](https://github.com/TKhanh)):**
   - Chịu trách nhiệm: Giao diện người dùng Frontend SPA (React 19 + Vite 6 + Tailwind CSS v4), Trải nghiệm streaming phản hồi từng chữ (SSE), Giao diện Thẻ xác nhận 2 pha, Bảng điều khiển Telemetry theo dõi chi phí, Bộ kiểm thử tích hợp giao diện và Hồ sơ tài liệu nghiệm thu dự án.
-  - Đóng góp Git: 8 commits trên nhánh hiện tại, 8 commits trên toàn bộ repository.
+  - Đóng góp Git: 8 commits trên nhánh `master`, 8 commits trên toàn bộ repository.
+
+Số liệu commit đo bằng `git shortlog -sne HEAD` (nhánh `master`, commit `4f03542`) và `git shortlog -sne --all`.
 
 Quá trình phát triển có các phiên làm việc được hỗ trợ bởi AI agent và được commit dưới tài khoản của người tích hợp. Báo cáo và tài liệu cuối kỳ được Hoàng tổng hợp với sự hỗ trợ của AI agent và được cả nhóm rà soát.
+
+Phần việc cụ thể của Dev A và Dev C đã được commit dưới tài khoản người tích hợp (danh sách commit/tệp tương ứng): **CHƯA CÓ DỮ LIỆU** — cần từng thành viên bổ sung trước khi nộp.
 
 ---
 
@@ -256,6 +260,8 @@ Hệ thống tích hợp 4 công cụ tác tử tự động trong `backend/app/
 3. `update_ticket_priority_or_status(ticket_id, new_priority, new_status)`: Cập nhật thông tin phiếu theo yêu cầu của khách hàng hoặc kỹ thuật viên.
 4. `search_workspace_knowledge(query, workspace_id)`: Tìm kiếm tri thức bổ sung theo ngữ cảnh chuyên biệt.
 
+**Cơ chế chọn công cụ (function calling):** LLM nhận khai báo JSON Schema của cả 4 công cụ và tự quyết định gọi công cụ nào cùng tham số (Gemini `FunctionDeclaration` / Ollama `tools`), theo prompt `agent_tool_router` trong `prompts.json`. Mã phiếu và email luôn lấy từ tin nhắn gốc của người dùng (LLM chỉ thấy văn bản đã che PII). Khi LLM không khả dụng (hết quota, timeout, không có khóa), hệ thống chuyển sang bộ định tuyến từ khóa để các chức năng vẫn hoạt động. Mỗi lần gọi LLM để chọn công cụ được ghi vào `ai_usage_logs` (phiên bản prompt, công cụ, token, chi phí, độ trễ).
+
 > [!IMPORTANT]
 > **Cơ chế Xác nhận 2 Pha (Two-Phase Execution):** Đối với các tác tử làm biến đổi trạng thái cơ sở dữ liệu (`create_escalation_ticket` và `update_ticket_priority_or_status`), hệ thống KHÔNG tự ý thực thi ngay mà sinh ra một đối tượng `PendingAction` với mã `action_id` duy nhất và gửi về giao diện. Người dùng bấm **[Xác nhận thực thi]** thì Backend mới chính thức ghi dữ liệu, ngăn chặn hoàn toàn rủi ro thao tác nhầm lẫn do AI tự suy luận.
 
@@ -295,6 +301,11 @@ Nhằm bảo vệ quyền riêng tư người dùng theo chuẩn bảo mật d�
 ### 5.3 Ngưỡng Lọc Phù hợp & Dự phòng Okapi BM25 Circuit Breaker
 - **Bộ lọc điểm tương đồng:** Hệ thống áp dụng ngưỡng sàn `RAG_MIN_SIMILARITY_SCORE = 0.25` và điểm lexical Okapi BM25 $\ge 1.2$. Các câu hỏi nằm ngoài phạm vi tri thức (out-of-scope như thời tiết, nấu ăn, giá tiền mã hóa) sẽ tự động kích hoạt cờ `escalation_recommended=True` và điểm tin cậy `confidence < 0.65`, từ chối trả lời ảo giác và đề xuất kết nối nhân viên hỗ trợ.
 - **Cost-Guard Circuit Breaker:** Khi Google Gemini trả về mã lỗi HTTP 429 (`ResourceExhausted`), hệ thống tự động khóa cổng gọi Cloud trong 60 giây (`FREE_TIER_RATE_LIMIT_COOLDOWN`), chuyển toàn bộ lưu lượng sang bộ so khớp BM25 cục bộ, bảo vệ hệ thống khỏi tình trạng treo hoặc sập dịch vụ. Quản trị viên có thể mở khóa mạch ngắt bất kỳ lúc nào bằng nút **[Mở Khóa Cooldown 429]** trên giao diện Telemetry.
+
+### 5.4 Rà soát Secret trong Lịch sử Git
+- Commit `cb404fe` chứa chuỗi dạng `AIzaSy…` trong `backend/tests/ai/test_llm_request_and_circuit_breaker.py`. Đây là **dữ liệu kiểm thử giả** (`AIzaSyABC` + dãy số tuần tự) dùng để kiểm tra hàm che khóa `scrub_sensitive`, không phải khóa API thật.
+- Trước commit `c221813`, `backend/app/core/config.py` và `backend/.env.example` có một giá trị `JWT_SECRET_KEY` mặc định dạng chữ (placeholder cho môi trường phát triển). Commit `c221813` đã gỡ giá trị này; hệ thống chỉ lưu SHA-256 để nhận diện và từ chối placeholder, sinh secret ngẫu nhiên mỗi tiến trình khi bật demo login, và từ chối khởi động khi tắt demo login mà không cấu hình secret. Mọi triển khai thật phải đặt `JWT_SECRET_KEY` riêng qua biến môi trường.
+- Tệp `.env` nằm trong `.gitignore`; không có commit nào thêm tệp `.env`.
 
 ---
 

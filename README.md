@@ -129,6 +129,53 @@ smartdesk-ai/
   npm run dev --prefix frontend
   ```
 
+### 4.3. Chạy bằng Docker Compose (bản dùng để demo)
+Yêu cầu: Docker Desktop (Compose v2).
+
+1. Tạo file `.env` ở **thư mục gốc** (cạnh `docker-compose.yml`) để Compose truyền biến vào container. Chỉ khai báo các biến cần thiết, ví dụ tên biến (không commit giá trị):
+   ```dotenv
+   GEMINI_API_KEY=
+   JWT_SECRET_KEY=
+   GOOGLE_OAUTH_CLIENT_ID=
+   POSTGRES_PASSWORD=
+   ```
+2. Build và khởi động 3 dịch vụ (PostgreSQL 16 + pgvector, Backend FastAPI, Frontend Nginx):
+   ```bash
+   docker compose up --build -d
+   ```
+3. Truy cập:
+   - Giao diện: <http://localhost:3000>
+   - API & Swagger: <http://localhost:8000/docs> · Health: <http://localhost:8000/api/v1/health>
+4. Kiểm tra trạng thái và log: `docker compose ps` · `docker compose logs -f backend`
+5. Dừng: `docker compose down` (dữ liệu PostgreSQL được giữ trong volume `pgdata`).
+
+> Kiểm tra nhanh trên Windows: `powershell -ExecutionPolicy Bypass -File scripts/smoke_docker.ps1`.
+
+### 4.4. Biến môi trường (chỉ liệt kê tên, không kèm giá trị)
+
+| Biến | Nơi dùng | Bắt buộc | Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `AI_PROVIDER` | Backend | Không | `gemini` (mặc định) hoặc `ollama` |
+| `GEMINI_API_KEY` / `GEMINI_API_KEYS` | Backend | Không | Khóa Gemini; để trống thì hệ thống chạy chế độ dự phòng BM25 |
+| `LLM_MODEL_NAME`, `LLM_FALLBACK_MODEL`, `LLM_FALLBACK_MODEL_NAME` | Backend | Không | Model chính và model dự phòng |
+| `EMBEDDING_MODEL_NAME`, `EMBEDDING_DIMENSIONS` | Backend | Không | Model và số chiều embedding |
+| `LLM_TIMEOUT_SECONDS`, `RATE_LIMIT_COOLDOWN_SECONDS` | Backend | Không | Ngưỡng timeout và thời gian khóa Cost-Guard |
+| `LLM_INPUT_COST_PER_MILLION`, `LLM_OUTPUT_COST_PER_MILLION` | Backend | Không | Đơn giá token để tính chi phí |
+| `OLLAMA_BASE_URL`, `OLLAMA_LLM_MODEL`, `OLLAMA_EMBEDDING_MODEL`, `OLLAMA_TIMEOUT_SECONDS`, `OLLAMA_KEEP_ALIVE` | Backend | Khi dùng Ollama | Cấu hình model cục bộ |
+| `DATABASE_URL`, `FALLBACK_SQLITE_URL` | Backend | Không | Kết nối PostgreSQL; tự chuyển sang SQLite khi không kết nối được |
+| `POSTGRES_PASSWORD` | Docker Compose | Không | Mật khẩu PostgreSQL trong container |
+| `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | Backend | **Có** khi tắt demo login | Khóa ký và thời hạn JWT |
+| `GOOGLE_OAUTH_CLIENT_ID` | Backend + Docker build frontend | Khi dùng đăng nhập Google | OAuth2 Web Client ID của Google |
+| `VITE_GOOGLE_CLIENT_ID` | Frontend (`frontend/.env.local`) | Khi dùng đăng nhập Google | Cùng giá trị với `GOOGLE_OAUTH_CLIENT_ID`; để trống thì ẩn nút Google |
+| `VITE_API_URL` | Frontend | Không | URL API backend |
+| `DEMO_LOGIN_ENABLED`, `DEMO_ADMIN_PASSWORD`, `DEMO_USER_PASSWORD`, `ADMIN_EMAILS` | Backend | Không | Tài khoản demo và danh sách email admin |
+| `LOGIN_MAX_FAILED_ATTEMPTS`, `LOGIN_THROTTLE_WINDOW_SECONDS` | Backend | Không | Chống dò mật khẩu |
+| `CORS_ORIGINS` | Backend | Không | Danh sách origin được phép |
+| `CHUNK_SIZE`, `CHUNK_OVERLAP`, `RAG_CONFIDENCE_THRESHOLD`, `RAG_MIN_SIMILARITY_SCORE` | Backend | Không | Tham số RAG |
+| `PROMPTS_PATH`, `SEED_FAQ_PATH` | Backend | Không | Đường dẫn catalog prompt và FAQ |
+
+Danh sách đầy đủ có mô tả nằm trong `backend/.env.example` và `frontend/.env.example`.
+
 ---
 
 ## 5. Kiểm thử Hệ thống (Testing)
