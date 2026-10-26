@@ -528,6 +528,8 @@ Authenticate via Google OAuth2 ID Token or 1-click Demo accounts (`admin@smartde
 
 #### Security & Verification Rules:
 - **`provider: "google"`**: Requires valid Google ID token credential in `credential`. The backend cryptographically verifies token signature with Google public keys (`google-auth`), checks audience against `GOOGLE_OAUTH_CLIENT_ID`, checks issuer (`accounts.google.com`), checks expiry, and ensures `email_verified=true`. If `GOOGLE_OAUTH_CLIENT_ID` is not configured, returns `HTTP 501 Not Implemented`. Newly created Google users are assigned `role: "user"`; elevated to `"admin"` only if their email is listed in `ADMIN_EMAILS`.
+- Verified Google sign-in links an existing email account to the unique Google `sub` and refreshes its display name and avatar. A conflicting linked `sub`, changed email for a linked identity, or inactive account is rejected with HTTP 401. Existing password hashes, workspace assignments, and persisted roles are preserved (except explicit `ADMIN_EMAILS` elevation).
+- The token response includes a nested `user` profile with nullable `avatar_url`; the top-level `role`, `email`, and `full_name` remain available for compatibility. `GET /auth/me` also returns `avatar_url` and `is_active`.
 - **`provider: "demo"`**: Available only when `DEMO_LOGIN_ENABLED=true` (default in dev, strictly false in shared/production deployments). Restricted to seeded accounts (`admin@smartdesk.ai`, `an.nguyen@company.vn`). Returns `HTTP 403 Forbidden` if demo login is disabled or if an unauthorized email is supplied. Never mints new accounts.
 
 #### Request Body

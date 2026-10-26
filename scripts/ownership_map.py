@@ -120,6 +120,7 @@ OWNERSHIP_MAP = {
         "docs/PRESENTATION_AND_DEMO.md",
         "docs/notes/C.md",
         "docs/notes/C-ai-usage.md",
+        "docs/notes/C-capabilities-demo.md",
         "docs/requests/devC.md",
     ],
     "integrator": [
@@ -169,6 +170,7 @@ OWNERSHIP_MAP = {
         "frontend/package-lock.json",
         "frontend/package.json",
         "frontend/src/types.ts",
+        "frontend/src/vite-env.d.ts",
         "frontend/src/types/*",
         "frontend/src/services/api.ts",
         "frontend/src/services/api/client.ts",

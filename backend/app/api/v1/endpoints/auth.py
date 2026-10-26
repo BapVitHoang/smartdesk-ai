@@ -50,7 +50,9 @@ def create_access_token(user: User) -> str:
         "exp": expire,
         "iat": now,
     }
-    return jwt.encode(token_payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(
+        token_payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
 
 
 def _token_response(user: User) -> TokenResponse:
@@ -62,7 +64,12 @@ def _token_response(user: User) -> TokenResponse:
         "role": user.role,
         "is_active": user.is_active,
         "workspace_id": user.workspace_id,
-        "created_at": user.created_at.isoformat() if hasattr(user, "created_at") and user.created_at else None,
+        "avatar_url": user.avatar_url,
+        "created_at": (
+            user.created_at.isoformat()
+            if hasattr(user, "created_at") and user.created_at
+            else None
+        ),
     }
     return TokenResponse(
         access_token=create_access_token(user),
@@ -142,7 +149,9 @@ async def demo_login_alias(
     """One-click demo login alias matching frontend client calls."""
     target_email = str(payload.email).strip().lower() if payload.email else ""
     if not target_email and payload.role:
-        target_email = "admin@smartdesk.ai" if payload.role == "admin" else "an.nguyen@company.vn"
+        target_email = (
+            "admin@smartdesk.ai" if payload.role == "admin" else "an.nguyen@company.vn"
+        )
     if not target_email:
         target_email = "admin@smartdesk.ai"
     req = OAuth2LoginRequest(email=target_email, provider="demo")
@@ -187,7 +196,9 @@ async def _demo_login(payload: OAuth2LoginRequest, db: AsyncSession) -> TokenRes
     return _token_response(user)
 
 
-async def _google_login(payload: OAuth2LoginRequest, request: Request, db: AsyncSession) -> TokenResponse:
+async def _google_login(
+    payload: OAuth2LoginRequest, request: Request, db: AsyncSession
+) -> TokenResponse:
     """Verified Google sign-in. New users get role 'user'; admin only via the ADMIN_EMAILS allowlist."""
     if not payload.credential:
         raise HTTPException(
@@ -214,18 +225,27 @@ async def _google_login(payload: OAuth2LoginRequest, request: Request, db: Async
         )
 
     email = str(claims["email"]).strip().lower()
+    google_sub = claims.get("sub")
+    avatar_url = str(claims.get("picture") or "")[:512] or None
+    full_name = str(claims.get("name") or email.split("@")[0])[:150]
     is_allowlisted_admin = email in settings.ADMIN_EMAILS
 
-    result = await db.execute(select(User).where(User.email == email))
-    user: Optional[User] = result.scalars().first()
+    user: Optional[User] = None
+    if google_sub:
+        result = await db.execute(select(User).where(User.google_sub == google_sub))
+        user = result.scalars().first()
+    if user is None:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalars().first()
 
     if user is None:
-        full_name = str(claims.get("name") or email.split("@")[0])[:150]
         user = User(
             email=email,
             full_name=full_name,
             role="admin" if is_allowlisted_admin else "user",
             oauth_provider="google",
+            google_sub=google_sub,
+            avatar_url=avatar_url,
             workspace_id=1,
             is_active=True,
         )
@@ -233,15 +253,22 @@ async def _google_login(payload: OAuth2LoginRequest, request: Request, db: Async
         await db.commit()
         await db.refresh(user)
     else:
-        if not user.is_active:
+        if (
+            not user.is_active
+            or (user.google_sub and user.google_sub != google_sub)
+            or user.email != email
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Google credential không hợp lệ.",
             )
+        user.google_sub = google_sub
+        user.avatar_url = avatar_url
+        user.full_name = full_name
         if is_allowlisted_admin and user.role != "admin":
             user.role = "admin"
-            await db.commit()
-            await db.refresh(user)
+        await db.commit()
+        await db.refresh(user)
 
     return _token_response(user)
 
@@ -292,8 +319,12 @@ async def login_for_access_token(
     user = res.scalars().first()
 
     # Always run the (constant-time) hash check so unknown emails take as long as wrong passwords.
-    password_ok = await verify_password_async(password, user.password_hash if user else None)
-    is_demo_disabled = bool(user and user.oauth_provider == "demo" and not settings.DEMO_LOGIN_ENABLED)
+    password_ok = await verify_password_async(
+        password, user.password_hash if user else None
+    )
+    is_demo_disabled = bool(
+        user and user.oauth_provider == "demo" and not settings.DEMO_LOGIN_ENABLED
+    )
     if not user or not user.is_active or not password_ok or is_demo_disabled:
         login_throttle.record_failure(email_key, ip_key)
         logger.warning("Failed password login attempt from %s", ip_key)
@@ -319,4 +350,6 @@ async def get_me(current_user: User = Depends(get_current_user)) -> UserProfileR
         role=current_user.role,
         oauth_provider=current_user.oauth_provider,
         workspace_id=current_user.workspace_id,
+        avatar_url=current_user.avatar_url,
+        is_active=current_user.is_active,
     )

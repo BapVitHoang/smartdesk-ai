@@ -60,11 +60,20 @@ export const LoginSwitcher: React.FC<LoginSwitcherProps> = ({
       {userState ? (
         <div className="flex items-center gap-2 bg-slate-100/90 py-1 px-2.5 rounded-xl border border-slate-200">
           <div
-            className={`w-6 h-6 rounded-full text-white flex items-center justify-center font-bold text-[10px] shadow-2xs ${
+            className={`relative w-6 h-6 shrink-0 overflow-hidden rounded-full text-white flex items-center justify-center font-bold text-[10px] shadow-2xs ${
               userState.role === 'admin' ? 'bg-indigo-600' : 'bg-emerald-600'
             }`}
           >
             {userState.full_name.charAt(0)}
+            {(userState.avatar_url || userState.picture_url) && (
+              <img
+                src={userState.avatar_url || userState.picture_url}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="absolute inset-0 h-full w-full object-cover"
+                onError={(event) => { event.currentTarget.hidden = true; }}
+              />
+            )}
           </div>
           <div className="flex flex-col text-left">
             <span className="font-semibold text-slate-800 leading-tight text-[11px] truncate max-w-[110px]">

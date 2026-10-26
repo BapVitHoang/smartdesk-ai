@@ -132,6 +132,17 @@ async def init_db() -> None:
                 ).fetchall()
             ]
             if user_cols:
+                if "google_sub" not in user_cols:
+                    sync_conn.exec_driver_sql(
+                        "ALTER TABLE users ADD COLUMN google_sub VARCHAR(255)"
+                    )
+                if "avatar_url" not in user_cols:
+                    sync_conn.exec_driver_sql(
+                        "ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512)"
+                    )
+                sync_conn.exec_driver_sql(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_sub ON users (google_sub)"
+                )
                 if "password_hash" not in user_cols:
                     sync_conn.exec_driver_sql(
                         "ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"
@@ -156,6 +167,15 @@ async def init_db() -> None:
 
     def _migrate_postgres_columns(sync_conn):
         try:
+            sync_conn.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255)"
+            )
+            sync_conn.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512)"
+            )
+            sync_conn.exec_driver_sql(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_sub ON users (google_sub)"
+            )
             sync_conn.exec_driver_sql(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)"
             )

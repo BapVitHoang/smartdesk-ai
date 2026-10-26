@@ -30,6 +30,7 @@ export interface LoginCredentials {
 
 export interface OAuth2LoginRequest {
   provider: 'google' | 'demo';
+  token?: string;
   credential?: string;
   email?: string;
 }

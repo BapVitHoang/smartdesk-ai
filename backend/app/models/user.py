@@ -14,12 +14,24 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    email: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
-    role: Mapped[str] = mapped_column(String(32), default="user", index=True)  # "admin" | "user"
+    role: Mapped[str] = mapped_column(
+        String(32), default="user", index=True
+    )  # "admin" | "user"
     oauth_provider: Mapped[str] = mapped_column(String(50), default="google")
+    google_sub: Mapped[Optional[str]] = mapped_column(
+        String(255), unique=True, index=True, nullable=True
+    )
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     workspace_id: Mapped[int] = mapped_column(Integer, default=1)
     # Salted scrypt hash (never the plain password). NULL for accounts that sign in only via Google/demo.
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true(), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 import pytest
-from sqlalchemy import select, JSON
+from sqlalchemy import select, JSON, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from pgvector.sqlalchemy import Vector
 
@@ -37,9 +37,64 @@ def test_redact_pii_before_embedding() -> None:
 
 
 @pytest.mark.asyncio
+async def test_google_profile_migration_preserves_legacy_sqlite_users(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.db import session as db_session
+    from app.db import seed
+    from app.models.user import User
+
+    legacy_engine, legacy_factory = db_session.create_engine_and_factory(
+        f"sqlite+aiosqlite:///{(tmp_path / 'legacy-auth.db').as_posix()}"
+    )
+
+    async def skip_seed(session: AsyncSession) -> None:
+        return None
+
+    monkeypatch.setattr(db_session, "engine", legacy_engine)
+    monkeypatch.setattr(db_session, "async_session_factory", legacy_factory)
+    monkeypatch.setattr(seed, "seed_all", skip_seed)
+    try:
+        async with legacy_engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "CREATE TABLE users (id INTEGER PRIMARY KEY, email VARCHAR(255) UNIQUE, "
+                    "full_name VARCHAR(150), role VARCHAR(32), oauth_provider VARCHAR(50), "
+                    "workspace_id INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+                )
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO users (id, email, full_name, role, oauth_provider, workspace_id) "
+                    "VALUES (1, 'legacy@example.com', 'Legacy User', 'admin', 'local', 2)"
+                )
+            )
+        await db_session.init_db()
+        await db_session.init_db()
+        async with legacy_factory() as session:
+            user = (await session.execute(select(User))).scalar_one()
+            assert user.email == "legacy@example.com"
+            assert user.role == "admin"
+            assert user.workspace_id == 2
+            assert user.is_active is True
+            assert user.google_sub is None
+            assert user.avatar_url is None
+            assert user.password_hash is None
+            user.google_sub = "legacy-google-subject"
+            await session.commit()
+            indexes = (await session.execute(text("PRAGMA index_list(users)"))).all()
+            assert any(
+                index[1] == "ix_users_google_sub" and index[2] == 1 for index in indexes
+            )
+    finally:
+        await legacy_engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_search_similar_chunks_sqlite_fallback(client) -> None:
     """Verify search_similar_chunks runs cleanly on SQLite using in-memory cosine similarity."""
     from app.db.session import async_session_factory
+
     async with async_session_factory() as session:
         # Workspace 2 has seeded documents/chunks from sample_documents
         results = await embedding_service.search_similar_chunks(
@@ -47,7 +102,7 @@ async def test_search_similar_chunks_sqlite_fallback(client) -> None:
             query="chi phí khám răng và bảng giá điều trị",
             top_k=2,
             session=session,
-            only_published=False
+            only_published=False,
         )
         assert isinstance(results, list)
         assert len(results) > 0, "Expected at least 1 similar chunk for workspace 2"
@@ -59,19 +114,25 @@ async def test_search_similar_chunks_sqlite_fallback(client) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    not os.getenv("TEST_DATABASE_URL") or "postgresql" not in os.getenv("TEST_DATABASE_URL", ""),
-    reason="Requires PostgreSQL TEST_DATABASE_URL"
+    not os.getenv("TEST_DATABASE_URL")
+    or "postgresql" not in os.getenv("TEST_DATABASE_URL", ""),
+    reason="Requires PostgreSQL TEST_DATABASE_URL",
 )
 async def test_search_similar_chunks_postgresql_pgvector(client, caplog) -> None:
     """Verify search_similar_chunks runs native pgvector SQL query with <=> cosine distance on PostgreSQL."""
     import logging
     from app.db.session import async_session_factory
+
     async with async_session_factory() as session:
         # Seed test chunk if needed
-        existing = await session.execute(select(KnowledgeChunk).where(KnowledgeChunk.workspace_id == 2))
+        existing = await session.execute(
+            select(KnowledgeChunk).where(KnowledgeChunk.workspace_id == 2)
+        )
         chunk = existing.scalars().first()
         if not chunk:
-            dummy_vec = embedding_service.generate_pseudo_embedding("Dịch vụ niềng răng trong suốt SmileCare")
+            dummy_vec = embedding_service.generate_pseudo_embedding(
+                "Dịch vụ niềng răng trong suốt SmileCare"
+            )
             chunk = KnowledgeChunk(
                 workspace_id=2,
                 chunk_id="smilecare-chunk-test-1",
@@ -79,7 +140,7 @@ async def test_search_similar_chunks_postgresql_pgvector(client, caplog) -> None
                 page_number=1,
                 title="Bảng giá niềng răng SmileCare",
                 content="Chi phí niềng răng trong suốt từ 35 triệu đến 80 triệu đồng.",
-                embedding=dummy_vec
+                embedding=dummy_vec,
             )
             session.add(chunk)
             await session.commit()
@@ -90,7 +151,7 @@ async def test_search_similar_chunks_postgresql_pgvector(client, caplog) -> None
                 query="niềng răng chi phí bao nhiêu",
                 top_k=2,
                 session=session,
-                only_published=False
+                only_published=False,
             )
         # Assert no fallback warning occurred
         for record in caplog.records:
@@ -101,4 +162,3 @@ async def test_search_similar_chunks_postgresql_pgvector(client, caplog) -> None
             assert "chunk_id" in r
             assert "score" in r
             assert -1.0 <= r["score"] <= 1.0
-
