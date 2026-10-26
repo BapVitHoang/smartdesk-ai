@@ -1,31 +1,49 @@
 # SmartDesk AI — Post-Merge Final Verification Report (`06-final-verification.md`)
 
-**Branch:** `verify/final-verification` (branched from `origin/Hoang` at `9d004fb7ca6a3598d2b89e51e45bfdbaa64f93a8`)  
+**Branch:** `verify/final-verification-2` (branched from `origin/Hoang` at `4e514db`)  
 **Integrator:** Ngô Việt Hoàng (`Bap <23110020@student.hcmute.edu.vn>`, `@BapVitHoang`) — Dev B & Integrator  
 **Date:** 2026-10-26  
 
 ---
 
-## Plan
+## Plan: Re-Audit Against The Real Requirement File (Prompt 4b)
 
-1. **Task 0 (Preconditions):**
-   - Confirm clean branch `verify/final-verification` from `origin/Hoang` (`9d004fb`), `origin/integration/merge-all` (`86ab75c`) ancestor of `origin/Hoang`, and `git log --merges --oneline -15`.
-   - Confirm `git config user.name`/`user.email` match `docs/TEAM_ROSTER.md` with all 3 rows `verified_by_user = True`, `GEMINI_API_KEY` set (never printed), Docker Desktop running, and ports `3000`, `8000`, `5432` free.
-   - Run and record in `docs/audit/06-evidence/task0-preconditions.txt`: `check_ownership.py --verify-consistency`, `check_roster.py` (expect 16 pre-existing hits from `MRG-DEF-01` & `MRG-DEF-02`), offline `pytest backend/tests -q` (SQLite, empty `GEMINI_API_KEY`), `npm run lint --prefix frontend`, `npm run build --prefix frontend`, and `scripts/verify_setup.ps1`.
-   - Copy open defects (`MRG-DEF-01`..`MRG-DEF-09`) and human decisions from `docs/audit/07-merge-report.md` into the `Defects` table (`OPEN`/`DECIDED`).
-2. **Task 1 (Apply Pending Requests Touching Frozen Files):**
-   - Inspect `docs/requests/devA.md`, `devB.md`, `devC.md` and compare `docs/API_CONTRACT.md` & `docs/spec/CONTRACTS.md` with merged code (`page`, `sort_by`/`sort_order`, priority order `Urgent..Low`, `X-Total-Count` + `Access-Control-Expose-Headers`, authenticated `POST /tickets`, `reset-cooldown`, frontend types).
-   - Apply each frozen-file request in ONE commit per request (`chore(requests): apply MRG-DEF-07`, `chore(requests): apply MRG-DEF-08`, `chore(requests): apply MRG-DEF-02`) and mark every request across `devA.md`, `devB.md`, `devC.md` as `DONE`, `REJECTED` (with reason), or `LEFT FOR OWNER`.
-3. **Task 2 (Real E2E Verification — Items A..M):**
-   - Run `docker compose down -v`, `docker compose build`, `scripts/smoke_docker.ps1`, then `docker compose up -d`.
-   - Strictly budget live Gemini calls (`<= 8` total across D..G, spaced `>= 4.5s`): start backend with empty `GEMINI_API_KEY` for non-LLM functional checks (A, B, C, E, F, G deterministic 3-agent trace, H, I), and enable live `GEMINI_API_KEY` only for budgeted live calls in D (D1 in-scope + D2 out-of-scope = 2 live calls, plus E/G live sample if within 8 calls), redacting all tokens/keys/passwords (`<redacted>`) in `docs/audit/06-evidence/`.
-   - Verify and save evidence for **A** (Health/Nginx/proxy), **B1..B7** (Auth/RBAC/throttle/DEMO_LOGIN_ENABLED=false/JWT secret pytest), **C1..C5** (Tickets auth/SLA/priority sort/pagination/CORS/delete/RBAC counts), **D** (Live Chat in-scope, out-of-scope, EN/VI injection), **E** (SSE direct & via Nginx), **F** (Tool Agent confirm/double-confirm/cancel/cross-user 403), **G** (Document upload/verify/publish/RAG query), **H1..H2** (`pgvector <=>` SQL + PostgreSQL `TEST_DATABASE_URL` pytest on separate `smartdesk_test` DB + `SHOW log_statement;`=`none`), **I** (Telemetry & `reset-cooldown` 200/403/401), **J** (`A-eval-report.md` 17 live LLM / 3 tool / 4 guardrail / 0 fallback audit), **K** (`375x812` screenshots & `CR-DEVC-01`/`02` code check), **L** (`127.0.0.1` port bindings), and **M** (`git ls-files`, `git log -S "AIza"`, `frontend/dist` scan); finish with `docker compose down`.
-4. **Task 3 (REQ Table & Defects):**
-   - Populate full `REQ-01..REQ-42` + `CRIT-01..CRIT-10` verification table and updated `Defects` table in `docs/audit/06-final-verification.md`.
-5. **Task 4 (`AI_USAGE.md`):**
-   - Compose root `AI_USAGE.md` from `A-ai-usage.md`, `B-ai-usage.md`, and `C-ai-usage.md` with verified names/MSSVs from `docs/TEAM_ROSTER.md` and real commit hashes verified via `git log --grep`.
-6. **Task 5 (Authorship Table) & Task 6 (Commit, Self-Review Loop & Push):**
-   - Add `docs/audit/06-evidence/*` to `scripts/ownership_map.py` (+ `gen_codeowners.py`), add `git shortlog -sne --all` and `origin/Hoang` per-author summary (no percentages, history not rewritten), commit deliverables, run Phase 3 4-subagent Self-Review Loop, and push `origin verify/final-verification`.
+1. **Task 0 (Preconditions Baseline):**
+   - Verify clean working tree on `verify/final-verification-2` branched from `origin/Hoang` (`4e514db`).
+   - Verify `git log --merges --oneline -15` includes merges of fix PRs (`4e514db`, `6db7ca0`).
+   - Verify committer identity matches Hoàng's row in `docs/TEAM_ROSTER.md` (RULE 4: `Bap <23110020@student.hcmute.edu.vn>`).
+   - Run and record: `check_ownership.py --verify-consistency`, `check_roster.py`, `pytest backend/tests -q`, `npm run lint --prefix frontend`, `npm run build --prefix frontend`.
+   - Main risk: Pre-existing slide fabrication hits in `check_roster.py` (`MRG-DEF-01`).
+2. **Task 1 (Extract Requirements Verbatim):**
+   - Create `docs/audit/06-requirements-extract.md` extracting verbatim all 42 REQ items and 10 CRIT items from `docs/audit/00-checklist.md` with exact IDs, sections, weights, and counts.
+   - Proof: Subagent check verifying exact matching against `00-checklist.md`.
+   - Main risk: Accidental paraphrasing or missing items.
+3. **Task 2 (Rebuild REQ Table):**
+   - Rebuild the REQ table in `06-final-verification.md`: REQ ID | short verbatim title | status (DONE / PARTIAL / FAILED / NOT TESTED) | evidence | remaining gap | owner.
+   - Enforce rule: DONE only when executed evidence covers EVERY clause; items with open defects are PARTIAL.
+   - SmartDesk AI selected Capabilities A, B, C, E (exceeding REQ-12 requirement of 3); D is marked NOT SELECTED.
+   - Proof: Verification that every row links to concrete evidence.
+4. **Task 3 (Rebuild CRIT Section):**
+   - Rebuild CRIT section with verbatim weight/points, existing evidence, and qualitative gaps.
+   - Enforce: NO numeric self-scores or "x/10"; use `git shortlog` counts.
+   - Proof: Grep for "/10" returns zero occurrences.
+5. **Task 4 (Re-Execute Affected Items):**
+   - Pre-flight: Check `docker ps` for PostgreSQL healthy state (`/api/v1/health`), ensure cooldown is clear (`cooldown_until == 0`).
+   - Pacing & budget: Enforce >= 5.0s spacing between live calls, max 8 live Gemini calls across Task 4.
+   - Redaction: Pipe curl/httpx outputs through secret sanitizer (`[REDACTED_JWT_TOKEN]`, `[REDACTED_SECRET]`) before saving to `docs/audit/06-evidence/`.
+   - Execute and record:
+     * Item C: pagination (`page=1&page_size=2`, `sort_by`, `sort_order`, `X-Total-Count` header mapped to frontend) -> `docs/audit/06-evidence/item-C-tickets.txt`.
+     * Item D: live chat query on PostgreSQL -> `docs/audit/06-evidence/item-D-chat.txt`.
+     * Item G: live doc upload with verification on PostgreSQL (document pseudo-embedding fallback under MRG-DEF-10) -> `docs/audit/06-evidence/item-G-documents.txt`.
+     * Item F: confirm-action authorization & cross-user block using two distinct user tokens -> `docs/audit/06-evidence/item-F-tools.txt`.
+     * Item I: admin telemetry & cooldown reset via demo admin account -> `docs/audit/06-evidence/item-I-telemetry.txt`.
+     * Item K: mobile viewports UI responsive audit -> `docs/audit/06-evidence/item-K-mobile-ui.txt`.
+6. **Task 5 (Audit Claims on Evaluation & Screenshots):**
+   - Audit `A-eval-report.md`: runner, date, keys, 24 test cases, baseline 8/24 derivation (hybrid legacy simulation executing FAQ matcher + regex vs missing features), transparently state zero held-out cases.
+   - Audit all 14 files in `docs/evidence/` (classify each as real-backend / mock / unknown with evidence).
+7. **Task 6 (Defects, Authorship & Push):**
+   - Update Defects table (`MRG-DEF-01..10`); record `git shortlog -sne --all` and per-author commit list.
+   - Commit and push `verify/final-verification-2`.
 
 ---
 
