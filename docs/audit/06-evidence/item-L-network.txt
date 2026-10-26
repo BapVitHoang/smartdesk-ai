@@ -1,0 +1,22 @@
+﻿=== ITEM L: NETWORK EXPOSURE & PORT BINDINGS AUDIT ===
+
+1. docker compose ps output:
+  NAME                 IMAGE                    COMMAND                  SERVICE    CREATED         STATUS                   PORTS
+  smartdesk-backend    smartdesk-ai-backend     "uvicorn app.main:apΓÇª"   backend    5 minutes ago   Up 4 minutes (healthy)   127.0.0.1:8000->8000/tcp
+  smartdesk-frontend   smartdesk-ai-frontend    "/docker-entrypoint.ΓÇª"   frontend   7 minutes ago   Up 7 minutes             0.0.0.0:3000->80/tcp
+  smartdesk-postgres   pgvector/pgvector:pg16   "docker-entrypoint.sΓÇª"   postgres   7 minutes ago   Up 7 minutes (healthy)   127.0.0.1:5432->5432/tcp
+
+2. docker port backend output:
+  8000/tcp -> 127.0.0.1:8000
+
+3. docker port postgres output:
+  5432/tcp -> 127.0.0.1:5432
+
+4. docker port frontend output:
+  80/tcp -> 0.0.0.0:3000
+
+5. Exposure Verification Conclusion:
+  - smartdesk-backend: Bound strictly to 127.0.0.1:8000 (never 0.0.0.0:8000)
+  - smartdesk-postgres: Bound strictly to 127.0.0.1:5432 (never 0.0.0.0:5432)
+  - smartdesk-frontend: Bound to port 3000 (Nginx reverse proxy facing client)
+  - Result: PASS (Backend application and PostgreSQL database are strictly isolated from external public interface).

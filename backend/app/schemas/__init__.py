@@ -8,8 +8,25 @@ from app.schemas.ticket import (
     TicketFilter,
     TicketPriorityEnum,
     TicketStatusEnum,
+    TicketCategoryEnum,
 )
 from app.schemas.health import HealthResponse, SmokeTestResponse
+from app.schemas.workspace import (
+    WorkspaceBase,
+    WorkspaceCreate,
+    WorkspaceUpdate,
+    WorkspaceResponse,
+)
+from app.schemas.document import (
+    DocumentChunkResponse,
+    DocumentResponse,
+    DocumentDetailResponse,
+    DocumentPublishResponse,
+)
+from app.schemas.verification import (
+    VerificationItemResponse,
+    VerificationReportResponse,
+)
 
 __all__ = [
     "ChatRequest",
@@ -21,6 +38,17 @@ __all__ = [
     "TicketFilter",
     "TicketPriorityEnum",
     "TicketStatusEnum",
+    "TicketCategoryEnum",
     "HealthResponse",
     "SmokeTestResponse",
+    "WorkspaceBase",
+    "WorkspaceCreate",
+    "WorkspaceUpdate",
+    "WorkspaceResponse",
+    "DocumentChunkResponse",
+    "DocumentResponse",
+    "DocumentDetailResponse",
+    "DocumentPublishResponse",
+    "VerificationItemResponse",
+    "VerificationReportResponse",
 ]

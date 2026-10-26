@@ -1,0 +1,38 @@
+import { BackendTicketResponse } from '../../types';
+
+export const MOCK_TICKETS: BackendTicketResponse[] = [
+  {
+    id: 1042,
+    workspace_id: 1,
+    ticket_code: '#TICK-1042',
+    customer_name: 'Nguyễn Văn An',
+    customer_email: 'an.nguyen@company.vn',
+    category: 'Authentication',
+    priority: 'Urgent',
+    subject: 'Không thể đăng nhập tài khoản quản trị sau khi đổi điện thoại 2FA',
+    description: 'Tôi vừa đổi máy mới và cài lại Google Authenticator nhưng mã OTP không được chấp nhận. Hệ thống báo lỗi "Invalid token code".',
+    status: 'open',
+    ai_tags: ['Authentication', 'Urgent', '2FA Issue'],
+    ai_draft_reply: 'Chào anh An, hệ thống SmartDesk đã tiếp nhận sự cố mất mã 2FA. Đội ngũ an ninh thông tin đang kiểm tra và sẽ liên hệ qua số điện thoại đăng ký trong vòng 2 giờ.',
+    estimated_response_hours: 2,
+    created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
+    updated_at: null,
+  },
+  {
+    id: 1043,
+    workspace_id: 1,
+    ticket_code: '#TICK-1043',
+    customer_name: 'Trần Thị Mai',
+    customer_email: 'mai.tran@startup.io',
+    category: 'Billing',
+    priority: 'High',
+    subject: 'Hóa đơn tháng 10 bị trừ tiền 2 lần cho cùng một gói Enterprise',
+    description: 'Thẻ tín dụng của tôi bị trừ 2 giao dịch liên tiếp vào ngày 15/10 với số tiền 4.900.000 VNĐ mỗi lần. Xin hoàn lại khoản trừ thừa.',
+    status: 'in_progress',
+    ai_tags: ['Billing', 'High', 'Refund Request'],
+    ai_draft_reply: 'Chào chị Mai, bộ phận kế toán đã xác nhận có 2 lệnh thanh toán trùng lặp. Khoản tiền 4.900.000 VNĐ sẽ được hoàn về thẻ trong 3-5 ngày làm việc.',
+    estimated_response_hours: 4,
+    created_at: new Date(Date.now() - 3600000 * 12).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+  },
+];

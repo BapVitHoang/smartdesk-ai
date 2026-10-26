@@ -1,0 +1,23 @@
+=== TASK 5: REPAIR MERGE-INDUCED BREAKAGE ONLY ===
+
+1. Summary of Check Results Across Tasks 2–4:
+   - pytest (backend/tests): 120 passed, 1 skipped (exit=0) -> PASS (0 merge-induced failures)
+   - run_eval.py --mode deterministic: 24/24 (100.0%) passed (exit=0) -> PASS (0 merge-induced failures)
+   - npm ci --prefix frontend: exit=0 -> PASS
+   - npm run lint --prefix frontend: exit=0 -> PASS
+   - npm run build --prefix frontend: exit=0 -> PASS
+   - check_ownership.py --verify-consistency: exit=0 -> PASS
+
+2. Analysis of check_roster.py Failures (exit=1, 16 violations):
+   - Violation A (1 violation):
+     `docs/notes/A-ai-usage.md:51: Unverified full name 'Google Antigravity Coding Assistant' associated with role/MSSV: - **AI Tool Used:** Google Antigravity Coding Assistant [Dev-A]`
+     * Source branch check: Present verbatim on `origin/Nguyen2` (`62c7e5a`, introduced in commit `a03536f`). `origin/Nguyen2` already contained `scripts/check_roster.py` from `origin/Hoang` (`9fc5443`), so this failure existed on `origin/Nguyen2` alone (not caused by the merge). Additionally, `scripts/check_roster.py:137` regex false-positives on the 4-word tool name `Google Antigravity Coding Assistant` when followed by `(Dev A)`.
+     * Action per Task 5 rule ("If the failure already existed on the source branch, do NOT fix it; report it in the Defects section with its owner"): Not modified; logged in Defects section (owners: `devA` / `integrator`).
+
+   - Violations B (15 violations):
+     `docs/SLIDES.pdf` (8 matches) and `docs/SLIDES.pptx` (7 matches) containing unverified names/MSSVs (`[REDACTED_FABRICATED_NAME_1]`, `[REDACTED_FABRICATED_NAME_2]`, `[REDACTED_FABRICATED_NAME_3]`, `2311XXXX_A`, `2311XXXX_B`, `2311XXXX_C`).
+     * Source branch check: Present verbatim on `origin/feature/c-frontend-docs` (`74d3319`) and already documented in `docs/requests/devC.md` as `CR-002`.
+     * Action per Policy P5 ("Binary files (png, pdf, pptx): take the Dev C branch version without merging; list them in the report as 'to be regenerated in Prompt 5'") and Task 5 rule: Not modified; listed in Section 6 (Binaries to regenerate in Prompt 5) and Section 7 (Defects, owner: `devC`).
+
+Result: Zero merge-induced breakages required a `fix(merge):` commit.
+

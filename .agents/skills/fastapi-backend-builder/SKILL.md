@@ -3,7 +3,7 @@ name: fastapi-backend-builder
 description: >-
   Build, scaffold, and test the FastAPI asynchronous backend for SmartDesk AI.
   Use when implementing API endpoints (/api/v1/chat, /api/v1/tickets, /api/v1/agent, /api/v1/health),
-  setting up Google Gemini 1.5 Flash RAG pipeline, configuring PostgreSQL pgvector,
+  setting up Google Gemini 3.5 Flash Lite / Ollama RAG pipeline, configuring PostgreSQL pgvector,
   or implementing the non-AI BM25 fallback mechanism.
 ---
 
@@ -17,8 +17,8 @@ This skill guides the AI assistant through developing, maintaining, and testing 
 
 Before modifying or generating code:
 1. Ensure Python 3.11+ is installed.
-2. Check environment variables (`GEMINI_API_KEY`, `DATABASE_URL`).
-3. Verify that the file structure matches the modular layout described in `AGENTS.md`.
+2. Check environment variables (`AI_PROVIDER`, `GEMINI_API_KEY`, `DATABASE_URL`).
+3. Verify that the file structure matches the modular layout described in `AGENTS.md` and `docs/ARCHITECTURE.md`.
 
 ---
 
@@ -29,7 +29,10 @@ Before modifying or generating code:
 - Use `pydantic_settings.BaseSettings` with `.env` reading.
 - Key settings:
   ```python
+  AI_PROVIDER: str = "gemini"
   GEMINI_API_KEY: str = ""
+  LLM_MODEL_NAME: str = "gemini-3.5-flash-lite"
+  EMBEDDING_MODEL_NAME: str = "gemini-embedding-001"
   DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/smartdesk"
   FALLBACK_SQLITE_URL: str = "sqlite+aiosqlite:///./smartdesk.db"
   LLM_TIMEOUT_SECONDS: float = 4.0
@@ -39,9 +42,11 @@ Before modifying or generating code:
 ### Step 2: Database Models & Schemas
 - Model `Ticket`:
   - `id`: Integer primary key
+  - `workspace_id`: Integer foreign key (default 1)
   - `ticket_code`: `#TICK-XXXX`
   - `customer_name`, `customer_email`: String
-  - `category`, `priority`: Enum or String
+  - `category`: `"Authentication" | "Billing" | "Bug Report" | "Feature Request" | "General"` (accepts `"Technical Bug"` alias)
+  - `priority`: `"Low" | "Medium" | "High" | "Urgent"` (SLA: 24h / 8h / 4h / 2h)
   - `subject`, `description`: Text
   - `status`: `open` | `in_progress` | `resolved`
   - `ai_tags`: JSON array of strings
@@ -49,26 +54,26 @@ Before modifying or generating code:
 - Model `FAQItem` / `KnowledgeChunk`:
   - `id`: Integer
   - `title`, `content`, `category`, `source_url`: Text
-  - `embedding`: Vector(768) (pgvector or serialized array fallback)
+  - `embedding`: JSON array / Vector (pgvector or serialized array fallback)
 
 ### Step 3: Implement Pure Services (`app/services/`)
 1. **`llm_service.py`**:
-   - Wrap Google Gemini 1.5 Flash using `google-genai` or `google-generativeai`.
+   - Wrap Google Gemini (`gemini-3.5-flash-lite` with fallback to `gemini-2.5-flash-lite`) and Ollama (`qwen2.5:3b`).
    - Measure real-time latency with `time.perf_counter()`.
-   - Strictly wrap calls in `asyncio.wait_for(..., timeout=config.LLM_TIMEOUT_SECONDS)`.
+   - Strictly wrap calls in `asyncio.wait_for(..., timeout=settings.LLM_TIMEOUT_SECONDS)`.
 2. **`fallback_service.py`**:
    - Pure Python non-AI deterministic FAQ matcher.
    - Load `backend/data/seed_faq.json`.
-   - Compute matching score using token overlap / BM25 / Jaccard similarity.
+   - Compute matching score using Okapi BM25.
    - Return top match or fallback template with zero LLM dependency.
 3. **`rag_service.py`**:
-   - Embed user query with `text-embedding-004`.
-   - Query similarity against `KnowledgeChunk`.
+   - Embed user query with `gemini-embedding-001` (or `nomic-embed-text` on Ollama).
+   - Query similarity against workspace-isolated `KnowledgeChunk`.
    - Build grounded prompt with citations: `[Doc #X: title]`.
    - If error or timeout occurs, smoothly invoke `fallback_service.py`.
 4. **`ticket_service.py`**:
    - Handle ticket creation with auto-generated `#TICK-XXXX`.
-   - Async background task to analyze ticket category/priority and write `ai_draft_reply`.
+   - Compute SLA (`Urgent: 2h, High: 4h, Medium: 8h, Low: 24h`), tags, and `ai_draft_reply`.
 
 ### Step 4: Router Endpoints (`app/api/v1/endpoints/`)
 - `POST /api/v1/chat`: Returns response, citations, latency_ms, is_fallback. Includes prompt injection guardrail check.
@@ -77,13 +82,8 @@ Before modifying or generating code:
 - `PATCH /api/v1/tickets/{id}`: Agent edit draft, category, priority, or status (`open`, `in_progress`, `resolved`).
 - `POST /api/v1/agent/tickets/{id}/generate-draft`: AI Copilot regeneration.
 - `GET /api/v1/knowledge`: Query indexed knowledge items and seed FAQs.
-- `POST /api/v1/knowledge/sync`: Re-index seed FAQs into database vector chunks.
-- `GET /api/v1/health`: Basic readiness & DB ping.
-- `GET /api/v1/health/smoke-test`: Executes live LLM call and returns latency report matching acceptance criteria.
-
-### Step 5: Security & Status Mapping Integration
-- **Guardrail:** Sanitize inputs and reject prompt injection attempts before calling LLM (`core/security.py`).
-- **Status Mapping:** Backend uses lowercase statuses (`"open"`, `"in_progress"`, `"resolved"`). These map to frontend (`"Open"`, `"Pending"`, `"Resolved"`).
+- `GET /api/v1/workspaces` & `POST /api/v1/workspaces/{id}/documents/upload`: Multi-tenant workspaces & document ingestion.
+- `GET /api/v1/health` & `GET /api/v1/health/smoke-test`: Readiness & live LLM latency benchmark.
 
 ---
 
@@ -97,17 +97,6 @@ pip install -r backend/requirements.txt
 # Run server in reload mode
 cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Run smoke test endpoint
-curl http://localhost:8000/api/v1/health/smoke-test
-
 # Run automated tests
-pytest tests/ -v
+pytest backend/tests/ -v
 ```
-
----
-
-## 4. Troubleshooting & Fallback Matrix
-- **Problem: Gemini API Rate Limit (HTTP 429) or Outage**:
-  - `rag_service.py` catches `Exception` -> calls `fallback_service.match_faq()` -> response has `"is_fallback": true`.
-- **Problem: PostgreSQL pgvector not available locally**:
-  - `db/session.py` catches connection error or uses SQLite in-memory cosine fallback for vector similarity during development.

@@ -1,15 +1,14 @@
 """Ticket lifecycle management, SLA estimation, auto-tagging, and AI Copilot drafting."""
 
-import random
+import re
 import logging
-from typing import List, Tuple
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from app.models.ticket import Ticket
 from app.schemas.ticket import TicketCreate
-from app.services.llm_service import llm_service
-from app.services.fallback_service import fallback_service
+from app.services.ticket_copilot_service import ticket_copilot_service
 
 logger = logging.getLogger("smartdesk.ticket_service")
 
@@ -21,11 +20,11 @@ class TicketService:
         """Determines expected response SLA hours according to urgency level."""
         mapping = {
             "Urgent": 2,
-            "High": 6,
-            "Medium": 12,
+            "High": 4,
+            "Medium": 8,
             "Low": 24
         }
-        return mapping.get(priority, 12)
+        return mapping.get(priority, 8)
 
     def extract_ai_tags(self, category: str, priority: str, subject: str, description: str) -> List[str]:
         """
@@ -61,89 +60,119 @@ class TicketService:
         category: str,
         priority: str,
         subject: str,
-        description: str
+        description: str,
+        workspace_id: Optional[int] = 1,
+        db: Optional[AsyncSession] = None
     ) -> str:
         """
-        Generates a professional, empathetic draft resolution using LLM or structured template fallback.
+        Generates a professional, empathetic draft resolution using TicketCopilotService single-call
+        structured output aligned with workspace persona and business rules.
         """
-        # Search relevant FAQ for grounding the draft
-        matched = fallback_service.match_faq(f"{subject} {description}")
-        faq_context = matched.get("response", "")
-
-        draft_prompt = (
-            f"You are a Senior Customer Support Specialist at SmartDesk AI.\n"
-            f"Draft a polite, professional, and empathetic email reply to the customer.\n\n"
-            f"Customer Details:\n"
-            f"- Name: {customer_name}\n"
-            f"- Issue Category: {category}\n"
-            f"- Priority: {priority}\n"
-            f"- Subject: {subject}\n"
-            f"- Description: {description}\n\n"
-            f"Knowledge Base Reference:\n{faq_context}\n\n"
-            f"Writing Guidelines:\n"
-            f"1. Greet the customer warmly by their full name.\n"
-            f"2. Acknowledge and summarize their specific concern with empathy.\n"
-            f"3. Provide clear step-by-step resolution instructions or explain the next investigative steps.\n"
-            f"4. State that their ticket is actively being handled by the support engineering team.\n"
-            f"5. Conclude with a warm closing from 'SmartDesk Support Engineering'."
-        )
-
         try:
-            draft_text, _ = await llm_service.generate_response(
-                prompt=draft_prompt,
-                temperature=0.3
+            copilot_output = await ticket_copilot_service.generate_ticket_triage_and_draft(
+                subject=subject,
+                description=description,
+                workspace_id=workspace_id or 1,
+                session=db,
+                customer_name=customer_name,
+                category_hint=category,
+                priority_hint=priority,
             )
-            if draft_text and len(draft_text.strip()) > 30:
-                return draft_text.strip()
-        except Exception as e:
-            logger.info(f"LLM draft generation unavailable ({e}). Synthesizing structured template draft.")
+            if copilot_output and copilot_output.ai_draft_reply and len(copilot_output.ai_draft_reply.strip()) > 30:
+                return copilot_output.ai_draft_reply.strip()
+        except Exception as exc:
+            logger.warning(f"TicketCopilot draft generation encountered error: {exc}")
 
-        # Deterministic template fallback
+        # Deterministic template fallback in Vietnamese (AGENTS.md & PLAN.md)
+        sla_hours = self.calculate_sla_hours(priority)
+        ws_name = "SmartDesk Cloud Support"
+        persona_name = "SmartDesk Support Specialist"
         return (
-            f"Dear {customer_name},\n\n"
-            f"Thank you for contacting SmartDesk AI Support. We have received your inquiry regarding \"{subject}\" "
-            f"and our support team has categorized it as [{category}] with [{priority}] priority.\n\n"
-            f"Based on our support policies for {category}:\n"
-            f"1. Our engineering team is currently verifying the status of your account and system logs.\n"
-            f"2. In the meantime, if you have any additional error codes, screenshots, or logs, please reply directly to this thread.\n"
-            f"3. You will receive an update from a dedicated specialist within our {self.calculate_sla_hours(priority)}-hour SLA window.\n\n"
-            f"We appreciate your patience while we investigate this matter for you.\n\n"
-            f"Warm regards,\n"
-            f"SmartDesk Support Team"
+            f"Kính gửi {customer_name},\n\n"
+            f"Cảm ơn quý khách đã liên hệ với {ws_name}. Chúng tôi đã tiếp nhận yêu cầu liên quan đến \"{subject}\" "
+            f"và phân loại yêu cầu vào danh mục [{category}] với mức độ ưu tiên [{priority}].\n\n"
+            f"Chính sách hỗ trợ cho danh mục {category}:\n"
+            f"1. Đội ngũ chuyên trách đang tiến hành rà soát chi tiết yêu cầu của quý khách.\n"
+            f"2. Nếu có thêm ảnh chụp màn hình, mã lỗi hoặc chứng từ giao dịch, quý khách vui lòng phản hồi trực tiếp vào phiếu này.\n"
+            f"3. Quý khách sẽ nhận được phản hồi từ chuyên viên trong khung cam kết SLA {sla_hours} giờ.\n\n"
+            f"Rất cảm ơn sự kiên nhẫn của quý khách.\n\n"
+            f"Trân trọng,\n"
+            f"{persona_name} - {ws_name}"
         )
 
     async def create_ticket(self, db: AsyncSession, ticket_in: TicketCreate) -> Ticket:
         """
-        Creates a new ticket, assigns #TICK-XXXX code, auto-tags, and pre-populates AI draft.
+        Creates a new ticket, assigns #TICK-XXXX code, auto-tags, and pre-populates AI draft
+        using single-call ticket copilot structured output (REQ-15).
         """
-        # Get count to determine next sequence number
-        count_result = await db.execute(select(func.count(Ticket.id)))
-        current_count = count_result.scalar_one() or 0
-        sequence_num = 1001 + current_count
-
+        # Determine next sequence number by finding max existing code to avoid collision with seed data
+        result = await db.execute(select(Ticket.ticket_code))
+        existing_codes = result.scalars().all()
+        max_num = 1000
+        for code in existing_codes:
+            m = re.search(r"(\d+)$", code)
+            if m:
+                val = int(m.group(1))
+                if val > max_num:
+                    max_num = val
+        sequence_num = max(max_num + 1, 1001)
         ticket_code = f"#TICK-{sequence_num}"
+        existing_set = set(existing_codes)
+        while ticket_code in existing_set:
+            sequence_num += 1
+            ticket_code = f"#TICK-{sequence_num}"
+
+        ws_id = ticket_in.workspace_id or 1
 
         # Calculate SLA response hours
         sla_hours = self.calculate_sla_hours(ticket_in.priority.value)
 
-        # Generate AI tags
-        ai_tags = self.extract_ai_tags(
-            category=ticket_in.category,
-            priority=ticket_in.priority.value,
-            subject=ticket_in.subject,
-            description=ticket_in.description
-        )
-
-        # Generate pre-populated AI draft reply
-        ai_draft = await self.generate_draft_reply(
-            customer_name=ticket_in.customer_name,
-            category=ticket_in.category,
-            priority=ticket_in.priority.value,
-            subject=ticket_in.subject,
-            description=ticket_in.description
-        )
+        # 1. Single-call copilot structured triage and localized draft generation
+        try:
+            copilot_output = await ticket_copilot_service.generate_ticket_triage_and_draft(
+                subject=ticket_in.subject,
+                description=ticket_in.description,
+                workspace_id=ws_id,
+                session=db,
+                customer_name=ticket_in.customer_name,
+                category_hint=ticket_in.category,
+                priority_hint=ticket_in.priority.value,
+            )
+            ai_tags = copilot_output.ai_tags if copilot_output and copilot_output.ai_tags else self.extract_ai_tags(
+                category=ticket_in.category,
+                priority=ticket_in.priority.value,
+                subject=ticket_in.subject,
+                description=ticket_in.description
+            )
+            ai_draft = copilot_output.ai_draft_reply if copilot_output and copilot_output.ai_draft_reply else await self.generate_draft_reply(
+                customer_name=ticket_in.customer_name,
+                category=ticket_in.category,
+                priority=ticket_in.priority.value,
+                subject=ticket_in.subject,
+                description=ticket_in.description,
+                workspace_id=ws_id,
+                db=db
+            )
+        except Exception as e:
+            logger.warning(f"Error in ticket copilot triage, falling back to rule-based tags and draft: {e}")
+            ai_tags = self.extract_ai_tags(
+                category=ticket_in.category,
+                priority=ticket_in.priority.value,
+                subject=ticket_in.subject,
+                description=ticket_in.description
+            )
+            ai_draft = await self.generate_draft_reply(
+                customer_name=ticket_in.customer_name,
+                category=ticket_in.category,
+                priority=ticket_in.priority.value,
+                subject=ticket_in.subject,
+                description=ticket_in.description,
+                workspace_id=ws_id,
+                db=db
+            )
 
         db_ticket = Ticket(
+            workspace_id=ticket_in.workspace_id or 1,
             ticket_code=ticket_code,
             customer_name=ticket_in.customer_name,
             customer_email=str(ticket_in.customer_email),

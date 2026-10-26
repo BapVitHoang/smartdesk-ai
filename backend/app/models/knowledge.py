@@ -1,11 +1,16 @@
 """Knowledge base and FAQ ORM models."""
 
 from datetime import datetime, timezone
-from typing import List, Optional
-from sqlalchemy import String, Text, Integer, DateTime, JSON
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import List, Optional, TYPE_CHECKING
+from sqlalchemy import String, Text, Integer, DateTime, JSON, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
+from app.core.config import settings
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.document import Document
 
 
 def utc_now() -> datetime:
@@ -24,7 +29,7 @@ class FAQItem(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source_url: Mapped[str] = mapped_column(String(255), nullable=False)
-    embedding: Mapped[Optional[List[float]]] = mapped_column(JSON, nullable=True)
+    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(settings.EMBEDDING_DIMENSIONS).with_variant(JSON(), "sqlite"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -41,12 +46,20 @@ class KnowledgeChunk(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     chunk_id: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
-    parent_doc_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    parent_doc_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False, default="doc-default")
+    workspace_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True, default=1)
+    document_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("documents.id"), nullable=True, index=True
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    page_number: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source_url: Mapped[str] = mapped_column(String(255), nullable=False)
-    embedding: Mapped[Optional[List[float]]] = mapped_column(JSON, nullable=True)
+    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(settings.EMBEDDING_DIMENSIONS).with_variant(JSON(), "sqlite"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
+
+    document: Mapped[Optional["Document"]] = relationship("Document", back_populates="chunks")

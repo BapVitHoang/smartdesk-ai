@@ -1,0 +1,23 @@
+=== TASK 2 CHECKS (after merge: feature/b-platform into integration [306dec9]) ===
+1. pytest exit=0
+.....................................s.................................. [ 72%]
+...........................                                              [100%]
+98 passed, 1 skipped in 12.00s
+
+2. check_roster exit=0
+============================================================
+SmartDesk AI ΓÇö Roster & Anti-Fabrication Gate (check_roster.py)
+============================================================
+Loaded from docs/TEAM_ROSTER.md:
+  - Verified Full Names : None (CH╞»A C├ô Dß╗« LIß╗åU)
+  - Verified MSSVs      : None (CH╞»A C├ô Dß╗« LIß╗åU)
+  - Allowed Git Emails  : ['23110020@student.hcmute.edu.vn', 'khanhssaa77@gmail.com', 'lenguyensonghinh@gmail.com']
+  - Allowed Handles     : ['@tkhanh', '@theorijinnn', '@bapvithoang']
+------------------------------------------------------------
+[PASS] Anti-Fabrication & Roster Gate passed cleanly (0 violations).
+
+3. check_ownership --verify-consistency exit=0
+=== Checking Ownership & Governance Consistency ===
+[PASS] All 209 tracked files are mapped to an owner.
+[PASS] Zero overlaps between devA, devB, and devC.
+[PASS] .github/CODEOWNERS exists.

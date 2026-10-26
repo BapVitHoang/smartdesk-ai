@@ -1,0 +1,31 @@
+=== ITEM I: TELEMETRY & COST-GUARD OBSERVABILITY VERIFICATION ===
+I1 GET /api/v1/agent/ai-usage as Admin:
+  - Total requests: 36
+  - Total tokens: 3420
+  - Total cost (USD): 0.006180
+  - Avg latency (ms): 633.68
+  - Fallback count: 12
+  - Refused count: 6
+  - Recent logs count: 20
+
+I2.1 Unauthenticated POST /api/v1/agent/reset-cooldown: HTTP 401
+I2.2 Regular user POST /api/v1/agent/reset-cooldown: HTTP 403
+I2.3 Admin POST /api/v1/agent/reset-cooldown: HTTP 200, status=success, message=Circuit breaker cooldown has been reset. Cloud Gemini calls re-enabled., cooldown_active=False
+I2.4 Admin POST alias route (/agent/ai-usage/reset-cooldown): HTTP 200, status=success, cooldown_active=False
+
+---
+=== PROMPT 4b LIVE RE-EXECUTION AUDIT (2026-10-26) ===
+1. Admin Telemetry Access (Role: admin):
+- Endpoint: GET /api/v1/agent/ai-usage
+- HTTP Status: 200
+- Total requests recorded: 36
+- Total cost: $0.006180 USD
+
+2. Non-Admin RBAC Access Guard (Role: user):
+- Endpoint: POST /api/v1/agent/reset-cooldown
+- HTTP Status: 403 Forbidden (RBAC enforced)
+
+3. Admin Cooldown Reset Execution (Role: admin):
+- Endpoint: POST /api/v1/agent/reset-cooldown
+- HTTP Status: 200
+- Response: {"status": "success", "message": "Circuit breaker cooldown has been reset. Cloud Gemini calls re-enabled.", "cooldown_active": false}

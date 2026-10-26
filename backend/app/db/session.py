@@ -3,6 +3,7 @@
 from typing import AsyncGenerator
 import json
 import logging
+from pathlib import Path
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     AsyncSession,
@@ -11,7 +12,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy import select
 
-from app.core.config import settings
+from app.core.config import BACKEND_DIR, settings
 from app.db.base import Base
 
 logger = logging.getLogger("smartdesk.db")
@@ -28,7 +29,7 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
-def create_engine_and_factory(url: str):
+def create_engine_and_factory(url: str, **custom_kwargs):
     """Factory helper to build async engine and session factory."""
     norm_url = normalize_database_url(url)
     kwargs = {"echo": settings.DEBUG}
@@ -36,8 +37,10 @@ def create_engine_and_factory(url: str):
         kwargs["connect_args"] = {"check_same_thread": False}
     else:
         kwargs["pool_pre_ping"] = True
-        kwargs["pool_size"] = 10
-        kwargs["max_overflow"] = 20
+        if "poolclass" not in custom_kwargs:
+            kwargs["pool_size"] = 10
+            kwargs["max_overflow"] = 20
+    kwargs.update(custom_kwargs)
 
     eng = create_async_engine(norm_url, **kwargs)
     factory = async_sessionmaker(
@@ -51,6 +54,11 @@ def create_engine_and_factory(url: str):
 
 
 engine, async_session_factory = create_engine_and_factory(settings.DATABASE_URL)
+
+
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """Return the active async session factory (safe across SQLite fallback re-binds)."""
+    return async_session_factory
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -70,12 +78,57 @@ async def init_db() -> None:
     """Initialize database tables and seed initial FAQ data if empty."""
     global engine, async_session_factory
     from app.models.ticket import Ticket  # noqa: F401
-    from app.models.knowledge import FAQItem  # noqa: F401
+    from app.models.knowledge import FAQItem, KnowledgeChunk  # noqa: F401
+    from app.models.workspace import Workspace  # noqa: F401
+    from app.models.document import Document  # noqa: F401
+    from app.models.verification import VerificationReport, VerificationItem  # noqa: F401
+    from app.models.user import User  # noqa: F401
+    from app.models.ai_usage import AIUsageLog  # noqa: F401
+
+    def _migrate_sqlite_columns(sync_conn):
+        try:
+            ticket_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(tickets)").fetchall()]
+            if ticket_cols and "workspace_id" not in ticket_cols:
+                sync_conn.exec_driver_sql("ALTER TABLE tickets ADD COLUMN workspace_id INTEGER DEFAULT 1")
+            
+            kc_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(knowledge_chunks)").fetchall()]
+            if kc_cols:
+                if "workspace_id" not in kc_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN workspace_id INTEGER DEFAULT 1")
+                if "document_id" not in kc_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN document_id INTEGER")
+                if "chunk_index" not in kc_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN chunk_index INTEGER DEFAULT 0")
+                if "page_number" not in kc_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE knowledge_chunks ADD COLUMN page_number INTEGER DEFAULT 1")
+
+            user_cols = [row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()]
+            if user_cols:
+                if "password_hash" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)")
+                if "is_active" not in user_cols:
+                    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1")
+        except Exception as mig_err:
+            logger.warning(f"SQLite auto-migration notice: {mig_err}")
+
+    def _migrate_postgres_columns(sync_conn):
+        try:
+            sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
+            sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE")
+        except Exception as mig_err:
+            logger.warning(f"PostgreSQL auto-migration notice: {mig_err}")
 
     # 1. Synchronize schema, falling back to SQLite if PostgreSQL fails
     try:
         async with engine.begin() as conn:
+            if "postgresql" in engine.url.drivername:
+                from sqlalchemy import text
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             await conn.run_sync(Base.metadata.create_all)
+            if "sqlite" in engine.url.drivername:
+                await conn.run_sync(_migrate_sqlite_columns)
+            elif "postgresql" in engine.url.drivername:
+                await conn.run_sync(_migrate_postgres_columns)
         logger.info(f"Database schema synchronized successfully on {engine.url.drivername}.")
     except Exception as e:
         logger.warning(
@@ -85,87 +138,14 @@ async def init_db() -> None:
         engine, async_session_factory = create_engine_and_factory(settings.FALLBACK_SQLITE_URL)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(_migrate_sqlite_columns)
         logger.info("Database schema synchronized on fallback SQLite engine.")
 
-    # 2. Seed initial data
+    # 2. Seed initial data via modular db/seed package
     try:
+        from app.db.seed import seed_all
         async with async_session_factory() as session:
-            result = await session.execute(select(FAQItem).limit(1))
-            existing_faq = result.scalars().first()
-
-
-            if not existing_faq:
-                faq_path = settings.resolved_seed_faq_path
-                if faq_path.exists():
-                    logger.info(f"Seeding initial FAQ knowledge from {faq_path}...")
-                    with open(faq_path, "r", encoding="utf-8") as f:
-                        faq_records = json.load(f)
-
-                    for item in faq_records:
-                        faq_obj = FAQItem(
-                            doc_id=item.get("doc_id", ""),
-                            category=item.get("category", "General"),
-                            title=item.get("title", ""),
-                            content=item.get("content", ""),
-                            source_url=item.get("source_url", "")
-                        )
-                        session.add(faq_obj)
-
-                    await session.commit()
-                    logger.info(f"Successfully seeded {len(faq_records)} FAQ articles.")
-                else:
-                    logger.warning(f"Seed file not found at {faq_path}. Skipping initial seeding.")
-
-            # Seed initial Tickets if empty
-            ticket_result = await session.execute(select(Ticket).limit(1))
-            existing_ticket = ticket_result.scalars().first()
-            if not existing_ticket:
-                logger.info("Seeding initial support tickets...")
-                sample_tickets = [
-                    Ticket(
-                        ticket_code="#TICK-1042",
-                        customer_name="Nguyễn Văn An",
-                        customer_email="an.nguyen@company.vn",
-                        category="Billing",
-                        priority="High",
-                        subject="Lỗi thanh toán cổng VNPAY đơn hàng #9842",
-                        description="Tôi đã quét mã QR thanh toán thành công lúc 10:15, tài khoản trừ 1.500.000đ nhưng trang giỏ hàng báo Timeout. Mong hỗ trợ kiểm tra gấp.",
-                        status="open",
-                        ai_tags=["Billing", "High", "Invoice & Billing", "Network Timeout"],
-                        ai_draft_reply="Chào anh An, SmartDesk AI đã xác thực mã giao dịch của anh trên cổng VNPAY. Hệ thống đã đối soát thành công và tiến hành kích hoạt đơn hàng #9842 ngay cho anh trong vòng 5 phút tới.",
-                        estimated_response_hours=4
-                    ),
-                    Ticket(
-                        ticket_code="#TICK-1041",
-                        customer_name="Trần Mai Anh",
-                        customer_email="maianh.tran@tech.io",
-                        category="Authentication",
-                        priority="Urgent",
-                        subject="Không thể nhận email OTP đặt lại mật khẩu 2FA",
-                        description="Tôi cần truy cập tài khoản admin để duyệt hợp đồng gấp nhưng bấm gửi lại OTP 5 lần đều không nhận được mail.",
-                        status="in_progress",
-                        ai_tags=["Authentication", "Urgent", "2FA Recovery", "Password Reset"],
-                        ai_draft_reply="Chào chị Mai Anh, bộ phận kỹ thuật đã kiểm tra mail server của domain @tech.io bị chặn filter tạm thời. SmartDesk đã kích hoạt phương thức phục hồi phụ qua SMS xác thực tới số điện thoại đuôi **789.",
-                        estimated_response_hours=2
-                    ),
-                    Ticket(
-                        ticket_code="#TICK-1039",
-                        customer_name="Lê Hoàng Quân",
-                        customer_email="quan.le@startup.co",
-                        category="Feature Request",
-                        priority="Low",
-                        subject="Đề xuất tính năng Export báo cáo CSV tùy biến",
-                        description="Hiện tại hệ thống chỉ cho tải PDF tổng hợp tháng, mong muốn có thêm nút Export CSV theo tuần.",
-                        status="resolved",
-                        ai_tags=["Feature Request", "Low"],
-                        ai_draft_reply="Cảm ơn đóng góp của anh Quân. Tính năng tùy biến Export báo cáo đã được đưa vào Roadmap phiên bản Sprint Q3.",
-                        estimated_response_hours=24
-                    )
-                ]
-                for t in sample_tickets:
-                    session.add(t)
-                await session.commit()
-                logger.info(f"Successfully seeded {len(sample_tickets)} initial support tickets.")
+            await seed_all(session)
     except Exception as e:
-        logger.error(f"Error during database initialization: {e}", exc_info=True)
+        logger.error(f"Error during database initialization/seeding: {e}", exc_info=True)
         # For non-fatal database initialization failure, allow fallback

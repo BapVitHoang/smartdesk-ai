@@ -52,6 +52,7 @@ async def run_smoke_test() -> SmokeTestResponse:
         "You are an AI Customer Support Assistant. Briefly greet the user in one sentence and explain how to reset a password."
     )
 
+    active_model = settings.OLLAMA_LLM_MODEL if (settings.AI_PROVIDER or "").lower() == "ollama" else settings.LLM_MODEL_NAME
     start_time = time.perf_counter()
     try:
         response_text, latency_ms = await llm_service.generate_response(
@@ -59,7 +60,7 @@ async def run_smoke_test() -> SmokeTestResponse:
             temperature=0.2
         )
         return SmokeTestResponse(
-            model=settings.LLM_MODEL_NAME,
+            model=active_model,
             latency_ms=latency_ms,
             status="PASS",
             sample_prompt=sample_prompt,
@@ -69,7 +70,7 @@ async def run_smoke_test() -> SmokeTestResponse:
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
         logger.warning(f"Smoke test live LLM call failed ({elapsed_ms}ms): {e}")
         return SmokeTestResponse(
-            model=settings.LLM_MODEL_NAME,
+            model=active_model,
             latency_ms=elapsed_ms,
             status="PASS (Fallback Emulated)",
             sample_prompt=sample_prompt,

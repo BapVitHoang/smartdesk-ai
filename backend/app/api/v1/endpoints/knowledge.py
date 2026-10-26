@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 import logging
 
-from app.models.knowledge import FAQItem
+from app.models.knowledge import FAQItem, KnowledgeChunk
+from app.models.document import Document
 from app.schemas.knowledge import KnowledgeItemResponse
 from app.services.fallback_service import fallback_service
 from app.db.session import get_db
@@ -62,22 +63,44 @@ async def list_knowledge(
     response_model=KnowledgeItemResponse,
     status_code=status.HTTP_200_OK,
     summary="Get Knowledge Article Detail",
-    description="Fetch a single knowledge base article by its doc_id."
+    description="Fetch a single knowledge base article or document chunk by its doc_id."
 )
 async def get_knowledge_item(
     doc_id: str = Path(..., description="Document identifier"),
     db: AsyncSession = Depends(get_db)
 ) -> KnowledgeItemResponse:
-    """Retrieve a specific knowledge article."""
+    """Retrieve a specific knowledge article or workspace document chunk."""
+    # 1. Check FAQ items table
     result = await db.execute(select(FAQItem).where(FAQItem.doc_id == doc_id))
     item = result.scalars().first()
 
     if item:
         return KnowledgeItemResponse.model_validate(item)
 
+    # 2. Check static seed FAQs
     for f in fallback_service.faq_items:
         if f.get("doc_id") == doc_id:
             return KnowledgeItemResponse(**f)
+
+    # 3. Check KnowledgeChunk table for uploaded workspace chunks (e.g., doc-1-chk-1)
+    chunk_res = await db.execute(
+        select(KnowledgeChunk).where(KnowledgeChunk.chunk_id == doc_id)
+    )
+    chunk = chunk_res.scalars().first()
+    if chunk:
+        doc_res = await db.execute(
+            select(Document).where(Document.id == chunk.document_id)
+        )
+        doc = doc_res.scalars().first()
+        doc_title = doc.filename if doc else f"Tài liệu #{chunk.document_id}"
+        return KnowledgeItemResponse(
+            id=chunk.id,
+            doc_id=chunk.chunk_id,
+            title=f"{doc_title} (Trang {chunk.page_number})",
+            category="Tài liệu Workspace",
+            content=chunk.content,
+            source_url=f"/workspaces/{chunk.workspace_id}/documents/{chunk.document_id}"
+        )
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,

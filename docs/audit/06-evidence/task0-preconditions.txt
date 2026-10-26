@@ -1,0 +1,56 @@
+=== TASK 0 PRECONDITIONS BASELINE EVIDENCE ===
+Date: 2026-10-26
+Branch: verify/final-verification-2
+Base Commit: 4e514db (Merge branch 'fix/c-auth-headers' into Hoang)
+
+1. Branch & Merge Topology:
+- Active branch: verify/final-verification-2
+- Up to date with origin/Hoang
+- Recent merge commits:
+4e514db Merge branch 'fix/c-auth-headers' into Hoang
+6db7ca0 Merge branch 'fix/a-pending-action-ownership' into Hoang
+ac2fc81 merge: origin/TKhanh into integration
+141cb6d merge: origin/feature/c-frontend-docs into integration
+769f347 merge: origin/Nguyen2 into integration
+306dec9 merge: feature/b-platform into integration
+aa9eab9 Merge remote-tracking branch 'origin/Hoang' into feature/b-platform
+62c7e5a Merge remote-tracking branch 'origin/feature/a-ai-engine' into Nguyen2
+c5c84cb Merge remote-tracking branch 'origin/Hoang' into Nguyen2
+
+2. Committer Identity:
+- git config user.name: Bap
+- git config user.email: 23110020@student.hcmute.edu.vn
+- Matches docs/TEAM_ROSTER.md verified row for Ngô Việt Hoàng.
+
+3. Ownership & Governance Consistency:
+- Command: python scripts/check_ownership.py --verify-consistency
+- Output:
+=== Checking Ownership & Governance Consistency ===
+[PASS] All 261 tracked files are mapped to an owner.
+[PASS] Zero overlaps between devA, devB, and devC.
+[PASS] .github/CODEOWNERS exists.
+- Exit code: 0
+
+4. Roster & Anti-Fabrication Gate:
+- Command: python scripts/check_roster.py
+- Result: 12 violations found strictly in slide binaries (docs/SLIDES.pdf and docs/SLIDES.pptx), corresponding to known defect MRG-DEF-01.
+- All code files, documentation, and notes files have 0 violations.
+
+5. Pytest Backend Suite:
+- Command: python -m pytest backend/tests -q
+- Result: 139 passed, 2 skipped in 45.12s
+- Exit code: 0
+
+6. Frontend Lint & Build:
+- Command: npm run lint --prefix frontend
+- Result: 0 TypeScript errors (tsc --noEmit exited 0)
+- Command: npm run build --prefix frontend
+- Result: vite v6.4.3 built in 9.41s, dist generated, exited 0
+
+7. Environment & Docker State:
+- docker ps:
+smartdesk-backend: Up 2 hours (healthy), 127.0.0.1:8000->8000/tcp
+smartdesk-frontend: Up 2 hours, 0.0.0.0:3000->80/tcp
+smartdesk-postgres: Up 2 hours (healthy), 127.0.0.1:5432->5432/tcp
+- Health endpoint (http://127.0.0.1:8000/api/v1/health):
+{"status":"ok","database":"connected","version":"1.0.0"}

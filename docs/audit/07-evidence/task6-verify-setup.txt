@@ -1,0 +1,26 @@
+=== TASK 6: verify_setup.ps1 (exit=1) ===
+=================================================================
+  SmartDesk AI - Environment & Toolchain Verification Gate
+=================================================================
+[1/10] PASS - Git Repository & Active Branch
+       Current branch: integration/merge-all
+[2/10] PASS - Local Environment File (backend/.env)
+       backend/.env exists and is safely untracked
+[3/10] PASS - Python & Backend Dependencies
+       Python 3.13 with FastAPI, SQLAlchemy, Pydantic verified
+[4/10] PASS - Frontend Dependencies (node_modules)
+       node_modules installed
+[5/10] PASS - Backend Pytest Suite (Offline/Zero-Key Mode)
+       All backend tests passed (...........................................................s............ [ 59%] .................................................                        [100%] 120 passed, 1 skipped in 8.59s)
+[6/10] PASS - Frontend TypeScript Strict Check (npm run lint)
+       0 TypeScript errors
+[7/10] PASS - Frontend Production Build (npm run build)
+       Vite build successful
+[8/10] PASS - Docker Compose Configuration
+       docker-compose.yml is valid
+[9/10] PASS - Ownership & Governance Consistency
+       Zero overlaps, all tracked files mapped in OWNERSHIP_MAP & CODEOWNERS
+[10/10] FAIL - Roster & Anti-Fabrication Verification
+       Fabrication violations detected: ============================================================ SmartDesk AI ΓÇö Roster & Anti-Fabrication Gate (check_roster.py) ============================================================ Loaded from docs/TEAM_ROSTER.md:   - Verified Full Names : None (CH╞»A C├ô Dß╗« LIß╗åU)   - Verified MSSVs      : None (CH╞»A C├ô Dß╗« LIß╗åU)   - Allowed Git Emails  : ['23110020@student.hcmute.edu.vn', 'khanhssaa77@gmail.com', 'lenguyensonghinh@gmail.com']   - Allowed Handles     : ['@theorijinnn', '@tkhanh', '@bapvithoang'] ------------------------------------------------------------ [FAIL] Found 16 fabrication violations:   - docs/SLIDES.pdf (extracted text): Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): D ╞░╞í ng B ß║» p V ß╗ï t Ho├áng (2311XXXX_A)ΓÇó   - docs/SLIDES.pdf (extracted text): Unverified MSSV '2311XXXX_B' found (not verified in docs/TEAM_ROSTER.md): Nguy ß╗à n Nh ß║¡ t Huy (2311XXXX_B)ΓÇó   - docs/SLIDES.pdf (extracted text): Unverified MSSV '2311XXXX_C' found (not verified in docs/TEAM_ROSTER.md): Tr ß║º n Qu ß╗æ c Kh├ính (2311XXXX_C)ΓÇó   - docs/SLIDES.pdf (extracted text): Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): D ╞░╞í ng Bß║»pVß╗ït Ho├áng (2311XXXX_A)ΓÇó   - docs/SLIDES.pdf (extracted text): Unverified MSSV '2311XXXX_B' found (not verified in docs/TEAM_ROSTER.md): Nguy ß╗àn Nh ß║¡t Huy (2311XXXX_B)ΓÇó   - docs/SLIDES.pdf (extracted text): Unverified full name 'Nguy ß╗àn Nh ß║¡t Huy' associated with role/MSSV: Nguy ß╗àn Nh ß║¡t Huy (2311XXXX_B)ΓÇó   - docs/SLIDES.pdf (extracted text): Unverified MSSV '2311XXXX_C' found (not verified in docs/TEAM_ROSTER.md): Tr ß║ºn Qu ß╗æc Kh├ính (2311XXXX_C)ΓÇó   - docs/SLIDES.pdf (extracted text): Unverified full name 'Tr ß║ºn Qu ß╗æc Kh├ính' associated with role/MSSV: Tr ß║ºn Qu ß╗æc Kh├ính (2311XXXX_C)ΓÇó   - docs/SLIDES.pptx (extracted text): Disallowed fabricated name found matching 'D╞░╞íng\s+Bß║»p\s+Vß╗ït\s+Ho├áng': ΓÇó D╞░╞íng Bß║»p Vß╗ït Ho├áng   - docs/SLIDES.pptx (extracted text): Disallowed fabricated name found matching 'Bß║»p\s+Vß╗ït\s+Ho├áng': ΓÇó D╞░╞íng Bß║»p Vß╗ït Ho├áng   - docs/SLIDES.pptx (extracted text): Unverified MSSV '2311XXXX_A' found (not verified in docs/TEAM_ROSTER.md): ΓÇó MSSV: 2311XXXX_A   - docs/SLIDES.pptx (extracted text): Disallowed fabricated name found matching 'Nguyß╗àn\s+Nhß║¡t\s+Huy': ΓÇó Nguyß╗àn Nhß║¡t Huy   - docs/SLIDES.pptx (extracted text): Unverified MSSV '2311XXXX_B' found (not verified in docs/TEAM_ROSTER.md): ΓÇó MSSV: 2311XXXX_B   - docs/SLIDES.pptx (extracted text): Disallowed fabricated name found matching 'Trß║ºn\s+Quß╗æc\s+Kh├ính': ΓÇó Trß║ºn Quß╗æc Kh├ính   - docs/SLIDES.pptx (extracted text): Unverified MSSV '2311XXXX_C' found (not verified in docs/TEAM_ROSTER.md): ΓÇó MSSV: 2311XXXX_C   - docs/notes/A-ai-usage.md:51: Unverified full name 'Google Antigravity Coding Assistant' associated with role/MSSV: - **AI Tool Used:** Google Antigravity Coding Assistant [Dev-A]  All facts about people must be verified in docs/TEAM_ROSTER.md. Unknown names/MSSVs must be 'CH╞»A C├ô Dß╗« LIß╗åU'. Fake contribution percentages are forbidden.
+=================================================================
+  RESULT: 9/10 CHECKS PASSED. PLEASE FIX FAILED STEPS ABOVE.

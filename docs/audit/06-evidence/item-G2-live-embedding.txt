@@ -1,0 +1,72 @@
+=== ITEM G2: LIVE GEMINI EMBEDDING & POSTGRESQL PGVECTOR PROOF (MRG-DEF-10) ===
+
+1. Environment & Preconditions:
+   - AI Provider: Google Cloud Gemini (Primary)
+   - Embedding Model: gemini-embedding-001
+   - Configured Embedding Dimension: 768 (output_dimensionality=768)
+   - Target Database: PostgreSQL 16 with pgvector 0.8.6
+   - Target Workspace: Workspace 1 (SmartDesk Enterprise)
+
+2. Step 1 - Document Upload (Live Embedding Generation):
+   - Filename: chinh_sach_supercare_2026.txt (size: 169 bytes)
+   - Text Content: "Chính sách bảo hành đặc biệt SmartDesk SuperCare 2026: Đổi mới thiết bị trong vòng 48 giờ đối với mã lỗi SC-9999 tại trung tâm Quận 1."
+   - Endpoint: POST /api/v1/workspaces/1/documents/upload
+   - HTTP Status: 201 Created
+   - Created Document: ID 7, workspace_id: 1, status: pending, chunk_count: 1
+   - Database Verification:
+     Query: SELECT id, chunk_id, document_id, vector_dims(embedding) FROM knowledge_chunks WHERE document_id = 7;
+     Result:
+       id |  chunk_id   | document_id | vector_dims 
+      ----+-------------+-------------+-------------
+       14 | doc-7-chk-1 |           7 |         768
+     (1 row)
+   - Confirmed: Stored embedding vector dimension is exactly 768 dimensions matching vector(768).
+
+3. Step 2 - Active Multi-Agent Verification & Publishing:
+   - Verification Endpoint: POST /api/v1/documents/7/verify
+   - HTTP Status: 200 OK
+   - Verification Status: passed
+   - Publishing Endpoint: POST /api/v1/documents/7/publish
+   - HTTP Status: 200 OK
+   - Result: {'id': 7, 'status': 'published', 'message': 'Đã xuất bản tài liệu thành công ra Chatbot.'}
+
+4. Step 3 - Grounded RAG Query & Citation Verification:
+   - Endpoint: POST /api/v1/chat
+   - Question: "Thời gian đổi mới thiết bị đối với mã lỗi SC-9999 theo chính sách SmartDesk SuperCare 2026 là bao lâu?"
+   - HTTP Status: 200 OK
+   - is_fallback: False
+   - confidence: 0.9
+   - Top Cited Document:
+     * doc_id: "doc-7-chk-1"
+     * title: "chinh_sach_supercare_2026.txt - Trang 1 (Mục 1)"
+     * source_url: "/documents/7/page/1"
+     * page: 1
+     * snippet: "Chính sách bảo hành đặc biệt SmartDesk SuperCare 2026: Đổi mới thiết bị trong vòng 48 giờ đối với mã lỗi SC-9999 tại trung tâm Quận 1."
+
+5. Step 4 - PostgreSQL Native pgvector SQL Statement Captured:
+   - SQL Statement Captured from PostgreSQL Engine (log_statement = 'all'):
+     ```sql
+     SELECT knowledge_chunks.id, knowledge_chunks.chunk_id, knowledge_chunks.parent_doc_id, 
+            knowledge_chunks.workspace_id, knowledge_chunks.document_id, knowledge_chunks.chunk_index, 
+            knowledge_chunks.page_number, knowledge_chunks.title, knowledge_chunks.content, 
+            knowledge_chunks.source_url, knowledge_chunks.embedding, knowledge_chunks.created_at, 
+            $1::INTEGER - (knowledge_chunks.embedding <=> $2) AS score, documents.status AS doc_status 
+     FROM knowledge_chunks 
+     LEFT OUTER JOIN documents ON knowledge_chunks.document_id = documents.id 
+     WHERE knowledge_chunks.workspace_id = $3::INTEGER 
+       AND (knowledge_chunks.document_id IS NULL OR documents.status = $4::VARCHAR) 
+     ORDER BY knowledge_chunks.embedding <=> $5
+     LIMIT 3;
+     ```
+   - Confirmed: Native pgvector cosine distance operator `<=>` executed in SQL without error or fallback.
+
+6. Step 5 - Database Logging Security Hygiene Reset:
+   - Reset command: ALTER SYSTEM SET log_statement = 'none'; SELECT pg_reload_conf();
+   - Verification: SHOW log_statement;
+   - Output:
+      log_statement 
+     ---------------
+      none
+     (1 row)
+   - Confirmed: Query logging safely restored to 'none' preventing credential leaks.
+

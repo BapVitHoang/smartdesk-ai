@@ -1,0 +1,311 @@
+=== TASK 6: DOCKER BUILD & SMOKE TEST ===
+1. docker compose build exit=0
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [backend internal] load build definition from Dockerfile
+#1 transferring dockerfile: 955B 0.0s done
+#1 DONE 0.0s
+
+#2 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#2 DONE 2.0s
+
+#3 [backend internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [backend 1/6] FROM docker.io/library/python:3.11-slim@sha256:b7a9e5f6a93d6d4a31f129bbd4bdee69efccb6ded0fb230d78aafaf37af98377
+#4 DONE 0.0s
+
+#5 [backend internal] load build context
+#5 transferring context: 1.86MB 0.1s done
+#5 DONE 0.1s
+
+#6 [backend 2/6] WORKDIR /app
+#6 CACHED
+
+#7 [backend 3/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     build-essential     && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [backend 4/6] COPY requirements.txt .
+#8 CACHED
+
+#9 [backend 5/6] RUN pip install --no-cache-dir -r requirements.txt
+#9 CACHED
+
+#10 [backend 6/6] COPY . .
+#10 DONE 0.1s
+
+#11 [backend] exporting to image
+#11 exporting layers 0.0s done
+#11 writing image sha256:845d057d32f3ff68c98a53b9cba228cacfa52ddf34f0adaf981512c56f3da95e done
+#11 naming to docker.io/library/smartdesk-merge-backend done
+#11 DONE 0.1s
+
+#12 [backend] resolving provenance for metadata file
+#12 DONE 0.0s
+
+#13 [frontend internal] load build definition from Dockerfile
+#13 transferring dockerfile: 384B done
+#13 DONE 0.0s
+
+#14 [frontend internal] load metadata for docker.io/library/node:20-alpine
+#14 ...
+
+#15 [frontend internal] load metadata for docker.io/library/nginx:alpine
+#15 DONE 1.4s
+
+#14 [frontend internal] load metadata for docker.io/library/node:20-alpine
+#14 DONE 1.4s
+
+#16 [frontend internal] load .dockerignore
+#16 transferring context: 2B done
+#16 DONE 0.0s
+
+#17 [frontend builder 1/6] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#17 DONE 0.0s
+
+#18 [frontend stage-1 1/3] FROM docker.io/library/nginx:alpine@sha256:a3554c0d0b48177b1413c26e01f695334428020d9df01243fbae3e11cfd17417
+#18 DONE 0.0s
+
+#19 [frontend internal] load build context
+#19 transferring context: 126.40MB 4.9s
+#19 transferring context: 142.62MB 5.4s done
+#19 DONE 5.5s
+
+#20 [frontend builder 2/6] WORKDIR /app
+#20 CACHED
+
+#21 [frontend builder 3/6] COPY package*.json ./
+#21 CACHED
+
+#22 [frontend builder 4/6] RUN npm ci
+#22 CACHED
+
+#23 [frontend builder 5/6] COPY . .
+#23 DONE 2.1s
+
+#24 [frontend builder 6/6] RUN npm run build
+#24 0.641 
+#24 0.641 > smartdesk-ai@1.0.0 build
+#24 0.641 > vite build
+#24 0.641 
+#24 1.320 vite v6.4.3 building for production...
+#24 1.431 transforming...
+#24 4.944 Γ£ô 1699 modules transformed.
+#24 5.230 rendering chunks...
+#24 5.245 computing gzip size...
+#24 5.268 dist/index.html                   1.51 kB Γöé gzip:   0.68 kB
+#24 5.268 dist/assets/index-CImk_5tM.css   55.23 kB Γöé gzip:   9.56 kB
+#24 5.268 dist/assets/index-BDcyrc7z.js   414.79 kB Γöé gzip: 116.55 kB
+#24 5.269 Γ£ô built in 3.89s
+#24 DONE 5.4s
+
+#18 [frontend stage-1 1/3] FROM docker.io/library/nginx:alpine@sha256:a3554c0d0b48177b1413c26e01f695334428020d9df01243fbae3e11cfd17417
+#18 CACHED
+
+#25 [frontend stage-1 2/3] COPY --from=builder /app/dist /usr/share/nginx/html
+#25 DONE 0.0s
+
+#26 [frontend stage-1 3/3] COPY nginx.conf /etc/nginx/conf.d/default.conf
+#26 DONE 0.0s
+
+#27 [frontend] exporting to image
+#27 exporting layers 0.0s done
+#27 writing image sha256:bb13c427e96ded9fdd1cafbf98318df3ac03ebe69a715f4b9d40883350ff8202 done
+#27 naming to docker.io/library/smartdesk-merge-frontend done
+#27 DONE 0.1s
+
+#28 [frontend] resolving provenance for metadata file
+#28 DONE 0.0s
+docker :  backend  Built
+At line:4 char:9
++ $bOut = docker compose build 2>&1 | Out-String
++         ~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( backend  Built:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ frontend  Built
+
+2. smoke_docker.ps1 exit=0
+=================================================================
+  SmartDesk AI - Docker Compose & PostgreSQL Smoke Test
+=================================================================
+
+[1/8] Checking Docker Engine availability...
+Docker Engine is active and ready.
+
+[2/8] Building Docker images (postgres, backend, frontend)...
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [backend internal] load build definition from Dockerfile
+#1 transferring dockerfile: 955B done
+#1 DONE 0.0s
+
+#2 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#2 DONE 0.4s
+
+#3 [backend] resolving provenance for metadata file
+#3 DONE 0.0s
+
+#4 [backend internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [backend 1/6] FROM docker.io/library/python:3.11-slim@sha256:b7a9e5f6a93d6d4a31f129bbd4bdee69efccb6ded0fb230d78aafaf37af98377
+#5 DONE 0.0s
+
+#6 [backend internal] load build context
+#6 transferring context: 11.44kB 0.0s done
+#6 DONE 0.0s
+
+#7 [backend 3/6] RUN apt-get update && apt-get install -y --no-install-recommends     curl     build-essential     && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [backend 4/6] COPY requirements.txt .
+#8 CACHED
+
+#9 [backend 5/6] RUN pip install --no-cache-dir -r requirements.txt
+#9 CACHED
+
+#10 [backend 2/6] WORKDIR /app
+#10 CACHED
+
+#11 [backend 6/6] COPY . .
+#11 CACHED
+
+#12 [backend] exporting to image
+#12 exporting layers done
+#12 writing image sha256:845d057d32f3ff68c98a53b9cba228cacfa52ddf34f0adaf981512c56f3da95e done
+#12 naming to docker.io/library/smartdesk-merge-backend done
+#12 DONE 0.0s
+
+#13 [frontend internal] load build definition from Dockerfile
+#13 transferring dockerfile: 384B done
+#13 DONE 0.0s
+
+#14 [frontend internal] load metadata for docker.io/library/nginx:alpine
+#14 DONE 0.4s
+
+#15 [frontend internal] load metadata for docker.io/library/node:20-alpine
+#15 DONE 0.4s
+
+#16 [frontend internal] load .dockerignore
+#16 transferring context: 2B done
+#16 DONE 0.0s
+
+#17 [frontend builder 1/6] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#17 DONE 0.0s
+
+#18 [frontend stage-1 1/3] FROM docker.io/library/nginx:alpine@sha256:a3554c0d0b48177b1413c26e01f695334428020d9df01243fbae3e11cfd17417
+#18 DONE 0.0s
+
+#19 [frontend internal] load build context
+#19 transferring context: 603.89kB 0.3s done
+#19 DONE 0.4s
+
+#20 [frontend builder 6/6] RUN npm run build
+#20 CACHED
+
+#21 [frontend builder 4/6] RUN npm ci
+#21 CACHED
+
+#22 [frontend builder 5/6] COPY . .
+#22 CACHED
+
+#23 [frontend stage-1 2/3] COPY --from=builder /app/dist /usr/share/nginx/html
+#23 CACHED
+
+#24 [frontend builder 2/6] WORKDIR /app
+#24 CACHED
+
+#25 [frontend builder 3/6] COPY package*.json ./
+#25 CACHED
+
+#26 [frontend stage-1 3/3] COPY nginx.conf /etc/nginx/conf.d/default.conf
+#26 CACHED
+
+#27 [frontend] exporting to image
+#27 exporting layers done
+#27 writing image sha256:bb13c427e96ded9fdd1cafbf98318df3ac03ebe69a715f4b9d40883350ff8202 done
+#27 naming to docker.io/library/smartdesk-merge-frontend done
+#27 DONE 0.0s
+
+#28 [frontend] resolving provenance for metadata file
+#28 DONE 0.0s
+powershell :  backend  Built
+At line:6 char:9
++ $sOut = powershell -ExecutionPolicy Bypass -File scripts/smoke_docker ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( backend  Built:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ frontend  Built
+Build completed successfully.
+
+[3/8] Starting containers in detached mode...
+ Network smartdesk-merge_smartdesk-net  Creating
+ Network smartdesk-merge_smartdesk-net  Created
+ Volume "smartdesk-merge_pgdata"  Creating
+ Volume "smartdesk-merge_pgdata"  Created
+ Container smartdesk-postgres  Creating
+ Container smartdesk-postgres  Created
+ Container smartdesk-backend  Creating
+ Container smartdesk-backend  Created
+ Container smartdesk-frontend  Creating
+ Container smartdesk-frontend  Created
+ Container smartdesk-postgres  Starting
+ Container smartdesk-postgres  Started
+ Container smartdesk-postgres  Waiting
+ Container smartdesk-postgres  Healthy
+ Container smartdesk-backend  Starting
+ Container smartdesk-backend  Started
+ Container smartdesk-frontend  Starting
+ Container smartdesk-frontend  Started
+Containers started. Waiting for service healthchecks...
+
+[4/8] Polling backend health (http://localhost:8000/api/v1/health)...
+Backend is healthy (attempt 1/30): status=ok, db=connected
+
+[5/8] Verifying Nginx frontend and reverse proxy (http://localhost:3000)...
+Frontend SPA (HTTP 200) and reverse proxy /api/v1/ are functional!
+
+[6/8] Testing authentication, wrong password (401), and protected route gates...
+Demo admin login successful: token issued for admin@smartdesk.ai (role=admin)
+Wrong password rejected with HTTP 401 Unauthorized.
+Unauthenticated request to /tickets rejected with HTTP 401 Unauthorized.
+Authenticated ticket listing successful: HTTP 200, X-Total-Count=43
+Pagination verified: page=2 returned 10 tickets (X-Total-Count=43).
+
+[7/8] Verifying pgvector extension in PostgreSQL container...
+pgvector extension verified in PostgreSQL database:
+ extname | extversion 
+---------+------------
+ vector  | 0.8.6
+(1 row)
+
+
+[8/8] Verifying Nginx reverse proxy buffering for SSE token streaming...
+Nginx proxy_buffering off confirmed for real-time SSE streaming.
+
+=================================================================
+  ALL DOCKER & POSTGRESQL SMOKE CHECKS PASSED!
+=================================================================
+
+Tearing down containers retaining database volume (--remove-orphans)...
+ Container smartdesk-frontend  Stopping
+ Container smartdesk-frontend  Stopped
+ Container smartdesk-frontend  Removing
+ Container smartdesk-frontend  Removed
+ Container smartdesk-backend  Stopping
+ Container smartdesk-backend  Stopped
+ Container smartdesk-backend  Removing
+ Container smartdesk-backend  Removed
+ Container smartdesk-postgres  Stopping
+ Container smartdesk-postgres  Stopped
+ Container smartdesk-postgres  Removing
+ Container smartdesk-postgres  Removed
+ Network smartdesk-merge_smartdesk-net  Removing
+ Network smartdesk-merge_smartdesk-net  Removed
+Teardown complete.
+
+3. docker compose down exit=0

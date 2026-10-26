@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class TicketPriorityEnum(str, Enum):
@@ -23,17 +23,32 @@ class TicketStatusEnum(str, Enum):
 
 
 class TicketCategoryEnum(str, Enum):
-    """Standard support ticket categories."""
+    """Canonical support ticket categories (with backward-compatible alias)."""
     AUTHENTICATION = "Authentication"
     BILLING = "Billing"
-    TECHNICAL_BUG = "Technical Bug"
+    BUG_REPORT = "Bug Report"
+    TECHNICAL_BUG = "Technical Bug"  # Accepted alias for Bug Report
     FEATURE_REQUEST = "Feature Request"
     GENERAL = "General"
+
+
+CANONICAL_TICKET_CATEGORIES: List[str] = [
+    "Authentication",
+    "Billing",
+    "Bug Report",
+    "Feature Request",
+    "General",
+]
 
 
 class TicketCreate(BaseModel):
     """Schema for customer ticket submission or escalation."""
 
+    workspace_id: Optional[int] = Field(
+        default=None,
+        description="Associated workspace ID, defaults to Default Workspace",
+        examples=[1]
+    )
     customer_name: str = Field(
         ...,
         min_length=2,
@@ -50,9 +65,17 @@ class TicketCreate(BaseModel):
         ...,
         min_length=2,
         max_length=64,
-        description="Issue category (e.g., Authentication, Billing, Technical Bug)",
+        description="Issue category (Authentication, Billing, Bug Report, Feature Request, General; alias Technical Bug accepted)",
         examples=["Authentication"]
     )
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: str) -> str:
+        """Normalizes input alias 'Technical Bug' to canonical 'Bug Report'."""
+        if isinstance(v, str) and v.strip() == "Technical Bug":
+            return "Bug Report"
+        return v
     priority: TicketPriorityEnum = Field(
         default=TicketPriorityEnum.MEDIUM,
         description="Urgency level: Low, Medium, High, or Urgent",
@@ -92,6 +115,14 @@ class TicketUpdate(BaseModel):
         description="Updated ticket category",
         examples=["Authentication"]
     )
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: Optional[str]) -> Optional[str]:
+        """Normalizes input alias 'Technical Bug' to canonical 'Bug Report'."""
+        if isinstance(v, str) and v.strip() == "Technical Bug":
+            return "Bug Report"
+        return v
     priority: Optional[TicketPriorityEnum] = Field(
         default=None,
         description="Updated priority level",
@@ -105,6 +136,7 @@ class TicketResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int = Field(..., description="Unique integer primary key", examples=[1042])
+    workspace_id: Optional[int] = Field(default=1, description="Associated workspace ID", examples=[1])
     ticket_code: str = Field(..., description="Formatted ticket identifier", examples=["#TICK-1042"])
     customer_name: str = Field(..., description="Customer full name")
     customer_email: str = Field(..., description="Customer email address")
@@ -124,7 +156,7 @@ class TicketResponse(BaseModel):
     )
     estimated_response_hours: int = Field(
         ...,
-        description="SLA estimated response time in hours",
+        description="SLA estimated response time in hours (Urgent=2, High=4, Medium=8, Low=24)",
         examples=[2]
     )
     created_at: datetime = Field(..., description="Timestamp when ticket was created")
@@ -134,6 +166,7 @@ class TicketResponse(BaseModel):
 class TicketFilter(BaseModel):
     """Filter parameters for listing tickets in the Agent Triage Dashboard."""
 
+    workspace_id: Optional[int] = None
     status: Optional[str] = None
     category: Optional[str] = None
     priority: Optional[str] = None

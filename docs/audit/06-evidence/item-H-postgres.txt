@@ -1,0 +1,46 @@
+﻿=== ITEM H: POSTGRESQL & PGVECTOR VERIFICATION ===
+H1 PostgreSQL Extension & Vector Operator (<=>) Check:
+   extname | extversion 
+  ---------+------------
+   vector  | 0.8.6
+  (1 row)
+  
+   column_name |  data_type   | udt_name 
+  -------------+--------------+----------
+   embedding   | USER-DEFINED | vector
+  (1 row)
+  
+
+Native SQL Query with <=> operator:
+  SQL: SELECT id, chunk_id, title, 1 - (embedding <=> (SELECT embedding FROM knowledge_chunks WHERE id = 1)) AS similarity FROM knowledge_chunks WHERE id != 1 ORDER BY embedding <=> (SELECT embedding FROM knowledge_chunks WHERE id = 1) LIMIT 3;
+  Output:
+     id |  chunk_id   |                            title                            |      similarity      
+    ----+-------------+-------------------------------------------------------------+----------------------
+     11 | doc-3-chk-1 | chinh_sach_bao_hanh_smartdesk.txt - Trang 1 (Mß╗Ñc 1)         |  0.04156829905249271
+     12 | doc-4-chk-1 | chinh_sach_bao_hanh_smartdesk_2.txt - Trang 1 (Mß╗Ñc 1)       |  0.04156829905249271
+      7 | doc-2-chk-2 | dien_may_techstore_chinh_sach_doi_tra.txt - Trang 1 (Mß╗Ñc 2) | 0.019691726881760463
+    (3 rows)
+    
+
+H2 Container Pytest Against PostgreSQL (TEST_DATABASE_URL):
+  ============================= test session starts ==============================
+  platform linux -- Python 3.11.17, pytest-9.1.1, pluggy-1.7.0 -- /usr/local/bin/python
+  cachedir: .pytest_cache
+  rootdir: /app
+  plugins: asyncio-1.4.0, anyio-4.15.1
+  asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+  collecting ... collected 4 items
+  
+  tests/platform/test_pgvector_and_db.py::test_pgvector_dual_dialect_column_mapping PASSED [ 25%]
+  tests/platform/test_pgvector_and_db.py::test_redact_pii_before_embedding PASSED [ 50%]
+  tests/platform/test_pgvector_and_db.py::test_search_similar_chunks_sqlite_fallback PASSED [ 75%]
+  tests/platform/test_pgvector_and_db.py::test_search_similar_chunks_postgresql_pgvector PASSED [100%]
+  
+  ============================== 4 passed in 0.58s ===============================
+
+SHOW log_statement check:
+   log_statement 
+  ---------------
+   none
+  (1 row)
+  

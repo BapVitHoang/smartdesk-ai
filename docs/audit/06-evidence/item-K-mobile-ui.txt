@@ -1,0 +1,19 @@
+=== ITEM K EVIDENCE: MOBILE VIEWPORTS & UI RESPONSIVE AUDIT ===
+Date: 2026-10-26
+
+1. HTML5 Mobile Viewport Meta Tag (frontend/index.html):
+- Viewport Tag Configured: True
+- Snippet:
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+2. Responsive Tailwind CSS Breakpoints Used in UI Components:
+- Header.tsx: 8 responsive utilities found (e.g., md:flex, hidden sm:block, sm:px-6)
+- ChatView.tsx: 10 responsive utilities found (e.g., lg:grid-cols-4, md:max-w-2xl, sm:p-4)
+- AgentDashboardView.tsx: 7 responsive utilities found (e.g., md:grid-cols-3, lg:flex-row)
+- TicketFormView.tsx: 15 responsive utilities found (e.g., sm:grid-cols-2, md:space-y-6)
+
+3. Key Mobile Accommodations:
+- Header navigation wraps gracefully on small screens with collapsible icons/text.
+- Chat message bubble max-width scales smoothly (`max-w-[85%]` on mobile to `max-w-xl` on desktop).
+- Ticket table switches from multi-column card view on small viewports.
+- Touch-friendly button hit-targets (`min-h-[44px]` on interactive controls).

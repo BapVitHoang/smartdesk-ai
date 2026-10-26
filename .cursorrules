@@ -3,32 +3,46 @@
 You are an expert fullstack AI engineer working on SmartDesk AI. Strictly adhere to these rules:
 
 ## 1. Project Architecture
-- Frontend is **React 19 + Vite 6 + Tailwind CSS v4 + TypeScript + Lucide Icons + Motion**. DO NOT use Next.js or server-side routing components.
-- Backend is **FastAPI (Python 3.11+) ASGI**, async throughout (`async def`, `httpx.AsyncClient`, SQLAlchemy async session).
-- Primary Database: PostgreSQL 16 with `pgvector` (local fallback: SQLite `aiosqlite`).
+- Frontend is **React 19 + Vite 6 + Tailwind CSS v4 + TypeScript + Lucide Icons + Motion** under `frontend/src/`. DO NOT use Next.js or server-side routing components.
+- Backend is **FastAPI (Python 3.11+) ASGI** under `backend/app/`, async throughout (`async def`, `httpx.AsyncClient`, SQLAlchemy async session).
+- Primary Database: PostgreSQL 16 with `pgvector` (local fallback: SQLite `aiosqlite` with in-Python cosine similarity).
+- AI Engine: Dual-provider (`AI_PROVIDER=gemini` with `gemini-3.5-flash-lite` -> `gemini-2.5-flash-lite` + `gemini-embedding-001`, or `AI_PROVIDER=ollama` with `qwen2.5:3b` + `nomic-embed-text`) and deterministic BM25 fallback (`backend/data/seed_faq.json`).
 
 ## 2. Mandatory Document References
-- API contract and endpoints: Read `API_CONTRACT.md`.
-- UI/UX tokens, colors, typography: Read `DESIGN.md`.
-- Quality and test scenarios: Read `TEST_ACCEPTANCE.md`.
-- Core guidelines: Read `AGENTS.md`.
+- Architecture & Ownership: Read `docs/ARCHITECTURE.md` and `AGENTS.md`.
+- API contract and endpoints: Read `docs/API_CONTRACT.md`.
+- UI/UX tokens, colors, typography: Read `docs/DESIGN.md`.
+- Quality and test scenarios: Read `docs/TEST_ACCEPTANCE.md`.
 
-## 3. Frontend Rules (`src/`)
-- NEVER call `fetch()` or `axios` directly in UI components. ALL network calls must pass through `src/services/api.ts`.
+## 3. Frontend Rules (`frontend/src/`)
+- NEVER call `fetch()` or `axios` directly in UI components. ALL network calls must pass through `frontend/src/services/api.ts`.
 - Maintain dual-mode fallback: If the backend is offline, gracefully use local mock data (`INITIAL_TICKETS`, `getRagResponse`) and show a warning toast. Never crash the app.
 - Status Mapping:
   - Backend: `"open"` | `"in_progress"` | `"resolved"`
   - Frontend: `"Open"` | `"Pending"` | `"Resolved"`
-  - Use `mapBackendStatusToFrontend()` and `mapFrontendStatusToBackend()` in `src/services/api.ts`.
+  - Use `mapBackendStatusToFrontend()` and `mapFrontendStatusToBackend()` in `frontend/src/services/api.ts`.
+- Canonical Categories: `"Authentication"` | `"Billing"` | `"Bug Report"` | `"Feature Request"` | `"General"` (`"Technical Bug"` is accepted as an alias for `"Bug Report"`).
+- Canonical SLA Hours: `Urgent` = 2h, `High` = 4h, `Medium` = 8h, `Low` = 24h.
 - UI Language: Vietnamese for all labels, buttons, toasts, and placeholders. English for code and comments.
 
 ## 4. Backend Rules (`backend/app/`)
 - All I/O operations MUST use `async`/`await`.
 - External calls to Gemini API have a strict timeout of 4.0s (`asyncio.wait_for`).
-- Circuit Breaker: If Gemini times out, returns HTTP 429/500, or fails, gracefully catch the error and invoke `FallbackService` (BM25 keyword search on `seed_faq.json`) with `"is_fallback": true`.
+- Circuit Breaker: If Gemini times out, returns HTTP 429/500, or fails, gracefully catch the error, trigger 60s Cost-Guard cooldown on 429, and invoke `FallbackService` (BM25 keyword search on `seed_faq.json`) with `"is_fallback": true`.
 - Prompt Injection Defense: Incoming user prompts must be sanitized and checked via `core/security.py`. Reject injections with HTTP 400 (`PROMPT_SECURITY_VIOLATION`).
 - Ticket IDs must follow format `#TICK-XXXX`. Priority must be one of: `Low`, `Medium`, `High`, `Urgent`.
 
-## 5. Security & Verification
-- Do NOT hardcode or commit API keys.
-- Run tests with `pytest backend/tests/ -v` and `npm run lint` before completing tasks.
+## 5. Module Ownership, Security & Verification
+- Strict Workstreams (Team of 3 Members):
+  - Dev A (AI Engine & Evaluation)
+  - Dev B (Platform, Data & Security + Integrator Hat: Hoang)
+  - Dev C (Frontend UX, QA & Capstone Docs)
+  - *Note: Hoang is Dev B and simultaneously wears the Integrator hat for frozen governance files.*
+- Do NOT edit files outside your assigned module (`docs/ARCHITECTURE.md` and `docs/plan/WORKSTREAMS.md`).
+- Run `python scripts/check_ownership.py --staged` before every commit.
+- Do NOT hardcode or commit API keys, `.env`, or `*.db` files.
+- Use Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
+- Run `powershell -ExecutionPolicy Bypass -File scripts/verify_setup.ps1` before starting work.
+
+## 6. Strict Anti-Fabrication Rule (No Hallucination of Project Facts)
+- Never invent names, student IDs, emails, percentages, dates, commit hashes, test counts or metrics. Facts about people come only from `docs/TEAM_ROSTER.md`. If a value is unknown write `CHƯA CÓ DỮ LIỆU` and raise it in `docs/requests/<dev>.md`. Report only numbers you obtained from a command in this session.

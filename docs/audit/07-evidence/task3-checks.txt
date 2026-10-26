@@ -1,0 +1,87 @@
+=== TASK 3 CHECKS (after merge: origin/Nguyen2 into integration [769f347]) ===
+1. pytest exit=0
+.......................................................s................ [ 61%]
+.............................................                            [100%]
+116 passed, 1 skipped in 11.64s
+
+2. run_eval --mode deterministic exit=0
+python : No valid GEMINI_API_KEY detected. LLM calls will trigger FallbackService.
+At line:6 char:9
++ $out2 = python backend/scripts/run_eval.py --mode deterministic 2>&1  ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (No valid GEMINI...allbackService.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+[Cost-Guard] Free Tier cooldown active. Fast-pathing to FallbackService.
+=== SmartDesk AI Evaluation Benchmark (24 Cases | Mode: DETERMINISTIC) ===
+[01/24] EVAL-01 (normal        | WS1): Baseline=PASS -> Upgraded=PASS (13.1ms)
+[02/24] EVAL-02 (normal        | WS1): Baseline=PASS -> Upgraded=PASS (8.6ms)
+[03/24] EVAL-03 (normal        | WS1): Baseline=PASS -> Upgraded=PASS (8.0ms)
+[04/24] EVAL-04 (normal        | WS1): Baseline=PASS -> Upgraded=PASS (8.3ms)
+[05/24] EVAL-05 (normal        | WS1): Baseline=PASS -> Upgraded=PASS (8.8ms)
+[06/24] EVAL-06 (normal        | WS2): Baseline=FAIL -> Upgraded=PASS (10.8ms)
+[07/24] EVAL-07 (normal        | WS2): Baseline=FAIL -> Upgraded=PASS (9.8ms)
+[08/24] EVAL-08 (normal        | WS3): Baseline=FAIL -> Upgraded=PASS (10.8ms)
+[09/24] EVAL-09 (normal        | WS1): Baseline=FAIL -> Upgraded=PASS (6.7ms)
+[10/24] EVAL-10 (normal        | WS1): Baseline=FAIL -> Upgraded=PASS (5.0ms)
+[11/24] EVAL-11 (edge          | WS1): Baseline=PASS -> Upgraded=PASS (8.5ms)
+[12/24] EVAL-12 (edge          | WS1): Baseline=FAIL -> Upgraded=PASS (8.5ms)
+[13/24] EVAL-13 (edge          | WS1): Baseline=FAIL -> Upgraded=PASS (4.5ms)
+[14/24] EVAL-14 (edge          | WS2): Baseline=FAIL -> Upgraded=PASS (9.8ms)
+[15/24] EVAL-15 (edge          | WS3): Baseline=FAIL -> Upgraded=PASS (11.0ms)
+[16/24] EVAL-16 (edge          | WS1): Baseline=FAIL -> Upgraded=PASS (5.7ms)
+[17/24] EVAL-17 (should_refuse | WS1): Baseline=PASS -> Upgraded=PASS (0.0ms)
+[18/24] EVAL-18 (should_refuse | WS1): Baseline=FAIL -> Upgraded=PASS (0.0ms)
+[19/24] EVAL-19 (should_refuse | WS2): Baseline=FAIL -> Upgraded=PASS (0.0ms)
+[20/24] EVAL-20 (should_refuse | WS1): Baseline=PASS -> Upgraded=PASS (0.0ms)
+[21/24] EVAL-21 (should_refuse | WS2): Baseline=FAIL -> Upgraded=PASS (11.0ms)
+[22/24] EVAL-22 (should_refuse | WS1): Baseline=FAIL -> Upgraded=PASS (8.2ms)
+[23/24] EVAL-23 (should_refuse | WS2): Baseline=FAIL -> Upgraded=PASS (9.1ms)
+[24/24] EVAL-24 (should_refuse | WS3): Baseline=FAIL -> Upgraded=PASS (10.4ms)
+
+=== Evaluation Summary ===
+Baseline Pass Rate : 8/24 (33.3%) | Avg Latency: 0.15 ms
+Upgraded Pass Rate : 24/24 (100.0%) | Avg Latency: 7.37 ms
+Net Improvement    : +66.7% (+16 cases fixed)
+
+[OK] Wrote per-run evaluation JSON to: D:\SPKT_2023\year_4\newtech\smartdesk-merge\backend\data\eval_runs\eval_run_deterministic_20261025_232835.json
+
+[EXCELLENT] All 24 Upgraded cases passed in deterministic mode (0 failures).
+[INFO] Skipping Markdown report update. Use '--write-report' to persist results to A-eval-report.md.
+
+3. check_roster exit=1
+============================================================
+SmartDesk AI ΓÇö Roster & Anti-Fabrication Gate (check_roster.py)
+============================================================
+Loaded from docs/TEAM_ROSTER.md:
+  - Verified Full Names : None (CH╞»A C├ô Dß╗« LIß╗åU)
+  - Verified MSSVs      : None (CH╞»A C├ô Dß╗« LIß╗åU)
+  - Allowed Git Emails  : ['lenguyensonghinh@gmail.com', 'khanhssaa77@gmail.com', '23110020@student.hcmute.edu.vn']
+  - Allowed Handles     : ['@bapvithoang', '@tkhanh', '@theorijinnn']
+------------------------------------------------------------
+[FAIL] Found 1 fabrication violations:
+  - docs/notes/A-ai-usage.md:51: Unverified full name 'Google Antigravity Coding Assistant' associated with role/MSSV: - **AI Tool Used:** Google Antigravity Coding Assistant [Dev-A]
+
+All facts about people must be verified in docs/TEAM_ROSTER.md.
+Unknown names/MSSVs must be 'CH╞»A C├ô Dß╗« LIß╗åU'. Fake contribution percentages are forbidden.
+
+4. check_ownership --verify-consistency exit=0
+=== Checking Ownership & Governance Consistency ===
+[PASS] All 212 tracked files are mapped to an owner.
+[PASS] Zero overlaps between devA, devB, and devC.
+[PASS] .github/CODEOWNERS exists.
