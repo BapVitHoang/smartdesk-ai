@@ -39,6 +39,7 @@ async def get_current_user(
     - Returns HTTP 401 Unauthorized if the token is missing, invalid, expired, or the account is unknown/inactive.
     There is no unauthenticated, bypass, or legacy-token fallback.
     """
+
     if not credentials or not credentials.credentials:
         raise _unauthorized("Yêu cầu xác thực. Vui lòng cung cấp Bearer token hợp lệ.")
 
@@ -70,12 +71,16 @@ async def get_current_user(
 
 def require_role(required_role: str) -> Callable:
     """Enforces that the current authenticated user has the specified role (e.g. 'admin')."""
+
     async def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role != required_role and current_user.role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Quyền truy cập bị từ chối. Yêu cầu vai trò: '{required_role}'."
+                detail=f"Quyền truy cập bị từ chối. Yêu cầu vai trò: '{required_role}'.",
             )
         return current_user
 
     return role_checker
+
+
+require_admin = require_role("admin")

@@ -6,15 +6,20 @@ export interface User {
   full_name: string;
   role: UserRole;
   is_active: boolean;
-  picture_url?: string;
+  workspace_id?: number;
+  avatar_url?: string;
+  picture_url?: string; // Backwards compatible alias
   created_at?: string;
 }
 
 export interface AuthTokenResponse {
   access_token: string;
   token_type: string;
-  expires_in?: number;
   user: User;
+  role?: UserRole;
+  email?: string;
+  full_name?: string;
+  expires_in?: number;
 }
 
 export interface LoginCredentials {
@@ -25,7 +30,7 @@ export interface LoginCredentials {
 
 export interface OAuth2LoginRequest {
   provider: 'google' | 'demo';
-  token?: string;
+  credential?: string;
   email?: string;
 }
 
@@ -43,4 +48,6 @@ export interface UserProfileResponse {
   role: UserRole;
   workspace_id?: number;
   oauth_provider?: string;
+  avatar_url?: string;
+  is_active?: boolean;
 }
