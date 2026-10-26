@@ -1097,6 +1097,40 @@ Table auditing all cross-document claims across `README.md`, `docs/PROPOSAL.md`,
   - Title: `docs(final): formal capstone deliverables (report, slides, live-change playbook)`
   - Description: *"Prepared by Hoàng with an AI agent; TKhanhJK and TheOrijinnn review the report and slides before merge."*
 
+---
+
+## Phase 3: Review Loop Findings & Polish Resolutions
+
+Four specialized review subagents were launched in parallel to audit the deliverables against all graduation criteria:
+
+1. **Ownership Hunter Subagent (`85c3db1a-2f18-4186-b12c-fe8eaaa02c1c`):**
+   - Result: **0 Blockers, 0 Highs**, 1 Medium (Dev C file takeover acknowledged in PR description), 2 Lows.
+   - Status: **PASS**.
+2. **Security Reviewer Subagent (`75f54880-54f0-4025-ac98-cbd70017c95c`):**
+   - Result: **0 Blockers, 0 Highs**, 0 Mediums, 0 Lows.
+   - Clean security audit: No API keys, passwords, or secrets committed; PII redaction and prompt injection defenses intact.
+   - Status: **PASS**.
+3. **Skeptical Verifier Subagent (`0c682b1e-322e-4898-961a-bdb8c9c4a469`):**
+   - Result: **0 Blockers, 0 Highs**, 0 Mediums, 1 Low (commit count snapshot in report updated to latest HEAD).
+   - Status: **PASS**.
+4. **Requirements Auditor Subagent (`1f860e16-b434-4bd6-bbbc-3380fc6f1f4c`):**
+   - Result: **0 Blockers, 0 Highs**, 0 Mediums, 3 Lows (addressed in polish commits below).
+   - Status: **PASS**.
+
+### Polish Actions Executed:
+- **`1837da7` (`docs(capstone): polish individual defense prep, proposal criteria, and git statistics`):**
+  - Added Phần 4: Ngân Hàng Câu Hỏi & Kịch Bản Bảo Vệ Cá Nhân 12 Phút in `docs/PRESENTATION_AND_DEMO.md` covering targeted questions for Dev A (AI/RAG/Verification), Dev B (Platform/pgvector/JWT/SLA), and Dev C (SPA/SSE/Graceful Fallback).
+  - Updated `docs/PROPOSAL.md` lines 40–41 acceptance criteria for US-11 and US-12 from "Planned in PLAN.md..." to match actual implementations.
+  - Updated `docs/REPORT.md` Section 1.4 Git commit count for Dev B to 114 commits on current branch, 124 on repository.
+- **`c5a6aa5` (`chore(tools): pass scratch rootdir flag to pytest in verify_live_changes`):**
+  - Updated `docs/tools/verify_live_changes.py` to pass `--rootdir={scratch_backend}` to pytest. All 3 scenarios re-verified with 0 warnings.
+- **`ed631b3` (`docs(deliverables): regenerate REPORT.pdf with updated commit count and 11-page layout`):**
+  - Re-executed `build_report_pdf.py`: Output exactly 11 pages (strictly within 10–20 page requirement).
+- **Roster & Anti-Fabrication Final Verification:**
+  - `python scripts/check_roster.py`: 0 violations across repository (`MRG-DEF-01` 100% resolved).
+- **Traceability Final Verification:**
+  - `python docs/tools/verify_rtm.py`: 100% (42/42) requirements verified against real files and tests on disk.
+
 
 
 
