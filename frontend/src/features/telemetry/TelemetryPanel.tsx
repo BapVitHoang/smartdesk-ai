@@ -190,6 +190,9 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({ onToast }) => {
             ${stats?.total_cost_usd !== undefined ? stats.total_cost_usd.toFixed(4) : '0.0000'}
           </div>
           <div className="text-[11px] text-slate-500">
+            Trung bình <strong>${(stats?.avg_cost_usd ?? (stats?.total_requests ? (stats.total_cost_usd ?? 0) / stats.total_requests : 0)).toFixed(6)}</strong>/yêu cầu
+          </div>
+          <div className="text-[11px] text-slate-500">
             Tổng <strong>{(stats?.total_tokens ?? 0).toLocaleString()}</strong> tokens
             {stats?.total_input_tokens ? ` (${stats.total_input_tokens.toLocaleString()} in / ${stats.total_output_tokens?.toLocaleString()} out)` : ''}
           </div>

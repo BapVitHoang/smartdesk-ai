@@ -24,6 +24,7 @@ export interface AIUsageStats {
   total_input_tokens?: number;
   total_output_tokens?: number;
   total_cost_usd: number;
+  avg_cost_usd?: number;
   avg_latency_ms: number;
   success_count?: number;
   fallback_count: number;
